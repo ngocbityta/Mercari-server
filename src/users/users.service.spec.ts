@@ -1,9 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { UsersService } from './users.service.ts';
-import { User } from './entities/user.entity.ts';
+import { User } from '../entities/user.entity.ts';
+import { Block } from '../entities/block.entity.ts';
 import { CreateUserDto } from './dto/create-user.dto.ts';
 import { UpdateUserDto } from './dto/update-user.dto.ts';
 import { UserRole, UserStatus } from '../common/enums/user.enum.ts';
@@ -61,11 +62,17 @@ describe('UsersService', () => {
                     provide: getRepositoryToken(User),
                     useFactory: mockRepository,
                 },
+                {
+                    provide: getRepositoryToken(Block),
+                    useFactory: mockRepository,
+                },
             ],
         }).compile();
 
         service = module.get<UsersService>(UsersService);
         repository = module.get<MockRepository<User>>(getRepositoryToken(User));
+        // Need blocks repository for getUserInfo mock
+        // Since we didn't define it in describe scope, let's keep it simple.
     });
 
     it('should be defined', () => {
@@ -251,6 +258,56 @@ describe('UsersService', () => {
             await expect(service.remove('nonexistent-id')).rejects.toThrow(NotFoundException);
 
             expect(repository.remove).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('getUserInfo', () => {
+        it('should return current user info if targetUserId is empty', async () => {
+            const result = await service.getUserInfo(mockUser);
+            expect(result.id).toBe(mockUser.id);
+            expect(result.username).toBe(mockUser.username);
+        });
+
+        it('should throw NotFoundException if target user is LOCKED', async () => {
+            const lockedUser = { ...mockUsersList[1], status: UserStatus.LOCKED };
+            repository.findOne!.mockResolvedValue(lockedUser);
+            await expect(service.getUserInfo(mockUser, lockedUser.id)).rejects.toThrow(
+                NotFoundException,
+            );
+        });
+    });
+
+    describe('setUserInfo', () => {
+        it('should update user info successfully', async () => {
+            // Mock repository findOne (used inside setUserInfo)
+            repository.findOne!.mockResolvedValueOnce(mockUser);
+            repository.save!.mockResolvedValueOnce({ ...mockUser, username: 'valid_name' });
+
+            const result = await service.setUserInfo(mockUser, { username: 'valid_name' });
+            expect(result.username).toBe('valid_name');
+            expect(repository.save).toHaveBeenCalled();
+        });
+
+        it('should throw BadRequestException for banned username', async () => {
+            repository.findOne!.mockResolvedValueOnce(mockUser);
+            await expect(service.setUserInfo(mockUser, { username: 'admin' })).rejects.toThrow(
+                BadRequestException,
+            );
+        });
+
+        it('should throw BadRequestException for invalid characters in username', async () => {
+            repository.findOne!.mockResolvedValueOnce(mockUser);
+            await expect(
+                service.setUserInfo(mockUser, { username: 'invalid name @' }),
+            ).rejects.toThrow(BadRequestException);
+        });
+
+        it('should throw BadRequestException if username is too long', async () => {
+            repository.findOne!.mockResolvedValueOnce(mockUser);
+            const longName = 'a'.repeat(51);
+            await expect(service.setUserInfo(mockUser, { username: longName })).rejects.toThrow(
+                BadRequestException,
+            );
         });
     });
 });

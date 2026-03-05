@@ -3,7 +3,7 @@ import { UsersController } from './users.controller.ts';
 import { UsersService } from './users.service.ts';
 import { CreateUserDto } from './dto/create-user.dto.ts';
 import { UpdateUserDto } from './dto/update-user.dto.ts';
-import { User } from './entities/user.entity.ts';
+import { User } from '../entities/user.entity.ts';
 import { UserRole, UserStatus } from '../common/enums/user.enum.ts';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 
