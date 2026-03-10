@@ -21,5 +21,5 @@ export class SetReadNotificationDto {
 
     @IsString()
     @IsNotEmpty()
-    notification_id: string;
+    notificationId: string;
 }

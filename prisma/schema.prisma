@@ -1,0 +1,142 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  HV
+  GV
+}
+
+enum UserStatus {
+  ACTIVE
+  LOCKED
+}
+
+model User {
+  id           String    @id @default(uuid()) @db.Uuid
+  phonenumber  String    @unique @db.VarChar
+  password     String    @db.VarChar
+  username     String?   @db.VarChar
+  avatar       String?   @db.VarChar
+  coverImage   String?   @map("cover_image") @db.VarChar
+  description  String?   @db.Text
+  role         UserRole
+  token        String?   @db.VarChar
+  status       UserStatus @default(ACTIVE)
+  online       Boolean    @default(false)
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz
+
+  blocks           Block[]        @relation("blocker")
+  blockedBy        Block[]        @relation("blocked")
+  conversationsA   Conversation[] @relation("partnerA")
+  conversationsB   Conversation[] @relation("partnerB")
+  sentMessages     Message[]      @relation("sender")
+  receivedMessages Message[]      @relation("receiver")
+  devices          Device[]
+  notifications    Notification[]
+  pushSetting      PushSetting?
+
+  @@map("users")
+}
+
+model Block {
+  blockerId String @map("blocker_id") @db.Uuid
+  blockedId String @map("blocked_id") @db.Uuid
+
+  blocker User @relation("blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@id([blockerId, blockedId])
+  @@map("blocks")
+}
+
+model Conversation {
+  id         String   @id @default(uuid()) @db.Uuid
+  partnerAId String   @map("partner_a_id") @db.Uuid
+  partnerBId String   @map("partner_b_id") @db.Uuid
+  isDeleted  Boolean  @default(false) @map("is_deleted")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  partnerA User @relation("partnerA", fields: [partnerAId], references: [id], onDelete: Cascade)
+  partnerB User @relation("partnerB", fields: [partnerBId], references: [id], onDelete: Cascade)
+
+  messages Message[]
+
+  @@unique([partnerAId, partnerBId])
+  @@map("conversations")
+}
+
+model Message {
+  id             String   @id @default(uuid()) @db.Uuid
+  conversationId String   @map("conversation_id") @db.Uuid
+  senderId       String   @map("sender_id") @db.Uuid
+  receiverId     String   @map("receiver_id") @db.Uuid
+  content        String?  @db.Text
+  isRead         Boolean  @default(false) @map("is_read")
+  isDeleted      Boolean  @default(false) @map("is_deleted")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation("sender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver     User         @relation("receiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+model Device {
+  id       String @id @default(uuid()) @db.Uuid
+  userId   String @map("user_id") @db.Uuid
+  devtype  Int    @default(0)
+  devToken String @map("dev_token") @db.VarChar
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, devToken])
+  @@map("devices")
+}
+
+model Notification {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  type      String?  @db.VarChar
+  objectId  String?  @map("object_id") @db.Uuid
+  title     String?  @db.VarChar
+  avatar    String?  @db.VarChar
+  groupType Int      @default(0) @map("group_type")
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model PushSetting {
+  userId          String   @id @map("user_id") @db.Uuid
+  likeComment     Int      @default(1) @map("like_comment")
+  fromFriends     Int      @default(1) @map("from_friends")
+  requestedFriend Int      @default(1) @map("requested_friend")
+  suggestedFriend Int      @default(1) @map("suggested_friend")
+  birthday        Int      @default(1)
+  video           Int      @default(1)
+  report          Int      @default(1)
+  soundOn         Int      @default(1) @map("sound_on")
+  notificationOn  Int      @default(1) @map("notification_on")
+  vibrantOn       Int      @default(1) @map("vibrant_on")
+  ledOn           Int      @default(1) @map("led_on")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("push_settings")
+}

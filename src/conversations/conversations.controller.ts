@@ -7,12 +7,12 @@ import {
     DeleteMessageDto,
     DeleteConversationDto,
     SetSendMessageDto,
-} from './dto/conversation.dto.ts';
+} from './conversations.dto.ts';
 import { TokenGuard } from '../common/guards/token.guard.ts';
 import { CurrentUser } from '../common/decorators/current-user.decorator.ts';
-import { User } from '../entities/user.entity.ts';
+import type { User } from '@prisma/client';
 import { ApiResponse } from '../common/dto/api-response.dto.ts';
-import { ResponseCode } from '../common/enums/response-code.enum.ts';
+import { ResponseCode } from '../enums/response-code.enum.ts';
 
 @Controller()
 export class ConversationsController {
@@ -55,7 +55,7 @@ export class ConversationsController {
                 );
             }
 
-            if (!dto.partner_id && !dto.conversation_id) {
+            if (!dto.partnerId && !dto.conversationId) {
                 return ApiResponse.error(
                     ResponseCode.INVALID_PARAMETER_VALUE,
                     'Either partner_id or conversation_id is required',
@@ -66,8 +66,8 @@ export class ConversationsController {
                 user,
                 index,
                 count,
-                dto.partner_id,
-                dto.conversation_id,
+                dto.partnerId,
+                dto.conversationId,
             );
             return ApiResponse.success(result);
         } catch (error) {
@@ -83,7 +83,7 @@ export class ConversationsController {
     @UseGuards(TokenGuard)
     async setReadMessage(@Body() dto: SetReadMessageDto, @CurrentUser() user: User) {
         try {
-            if (!dto.partner_id && !dto.conversation_id) {
+            if (!dto.partnerId && !dto.conversationId) {
                 return ApiResponse.error(
                     ResponseCode.INVALID_PARAMETER_VALUE,
                     'Either partner_id or conversation_id is required',
@@ -92,8 +92,8 @@ export class ConversationsController {
 
             const result = await this.conversationsService.setReadMessage(
                 user,
-                dto.partner_id,
-                dto.conversation_id,
+                dto.partnerId,
+                dto.conversationId,
             );
             return ApiResponse.success(result);
         } catch (error) {
@@ -109,7 +109,7 @@ export class ConversationsController {
     @UseGuards(TokenGuard)
     async setSendMessage(@Body() dto: SetSendMessageDto, @CurrentUser() user: User) {
         try {
-            if (!dto.partner_id && !dto.conversation_id) {
+            if (!dto.partnerId && !dto.conversationId) {
                 return ApiResponse.error(
                     ResponseCode.INVALID_PARAMETER_VALUE,
                     'Either partner_id or conversation_id is required',
@@ -119,8 +119,8 @@ export class ConversationsController {
             const result = await this.conversationsService.setSendMessage(
                 user,
                 dto.message,
-                dto.partner_id,
-                dto.conversation_id,
+                dto.partnerId,
+                dto.conversationId,
             );
             return ApiResponse.success(result);
         } catch (error) {
@@ -143,7 +143,7 @@ export class ConversationsController {
     @UseGuards(TokenGuard)
     async deleteMessage(@Body() dto: DeleteMessageDto, @CurrentUser() user: User) {
         try {
-            const result = await this.conversationsService.deleteMessage(user, dto.message_id);
+            const result = await this.conversationsService.deleteMessage(user, dto.messageId);
             return ApiResponse.success(result);
         } catch (error) {
             if (error instanceof Error && error.message === 'Message not found') {
@@ -158,7 +158,7 @@ export class ConversationsController {
     @UseGuards(TokenGuard)
     async deleteConversation(@Body() dto: DeleteConversationDto, @CurrentUser() user: User) {
         try {
-            if (!dto.partner_id && !dto.conversation_id) {
+            if (!dto.partnerId && !dto.conversationId) {
                 return ApiResponse.error(
                     ResponseCode.INVALID_PARAMETER_VALUE,
                     'Either partner_id or conversation_id is required',
@@ -167,8 +167,8 @@ export class ConversationsController {
 
             const result = await this.conversationsService.deleteConversation(
                 user,
-                dto.partner_id,
-                dto.conversation_id,
+                dto.partnerId,
+                dto.conversationId,
             );
             return ApiResponse.success(result);
         } catch (error) {

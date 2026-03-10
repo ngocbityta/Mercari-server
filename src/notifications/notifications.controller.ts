@@ -1,11 +1,11 @@
 import { Controller, Post, Body, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import { NotificationsService } from './notifications.service.ts';
-import { GetNotificationDto, SetReadNotificationDto } from './dto/notification.dto.ts';
+import { GetNotificationDto, SetReadNotificationDto } from './notifications.dto.ts';
 import { TokenGuard } from '../common/guards/token.guard.ts';
 import { CurrentUser } from '../common/decorators/current-user.decorator.ts';
-import { User } from '../entities/user.entity.ts';
+import type { User } from '@prisma/client';
 import { ApiResponse } from '../common/dto/api-response.dto.ts';
-import { ResponseCode } from '../common/enums/response-code.enum.ts';
+import { ResponseCode } from '../enums/response-code.enum.ts';
 
 @Controller()
 export class NotificationsController {
@@ -40,7 +40,7 @@ export class NotificationsController {
         try {
             const result = await this.notificationsService.setReadNotification(
                 user,
-                dto.notification_id,
+                dto.notificationId,
             );
             return ApiResponse.success(result);
         } catch {

@@ -12,20 +12,20 @@ import {
     UseGuards,
 } from '@nestjs/common';
 import { UsersService } from './users.service.ts';
-import { CreateUserDto } from './dto/create-user.dto.ts';
-import { UpdateUserDto } from './dto/update-user.dto.ts';
 import {
+    CreateUserDto,
+    UpdateUserDto,
     GetUserInfoDto,
     SetUserInfoDto,
     ChangePasswordDto,
     SetBlockDto,
     CheckNewVersionDto,
-} from './dto/user-info.dto.ts';
+} from './users.dto.ts';
 import { TokenGuard } from '../common/guards/token.guard.ts';
 import { CurrentUser } from '../common/decorators/current-user.decorator.ts';
-import { User } from '../entities/user.entity.ts';
+import type { User } from '@prisma/client';
 import { ApiResponse } from '../common/dto/api-response.dto.ts';
-import { ResponseCode } from '../common/enums/response-code.enum.ts';
+import { ResponseCode } from '../enums/response-code.enum.ts';
 
 @Controller('users')
 export class UsersController {
@@ -68,7 +68,7 @@ export class UserInfoController {
     @UseGuards(TokenGuard)
     async getUserInfo(@Body() dto: GetUserInfoDto, @CurrentUser() user: User) {
         try {
-            const result = await this.usersService.getUserInfo(user, dto.user_id);
+            const result = await this.usersService.getUserInfo(user, dto.userId);
             return ApiResponse.success(result);
         } catch (error) {
             if (error instanceof Error && error.message === 'User not found') {
@@ -86,7 +86,7 @@ export class UserInfoController {
             const result = await this.usersService.setUserInfo(user, {
                 username: dto.username,
                 avatar: dto.avatar,
-                cover_image: dto.cover_image,
+                coverImage: dto.coverImage,
                 description: dto.description,
             });
             return ApiResponse.success(result);
@@ -106,7 +106,7 @@ export class UserInfoController {
             const result = await this.usersService.changePassword(
                 user,
                 dto.password,
-                dto.new_password,
+                dto.newPassword,
             );
             return ApiResponse.success(result);
         } catch (error) {
@@ -122,7 +122,7 @@ export class UserInfoController {
     @UseGuards(TokenGuard)
     async setBlock(@Body() dto: SetBlockDto, @CurrentUser() user: User) {
         try {
-            const result = await this.usersService.setBlock(user, dto.user_id, dto.type);
+            const result = await this.usersService.setBlock(user, dto.userId, dto.type);
             return ApiResponse.success(result);
         } catch (error) {
             if (error instanceof Error) {
@@ -137,7 +137,7 @@ export class UserInfoController {
     @UseGuards(TokenGuard)
     checkNewVersion(@Body() dto: CheckNewVersionDto, @CurrentUser() user: User) {
         try {
-            const result = this.usersService.checkNewVersion(user, dto.last_update);
+            const result = this.usersService.checkNewVersion(user, dto.lastUpdate);
             return ApiResponse.success(result);
         } catch (error) {
             if (error instanceof Error) {

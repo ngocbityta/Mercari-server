@@ -1,4 +1,4 @@
-import { ResponseCode, ResponseMessage } from '../enums/response-code.enum.ts';
+import { ResponseCode, ResponseMessage } from '../../enums/response-code.enum.ts';
 
 export class ApiResponse<T = any> {
     code: string;

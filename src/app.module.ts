@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { getDatabaseConfig } from './config/database.config.ts';
+import { ConfigModule } from '@nestjs/config';
+import { PrismaModule } from './prisma/prisma.module.ts';
 import { UsersModule } from './users/users.module.ts';
 import { NotificationsModule } from './notifications/notifications.module.ts';
 import { DevicesModule } from './devices/devices.module.ts';
@@ -14,11 +13,7 @@ import { EventsModule } from './events/events.module.ts';
             isGlobal: true,
             envFilePath: '.env',
         }),
-        TypeOrmModule.forRootAsync({
-            imports: [ConfigModule],
-            inject: [ConfigService],
-            useFactory: getDatabaseConfig,
-        }),
+        PrismaModule,
         EventsModule,
         UsersModule,
         NotificationsModule,

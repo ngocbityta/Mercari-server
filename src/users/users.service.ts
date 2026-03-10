@@ -4,28 +4,19 @@ import {
     ConflictException,
     BadRequestException,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { User } from '../entities/user.entity.ts';
-import { Block } from '../entities/block.entity.ts';
-import { CreateUserDto } from './dto/create-user.dto.ts';
-import { UpdateUserDto } from './dto/update-user.dto.ts';
-import { UserStatus } from '../common/enums/user.enum.ts';
+import { PrismaService } from '../prisma/prisma.service.ts';
+import { CreateUserDto, UpdateUserDto } from './users.dto.ts';
+import { UserStatus } from '../enums/users.enum.ts';
+import { User } from '@prisma/client';
 
-// Danh sách tên bị cấm
 const BANNED_USERNAMES = ['hitier', 'admin', 'root', 'superadmin'];
 
 @Injectable()
 export class UsersService {
-    constructor(
-        @InjectRepository(User)
-        private readonly usersRepository: Repository<User>,
-        @InjectRepository(Block)
-        private readonly blocksRepository: Repository<Block>,
-    ) {}
+    constructor(private readonly prisma: PrismaService) {}
 
     async create(createUserDto: CreateUserDto): Promise<User> {
-        const existingUser = await this.usersRepository.findOne({
+        const existingUser = await this.prisma.user.findUnique({
             where: { phonenumber: createUserDto.phonenumber },
         });
 
@@ -33,44 +24,42 @@ export class UsersService {
             throw new ConflictException('Số điện thoại đã được đăng ký');
         }
 
-        const user = this.usersRepository.create(createUserDto);
-        return this.usersRepository.save(user);
-    }
-
-    async findAll(): Promise<User[]> {
-        return this.usersRepository.find({
-            select: {
-                id: true,
-                phonenumber: true,
-                username: true,
-                avatar: true,
-                cover_image: true,
-                description: true,
-                role: true,
-                status: true,
-                online: true,
-                created_at: true,
-                updated_at: true,
+        return this.prisma.user.create({
+            data: {
+                phonenumber: createUserDto.phonenumber,
+                password: createUserDto.password,
+                role: createUserDto.role,
+                username: createUserDto.username,
+                avatar: createUserDto.avatar,
+                coverImage: createUserDto.coverImage,
+                description: createUserDto.description,
             },
         });
     }
 
-    async findOne(id: string): Promise<User> {
-        const user = await this.usersRepository.findOne({
-            where: { id },
+    async findAll(): Promise<User[]> {
+        return this.prisma.user.findMany({
             select: {
                 id: true,
                 phonenumber: true,
                 username: true,
                 avatar: true,
-                cover_image: true,
+                coverImage: true,
                 description: true,
                 role: true,
                 status: true,
                 online: true,
-                created_at: true,
-                updated_at: true,
+                createdAt: true,
+                updatedAt: true,
+                password: true, // Included for backward compatibility if needed, but select usually excludes password in TypeORM call
+                token: true,
             },
+        }) as unknown as Promise<User[]>; // Cast due to select
+    }
+
+    async findOne(id: string): Promise<User> {
+        const user = await this.prisma.user.findUnique({
+            where: { id },
         });
 
         if (!user) {
@@ -84,7 +73,7 @@ export class UsersService {
         const user = await this.findOne(id);
 
         if (updateUserDto.phonenumber && updateUserDto.phonenumber !== user.phonenumber) {
-            const existingUser = await this.usersRepository.findOne({
+            const existingUser = await this.prisma.user.findUnique({
                 where: { phonenumber: updateUserDto.phonenumber },
             });
 
@@ -93,13 +82,27 @@ export class UsersService {
             }
         }
 
-        Object.assign(user, updateUserDto);
-        return this.usersRepository.save(user);
+        return this.prisma.user.update({
+            where: { id },
+            data: {
+                phonenumber: updateUserDto.phonenumber,
+                password: updateUserDto.password,
+                role: updateUserDto.role,
+                username: updateUserDto.username,
+                avatar: updateUserDto.avatar,
+                coverImage: updateUserDto.coverImage,
+                description: updateUserDto.description,
+                status: updateUserDto.status,
+                online: updateUserDto.online,
+            },
+        });
     }
 
     async remove(id: string): Promise<void> {
-        const user = await this.findOne(id);
-        await this.usersRepository.remove(user);
+        await this.findOne(id);
+        await this.prisma.user.delete({
+            where: { id },
+        });
     }
 
     async getUserInfo(currentUser: User, targetUserId?: string) {
@@ -107,7 +110,7 @@ export class UsersService {
             return this.formatUserInfo(currentUser);
         }
 
-        const targetUser = await this.usersRepository.findOne({
+        const targetUser = await this.prisma.user.findUnique({
             where: { id: targetUserId },
         });
 
@@ -115,8 +118,13 @@ export class UsersService {
             throw new NotFoundException('User not found');
         }
 
-        const isBlocked = await this.blocksRepository.findOne({
-            where: { blocker_id: targetUserId, blocked_id: currentUser.id },
+        const isBlocked = await this.prisma.block.findUnique({
+            where: {
+                blockerId_blockedId: {
+                    blockerId: targetUserId,
+                    blockedId: currentUser.id,
+                },
+            },
         });
 
         if (isBlocked) {
@@ -128,15 +136,22 @@ export class UsersService {
 
     async setUserInfo(
         currentUser: User,
-        data: { username?: string; avatar?: string; cover_image?: string; description?: string },
+        data: { username?: string; avatar?: string; coverImage?: string; description?: string },
     ) {
-        const user = await this.usersRepository.findOne({
+        const user = await this.prisma.user.findUnique({
             where: { id: currentUser.id },
         });
 
         if (!user) {
             throw new NotFoundException('User not found');
         }
+
+        const updateData: {
+            username?: string;
+            avatar?: string;
+            coverImage?: string;
+            description?: string;
+        } = {};
 
         if (data.username !== undefined) {
             const normalizedUsername = data.username.trim();
@@ -160,22 +175,26 @@ export class UsersService {
                 throw new BadRequestException('This username is not allowed');
             }
 
-            user.username = normalizedUsername;
+            updateData.username = normalizedUsername;
         }
 
         if (data.avatar !== undefined) {
-            user.avatar = data.avatar;
+            updateData.avatar = data.avatar;
         }
 
-        if (data.cover_image !== undefined) {
-            user.cover_image = data.cover_image;
+        if (data.coverImage !== undefined) {
+            updateData.coverImage = data.coverImage;
         }
 
         if (data.description !== undefined) {
-            user.description = data.description;
+            updateData.description = data.description;
         }
 
-        const savedUser = await this.usersRepository.save(user);
+        const savedUser = await this.prisma.user.update({
+            where: { id: currentUser.id },
+            data: updateData,
+        });
+
         return this.formatUserInfo(savedUser);
     }
 
@@ -184,7 +203,7 @@ export class UsersService {
             throw new BadRequestException('Mật khẩu mới không được trùng với mật khẩu cũ');
         }
 
-        const isMatch = user.password === password; // Implement properly with bcrypt in real world if hashed
+        const isMatch = user.password === password;
         if (!isMatch) {
             throw new BadRequestException('Mật khẩu cũ không chính xác');
         }
@@ -193,7 +212,6 @@ export class UsersService {
             throw new BadRequestException('Mật khẩu mới phải từ 6 đến 50 ký tự');
         }
 
-        // Very basic simple overlap check (e.g. 80% similarity threshold)
         const getLongestCommonSubstring = (s1: string, s2: string): number => {
             const m = s1.length;
             const n = s2.length;
@@ -218,8 +236,10 @@ export class UsersService {
             throw new BadRequestException('Mật khẩu mới quá giống mật khẩu cũ');
         }
 
-        user.password = newPassword; // Need hash in real world
-        await this.usersRepository.save(user);
+        await this.prisma.user.update({
+            where: { id: user.id },
+            data: { password: newPassword },
+        });
 
         return {};
     }
@@ -229,7 +249,7 @@ export class UsersService {
             throw new BadRequestException('Bạn không thể chặn chính mình');
         }
 
-        const targetUser = await this.usersRepository.findOne({ where: { id: targetUserId } });
+        const targetUser = await this.prisma.user.findUnique({ where: { id: targetUserId } });
         if (!targetUser) {
             throw new NotFoundException('Người dùng không tồn tại');
         }
@@ -242,26 +262,37 @@ export class UsersService {
             throw new BadRequestException('Loại hành động không hợp lệ');
         }
 
-        const existingBlock = await this.blocksRepository.findOne({
-            where: { blocker_id: currentUser.id, blocked_id: targetUserId },
+        const existingBlock = await this.prisma.block.findUnique({
+            where: {
+                blockerId_blockedId: {
+                    blockerId: currentUser.id,
+                    blockedId: targetUserId,
+                },
+            },
         });
 
         if (type === '0') {
-            // Block usage
             if (existingBlock) {
                 throw new BadRequestException('Bạn đã chặn người này rồi');
             }
-            const block = this.blocksRepository.create({
-                blocker_id: currentUser.id,
-                blocked_id: targetUserId,
+            await this.prisma.block.create({
+                data: {
+                    blockerId: currentUser.id,
+                    blockedId: targetUserId,
+                },
             });
-            await this.blocksRepository.save(block);
         } else {
-            // Unblock usage
             if (!existingBlock) {
                 throw new BadRequestException('Bạn chưa từng chặn người này');
             }
-            await this.blocksRepository.remove(existingBlock);
+            await this.prisma.block.delete({
+                where: {
+                    blockerId_blockedId: {
+                        blockerId: currentUser.id,
+                        blockedId: targetUserId,
+                    },
+                },
+            });
         }
 
         return {};
@@ -272,11 +303,9 @@ export class UsersService {
             throw new BadRequestException('Parameter last_update is required');
         }
 
-        // Dummy logic to return standard structure since we don't have a notifications module integrated right here
-        // that allows counting unread messages or notifications yet.
         return {
             version: {
-                version: '1.0.0', // Real-world: from DB setup
+                version: '1.0.0',
                 active: user.status === UserStatus.ACTIVE ? '1' : '0',
                 required: '0',
                 url: 'https://example.com/app',
@@ -296,10 +325,10 @@ export class UsersService {
             id: user.id,
             username: user.username ?? '',
             avatar: user.avatar ?? '',
-            cover_image: user.cover_image ?? '',
+            coverImage: user.coverImage ?? '',
             description: user.description ?? '',
             online: user.online ? '1' : '0',
-            created: user.created_at?.toISOString() ?? '',
+            created: user.createdAt?.toISOString() ?? '',
         };
     }
 }

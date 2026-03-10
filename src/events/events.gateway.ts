@@ -33,7 +33,7 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
         this.logger.log(`Client connected: ${client.id}`);
 
         // Optional: Extract user token/ID from query/headers to register them
-        const userId = client.handshake.query.user_id as string;
+        const userId = client.handshake.query.userId as string;
         if (userId) {
             this.connectedUsers.set(userId, client.id);
             this.logger.log(`User ${userId} registered with socket ${client.id}`);

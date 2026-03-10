@@ -1,11 +1,11 @@
 import { Controller, Post, Body, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import { DevicesService } from './devices.service.ts';
-import { SetDevtokenDto } from './dto/device.dto.ts';
+import { SetDevtokenDto } from './devices.dto.ts';
 import { TokenGuard } from '../common/guards/token.guard.ts';
 import { CurrentUser } from '../common/decorators/current-user.decorator.ts';
-import { User } from '../entities/user.entity.ts';
+import type { User } from '@prisma/client';
 import { ApiResponse } from '../common/dto/api-response.dto.ts';
-import { ResponseCode } from '../common/enums/response-code.enum.ts';
+import { ResponseCode } from '../enums/response-code.enum.ts';
 
 @Controller()
 export class DevicesController {
@@ -16,8 +16,8 @@ export class DevicesController {
     @UseGuards(TokenGuard)
     async setDevtoken(@Body() dto: SetDevtokenDto, @CurrentUser() user: User) {
         try {
-            const devtype = parseInt(dto.devtype, 10);
-            if (isNaN(devtype)) {
+            const devtype = dto.devtype;
+            if (typeof devtype !== 'number' || isNaN(devtype)) {
                 return ApiResponse.error(
                     ResponseCode.INVALID_PARAMETER_VALUE,
                     'Invalid devtype value',

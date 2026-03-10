@@ -1,28 +1,25 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Notification } from '../entities/notification.entity.ts';
-import { User } from '../entities/user.entity.ts';
+import { PrismaService } from '../prisma/prisma.service.ts';
+import { User } from '@prisma/client';
 import { EventsGateway } from '../events/events.gateway.ts';
 
 @Injectable()
 export class NotificationsService {
     constructor(
-        @InjectRepository(Notification)
-        private readonly notificationsRepository: Repository<Notification>,
+        private readonly prisma: PrismaService,
         private readonly eventsGateway: EventsGateway,
     ) {}
 
     async getNotifications(user: User, index: number, count: number) {
-        const notifications = await this.notificationsRepository.find({
-            where: { user_id: user.id },
-            order: { created_at: 'DESC' },
+        const notifications = await this.prisma.notification.findMany({
+            where: { userId: user.id },
+            orderBy: { createdAt: 'desc' },
             skip: index,
             take: count,
         });
 
-        const badge = await this.notificationsRepository.count({
-            where: { user_id: user.id, is_read: false },
+        const badge = await this.prisma.notification.count({
+            where: { userId: user.id, isRead: false },
         });
 
         const lastUpdate = new Date().toISOString();
@@ -30,13 +27,13 @@ export class NotificationsService {
         return {
             data: notifications.map((n) => ({
                 type: n.type ?? '',
-                object_id: n.object_id ?? '0',
+                object_id: n.objectId ?? '0',
                 title: n.title ?? '',
-                notification_id: n.id,
-                created: n.created_at.toISOString(),
+                notificationId: n.id,
+                created: n.createdAt.toISOString(),
                 avatar: n.avatar ?? '',
-                group: n.group_type,
-                read: n.is_read ? '1' : '0',
+                group: n.groupType,
+                read: n.isRead ? '1' : '0',
             })),
             badge: String(badge),
             last_update: lastUpdate,
@@ -44,19 +41,21 @@ export class NotificationsService {
     }
 
     async setReadNotification(user: User, notificationId: string) {
-        const notification = await this.notificationsRepository.findOne({
-            where: { id: notificationId, user_id: user.id },
+        const notification = await this.prisma.notification.findUnique({
+            where: { id: notificationId },
         });
 
-        if (!notification) {
+        if (!notification || notification.userId !== user.id) {
             throw new NotFoundException('Notification not found');
         }
 
-        notification.is_read = true;
-        await this.notificationsRepository.save(notification);
+        await this.prisma.notification.update({
+            where: { id: notificationId },
+            data: { isRead: true },
+        });
 
-        const badge = await this.notificationsRepository.count({
-            where: { user_id: user.id, is_read: false },
+        const badge = await this.prisma.notification.count({
+            where: { userId: user.id, isRead: false },
         });
 
         return {

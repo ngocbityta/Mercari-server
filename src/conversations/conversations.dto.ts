@@ -29,11 +29,11 @@ export class GetConversationDto {
 
     @IsString()
     @IsOptional()
-    partner_id?: string;
+    partnerId?: string;
 
     @IsString()
     @IsOptional()
-    conversation_id?: string;
+    conversationId?: string;
 }
 
 export class SetReadMessageDto {
@@ -43,11 +43,11 @@ export class SetReadMessageDto {
 
     @IsString()
     @IsOptional()
-    partner_id?: string;
+    partnerId?: string;
 
     @IsString()
     @IsOptional()
-    conversation_id?: string;
+    conversationId?: string;
 }
 
 export class DeleteMessageDto {
@@ -57,7 +57,7 @@ export class DeleteMessageDto {
 
     @IsString()
     @IsNotEmpty()
-    message_id: string;
+    messageId: string;
 }
 
 export class DeleteConversationDto {
@@ -67,11 +67,11 @@ export class DeleteConversationDto {
 
     @IsString()
     @IsOptional()
-    partner_id?: string;
+    partnerId?: string;
 
     @IsString()
     @IsOptional()
-    conversation_id?: string;
+    conversationId?: string;
 }
 
 export class SetSendMessageDto {
@@ -81,11 +81,11 @@ export class SetSendMessageDto {
 
     @IsString()
     @IsOptional()
-    partner_id?: string;
+    partnerId?: string;
 
     @IsString()
     @IsOptional()
-    conversation_id?: string;
+    conversationId?: string;
 
     @IsString()
     @IsNotEmpty()

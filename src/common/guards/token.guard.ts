@@ -1,9 +1,7 @@
 import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { Request } from 'express';
-import { User } from '../../entities/user.entity.ts';
-import { UserStatus } from '../enums/user.enum.ts';
+import { PrismaService } from '../../prisma/prisma.service.ts';
+import { User, UserStatus } from '@prisma/client';
 
 interface CustomRequest extends Request {
     body: { token?: string };
@@ -12,10 +10,7 @@ interface CustomRequest extends Request {
 
 @Injectable()
 export class TokenGuard implements CanActivate {
-    constructor(
-        @InjectRepository(User)
-        private readonly usersRepository: Repository<User>,
-    ) {}
+    constructor(private readonly prisma: PrismaService) {}
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
         const request = context.switchToHttp().getRequest<CustomRequest>();
@@ -28,22 +23,8 @@ export class TokenGuard implements CanActivate {
             });
         }
 
-        const user = await this.usersRepository.findOne({
-            where: { token },
-            select: {
-                id: true,
-                phonenumber: true,
-                username: true,
-                avatar: true,
-                cover_image: true,
-                description: true,
-                role: true,
-                token: true,
-                status: true,
-                online: true,
-                created_at: true,
-                updated_at: true,
-            },
+        const user = await this.prisma.user.findFirst({
+            where: { token: token },
         });
 
         if (!user) {
