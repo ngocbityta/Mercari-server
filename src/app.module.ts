@@ -6,6 +6,7 @@ import { NotificationsModule } from './notifications/notifications.module.ts';
 import { DevicesModule } from './devices/devices.module.ts';
 import { ConversationsModule } from './conversations/conversations.module.ts';
 import { EventsModule } from './events/events.module.ts';
+import { PostsModule } from './posts/posts.module.ts';
 
 @Module({
     imports: [
@@ -19,6 +20,7 @@ import { EventsModule } from './events/events.module.ts';
         NotificationsModule,
         DevicesModule,
         ConversationsModule,
+        PostsModule,
     ],
 })
 export class AppModule {}
