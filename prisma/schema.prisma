@@ -30,6 +30,7 @@ model User {
   description  String?   @db.Text
   role         UserRole
   token        String?   @db.VarChar
+  height       String?   @db.VarChar
   status       UserStatus @default(ACTIVE)
   online       Boolean    @default(false)
   createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz
@@ -139,4 +140,13 @@ model PushSetting {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("push_settings")
+}
+
+model VerifyCode {
+  id          String   @id @default(uuid()) @db.Uuid
+  phonenumber String   @db.VarChar
+  code        String   @db.VarChar(6)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("verify_codes")
 }

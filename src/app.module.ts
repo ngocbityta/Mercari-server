@@ -6,6 +6,7 @@ import { NotificationsModule } from './notifications/notifications.module.ts';
 import { DevicesModule } from './devices/devices.module.ts';
 import { ConversationsModule } from './conversations/conversations.module.ts';
 import { EventsModule } from './events/events.module.ts';
+import { AuthModule } from './auth/auth.module.ts';
 
 @Module({
     imports: [
@@ -15,6 +16,7 @@ import { EventsModule } from './events/events.module.ts';
         }),
         PrismaModule,
         EventsModule,
+        AuthModule,
         UsersModule,
         NotificationsModule,
         DevicesModule,

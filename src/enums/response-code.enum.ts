@@ -1,5 +1,13 @@
 export enum ResponseCode {
     OK = '1000',
+    CAN_NOT_CONNECT = '1001',
+    MISSING_PARAMETER = '1002',
+    INVALID_PARAMETER_TYPE = '1003',
+    INVALID_PARAMETER_VALUE = '1004',
+    FILE_SIZE_EXCEEDED = '1006',
+    ACTION_DONE_PREVIOUSLY = '1009',
+    ACTION_NOT_VALID = '1010',
+    ACCOUNT_LOCKED = '9991',
     POST_NOT_FOUND = '9992',
     CODE_VERIFY_INCORRECT = '9993',
     NO_DATA = '9994',
@@ -8,13 +16,18 @@ export enum ResponseCode {
     METHOD_INVALID = '9997',
     TOKEN_INVALID = '9998',
     EXCEPTION_ERROR = '9999',
-    INVALID_PARAMETER_TYPE = '1003',
-    INVALID_PARAMETER_VALUE = '1004',
-    ACCOUNT_LOCKED = '9991',
 }
 
 export const ResponseMessage: Record<string, string> = {
     [ResponseCode.OK]: 'OK',
+    [ResponseCode.CAN_NOT_CONNECT]: 'Can not connect to server',
+    [ResponseCode.MISSING_PARAMETER]: 'Parameter is not enough',
+    [ResponseCode.INVALID_PARAMETER_TYPE]: 'Parameter type is invalid',
+    [ResponseCode.INVALID_PARAMETER_VALUE]: 'Parameter value is invalid',
+    [ResponseCode.FILE_SIZE_EXCEEDED]: 'File size is too big',
+    [ResponseCode.ACTION_DONE_PREVIOUSLY]: 'Action has been done previously by this user',
+    [ResponseCode.ACTION_NOT_VALID]: 'Action is not valid',
+    [ResponseCode.ACCOUNT_LOCKED]: 'Account is locked',
     [ResponseCode.POST_NOT_FOUND]: 'Post is not existed',
     [ResponseCode.CODE_VERIFY_INCORRECT]: 'Code verify is incorrect',
     [ResponseCode.NO_DATA]: 'No data or end of list data',
@@ -23,7 +36,4 @@ export const ResponseMessage: Record<string, string> = {
     [ResponseCode.METHOD_INVALID]: 'Method is invalid',
     [ResponseCode.TOKEN_INVALID]: 'Token is invalid',
     [ResponseCode.EXCEPTION_ERROR]: 'Exception error',
-    [ResponseCode.INVALID_PARAMETER_TYPE]: 'Parameter type is invalid',
-    [ResponseCode.INVALID_PARAMETER_VALUE]: 'Parameter value is invalid',
-    [ResponseCode.ACCOUNT_LOCKED]: 'Account is locked',
 };
