@@ -1,20 +1,19 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service.ts';
 import { SignupDto, LoginDto, CheckVerifyCodeDto, ChangeInfoAfterSignupDto } from './auth.dto.ts';
 import { ResponseCode, ResponseMessage } from '../enums/response-code.enum.ts';
 import { UserStatus } from '@prisma/client';
 import { TokenService } from './token.service.ts';
+import { UsersService } from '../users/users.service.ts';
+import { VerificationService } from './verification.service.ts';
 
 @Injectable()
 export class AuthService {
     constructor(
-        private readonly prisma: PrismaService,
+        private readonly usersService: UsersService,
         private readonly tokenService: TokenService,
+        private readonly verificationService: VerificationService,
     ) {}
 
-    /**
-     * Signup - Đăng ký tài khoản mới
-     */
     async signup(dto: SignupDto) {
         if (dto.password === dto.phonenumber) {
             return {
@@ -23,10 +22,7 @@ export class AuthService {
             };
         }
 
-        const existingUser = await this.prisma.user.findUnique({
-            where: { phonenumber: dto.phonenumber },
-        });
-
+        const existingUser = await this.usersService.findByPhonenumber(dto.phonenumber);
         if (existingUser) {
             return {
                 code: ResponseCode.USER_EXISTED,
@@ -34,26 +30,13 @@ export class AuthService {
             };
         }
 
-        await this.prisma.user.create({
-            data: {
-                phonenumber: dto.phonenumber,
-                password: dto.password,
-                role: dto.role,
-                status: UserStatus.ACTIVE,
-            },
+        await this.usersService.create({
+            phonenumber: dto.phonenumber,
+            password: dto.password,
+            role: dto.role,
         });
 
-        const verifyCode = this.tokenService.generateVerifyCode();
-
-        await this.prisma.verifyCode.deleteMany({
-            where: { phonenumber: dto.phonenumber },
-        });
-        await this.prisma.verifyCode.create({
-            data: {
-                phonenumber: dto.phonenumber,
-                code: verifyCode,
-            },
-        });
+        const verifyCode = await this.verificationService.generateAndStoreCode(dto.phonenumber);
 
         return {
             code: ResponseCode.OK,
@@ -64,9 +47,6 @@ export class AuthService {
         };
     }
 
-    /**
-     * Login - Đăng nhập
-     */
     async login(dto: LoginDto) {
         if (dto.password === dto.phonenumber) {
             return {
@@ -75,10 +55,7 @@ export class AuthService {
             };
         }
 
-        const user = await this.prisma.user.findUnique({
-            where: { phonenumber: dto.phonenumber },
-        });
-
+        const user = await this.usersService.findByPhonenumber(dto.phonenumber);
         if (!user) {
             return {
                 code: ResponseCode.USER_NOT_VALIDATED,
@@ -101,13 +78,7 @@ export class AuthService {
         }
 
         const token = this.tokenService.generateToken();
-        await this.prisma.user.update({
-            where: { id: user.id },
-            data: {
-                token: token,
-                online: true,
-            },
-        });
+        await this.usersService.updateToken(user.id, token, true);
 
         return {
             code: ResponseCode.OK,
@@ -122,14 +93,8 @@ export class AuthService {
         };
     }
 
-    /**
-     * Logout - Đăng xuất
-     */
     async logout(token: string) {
-        const user = await this.prisma.user.findFirst({
-            where: { token },
-        });
-
+        const user = await this.usersService.findByToken(token);
         if (!user) {
             return {
                 code: ResponseCode.TOKEN_INVALID,
@@ -137,14 +102,7 @@ export class AuthService {
             };
         }
 
-        // Xóa token
-        await this.prisma.user.update({
-            where: { id: user.id },
-            data: {
-                token: null,
-                online: false,
-            },
-        });
+        await this.usersService.updateToken(user.id, null, false);
 
         return {
             code: ResponseCode.OK,
@@ -152,14 +110,8 @@ export class AuthService {
         };
     }
 
-    /**
-     * Get Verify Code - Lấy lại mã xác thực
-     */
     async getVerifyCode(phonenumber: string) {
-        const user = await this.prisma.user.findUnique({
-            where: { phonenumber },
-        });
-
+        const user = await this.usersService.findByPhonenumber(phonenumber);
         if (!user) {
             return {
                 code: ResponseCode.USER_NOT_VALIDATED,
@@ -174,11 +126,7 @@ export class AuthService {
             };
         }
 
-        const existingCode = await this.prisma.verifyCode.findFirst({
-            where: { phonenumber },
-            orderBy: { createdAt: 'desc' },
-        });
-
+        const existingCode = await this.verificationService.getRecentCode(phonenumber);
         if (existingCode) {
             const elapsed = Date.now() - existingCode.createdAt.getTime();
             if (elapsed < 120_000) {
@@ -192,18 +140,7 @@ export class AuthService {
             }
         }
 
-        const verifyCode = this.tokenService.generateVerifyCode();
-
-        await this.prisma.verifyCode.deleteMany({
-            where: { phonenumber },
-        });
-
-        await this.prisma.verifyCode.create({
-            data: {
-                phonenumber,
-                code: verifyCode,
-            },
-        });
+        const verifyCode = await this.verificationService.generateAndStoreCode(phonenumber);
 
         return {
             code: ResponseCode.OK,
@@ -214,15 +151,8 @@ export class AuthService {
         };
     }
 
-    /**
-     * Check Verify Code - Xác nhận mã xác thực
-     */
     async checkVerifyCode(dto: CheckVerifyCodeDto) {
-        // Tìm user
-        const user = await this.prisma.user.findUnique({
-            where: { phonenumber: dto.phonenumber },
-        });
-
+        const user = await this.usersService.findByPhonenumber(dto.phonenumber);
         if (!user) {
             return {
                 code: ResponseCode.USER_NOT_VALIDATED,
@@ -237,27 +167,21 @@ export class AuthService {
             };
         }
 
-        const verifyRecord = await this.prisma.verifyCode.findFirst({
-            where: { phonenumber: dto.phonenumber },
-            orderBy: { createdAt: 'desc' },
-        });
-
-        if (!verifyRecord || verifyRecord.code !== dto.code_verify) {
+        const isValid = await this.verificationService.validateCode(
+            dto.phonenumber,
+            dto.code_verify,
+        );
+        if (!isValid) {
             return {
                 code: ResponseCode.CODE_VERIFY_INCORRECT,
                 message: 'Code verify is incorrect',
             };
         }
 
-        await this.prisma.verifyCode.deleteMany({
-            where: { phonenumber: dto.phonenumber },
-        });
+        await this.verificationService.deleteCodes(dto.phonenumber);
 
         const token = this.tokenService.generateToken();
-        await this.prisma.user.update({
-            where: { id: user.id },
-            data: { token },
-        });
+        await this.usersService.updateToken(user.id, token);
 
         return {
             code: ResponseCode.OK,
@@ -269,15 +193,8 @@ export class AuthService {
         };
     }
 
-    /**
-     * Change Info After Signup - Thay đổi thông tin sau đăng ký
-     */
     async changeInfoAfterSignup(dto: ChangeInfoAfterSignupDto) {
-        // Validate token
-        const user = await this.prisma.user.findFirst({
-            where: { token: dto.token },
-        });
-
+        const user = await this.usersService.findByToken(dto.token);
         if (!user) {
             return {
                 code: ResponseCode.TOKEN_INVALID,
@@ -292,13 +209,9 @@ export class AuthService {
             };
         }
 
-        const updatedUser = await this.prisma.user.update({
-            where: { id: user.id },
-            data: {
-                username: dto.username,
-                avatar: dto.avatar ?? user.avatar,
-                height: dto.height ?? user.height,
-            },
+        const updatedUser = await this.usersService.update(user.id, {
+            username: dto.username,
+            avatar: dto.avatar,
         });
 
         return {

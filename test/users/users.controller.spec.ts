@@ -1,10 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UsersController, UserInfoController } from '../../src/users/users.controller.ts';
 import { UsersService } from '../../src/users/users.service.ts';
+import { ProfileService } from '../../src/users/profile.service.ts';
+import { AccountService } from '../../src/users/account.service.ts';
+import { BlockService } from '../../src/users/block.service.ts';
 import { CreateUserDto } from '../../src/users/users.dto.ts';
 import { UserRole, UserStatus } from '../../src/enums/users.enum.ts';
 import { TokenGuard } from '../../src/common/guards/token.guard.ts';
-import { PrismaService } from '../../src/prisma/prisma.service.ts';
 
 describe('UsersController', () => {
     let controller: UsersController;
@@ -68,18 +70,24 @@ describe('UserInfoController', () => {
             controllers: [UserInfoController],
             providers: [
                 {
-                    provide: UsersService,
+                    provide: ProfileService,
                     useValue: {
                         getUserInfo: jest.fn(),
                         setUserInfo: jest.fn(),
+                    },
+                },
+                {
+                    provide: AccountService,
+                    useValue: {
                         changePassword: jest.fn(),
-                        setBlock: jest.fn(),
                         checkNewVersion: jest.fn(),
                     },
                 },
                 {
-                    provide: PrismaService,
-                    useValue: {},
+                    provide: BlockService,
+                    useValue: {
+                        setBlock: jest.fn(),
+                    },
                 },
             ],
         })

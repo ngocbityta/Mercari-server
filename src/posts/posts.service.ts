@@ -1,151 +1,160 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class PostsService {
-  constructor(private prisma: PrismaService) {}
+    constructor(private prisma: PrismaService) {}
 
-  async addPost(ownerId: string, content: string, media: string[], hashtags?: string[]) {
-    const post = await this.prisma.post.create({
-      data: {
-        ownerId,
-        content,
-        media,
-        hashtags: hashtags || [],
-      },
-      include: {
-        owner: true,
-      },
-    });
-    return post;
-  }
-
-  async editPost(postId: string, content?: string, media?: string[], hashtags?: string[]) {
-    const data: any = {};
-    if (content !== undefined) data.content = content;
-    if (media !== undefined) data.media = media;
-    if (hashtags !== undefined) data.hashtags = hashtags;
-
-    const post = await this.prisma.post.update({
-      where: { id: postId },
-      data,
-      include: {
-        owner: true,
-      },
-    });
-    return post;
-  }
-
-  async deletePost(postId: string) {
-    await this.prisma.post.delete({
-      where: { id: postId },
-    });
-    return { message: 'Post deleted successfully' };
-  }
-
-  async getPost(postId: string) {
-    const post = await this.prisma.post.findUnique({
-      where: { id: postId },
-      include: {
-        owner: true,
-      },
-    });
-    return post;
-  }
-
-  async getListPosts(index: number = 0, count: number = 10, lastId?: string) {
-    const skip = index * count;
-    const where: any = {};
-
-    if (lastId) {
-      const lastPost = await this.prisma.post.findUnique({
-        where: { id: lastId },
-      });
-      if (lastPost) {
-        where.createdAt = { lt: lastPost.createdAt };
-      }
+    async addPost(ownerId: string, content: string, media: string[], hashtags?: string[]) {
+        const post = await this.prisma.post.create({
+            data: {
+                ownerId,
+                content,
+                media,
+                hashtags: hashtags || [],
+            },
+            include: {
+                owner: true,
+            },
+        });
+        return post;
     }
 
-    const posts = await this.prisma.post.findMany({
-      where,
-      include: {
-        owner: true,
-      },
-      orderBy: { createdAt: 'desc' },
-      skip,
-      take: count,
-    });
+    async editPost(postId: string, content?: string, media?: string[], hashtags?: string[]) {
+        const data: Prisma.PostUpdateInput = {};
+        if (content !== undefined) {
+            data.content = content;
+        }
+        if (media !== undefined) {
+            data.media = media;
+        }
+        if (hashtags !== undefined) {
+            data.hashtags = hashtags;
+        }
 
-    const total = await this.prisma.post.count({ where });
+        const post = await this.prisma.post.update({
+            where: { id: postId },
+            data,
+            include: {
+                owner: true,
+            },
+        });
+        return post;
+    }
 
-    return {
-      data: posts,
-      total,
-      index,
-      count,
-    };
-  }
+    async deletePost(postId: string) {
+        await this.prisma.post.delete({
+            where: { id: postId },
+        });
+        return { message: 'Post deleted successfully' };
+    }
 
-  async checkNewItem(lastId: string) {
-    if (!lastId) return { hasNew: false, count: 0 };
+    async getPost(postId: string) {
+        const post = await this.prisma.post.findUnique({
+            where: { id: postId },
+            include: {
+                owner: true,
+            },
+        });
+        return post;
+    }
 
-    const lastPost = await this.prisma.post.findUnique({
-      where: { id: lastId },
-    });
+    async getListPosts(index: number = 0, count: number = 10, lastId?: string) {
+        const skip = index * count;
+        const where: Prisma.PostWhereInput = {};
 
-    if (!lastPost) return { hasNew: false, count: 0 };
+        if (lastId) {
+            const lastPost = await this.prisma.post.findUnique({
+                where: { id: lastId },
+            });
+            if (lastPost && lastPost.createdAt) {
+                where.createdAt = { lt: lastPost.createdAt };
+            }
+        }
 
-    const newCount = await this.prisma.post.count({
-      where: {
-        createdAt: { gt: lastPost.createdAt },
-      },
-    });
+        const posts = await this.prisma.post.findMany({
+            where,
+            include: {
+                owner: true,
+            },
+            orderBy: { createdAt: 'desc' },
+            skip,
+            take: count,
+        });
 
-    return { hasNew: newCount > 0, count: newCount };
-  }
+        const total = await this.prisma.post.count({ where });
 
-  async searchPosts(query: string, index: number = 0, count: number = 10) {
-    const skip = index * count;
+        return {
+            data: posts,
+            total,
+            index,
+            count,
+        };
+    }
 
-    const posts = await this.prisma.post.findMany({
-      where: {
-        OR: [
-          { content: { contains: query, mode: 'insensitive' } },
-          { hashtags: { hasSome: [query] } },
-        ],
-      },
-      include: {
-        owner: true,
-      },
-      orderBy: { createdAt: 'desc' },
-      skip,
-      take: count,
-    });
+    async checkNewItem(lastId: string) {
+        if (!lastId) {
+            return { hasNew: false, count: 0 };
+        }
 
-    const total = await this.prisma.post.count({
-      where: {
-        OR: [
-          { content: { contains: query, mode: 'insensitive' } },
-          { hashtags: { hasSome: [query] } },
-        ],
-      },
-    });
+        const lastPost = await this.prisma.post.findUnique({
+            where: { id: lastId },
+        });
 
-    return {
-      data: posts,
-      total,
-      index,
-      count,
-    };
-  }
+        if (!lastPost || !lastPost.createdAt) {
+            return { hasNew: false, count: 0 };
+        }
 
-  async getSavedSearch(userId: string) {
-    // Placeholder - will implement with SavedSearch model later
-    return [];
-  }
+        const newCount = await this.prisma.post.count({
+            where: {
+                createdAt: { gt: lastPost.createdAt },
+            },
+        });
 
-  async delSavedSearch(searchId: string) {
-    // Placeholder - will implement with SavedSearch model later
-    return { message: 'Saved search deleted' };
-  }
+        return { hasNew: newCount > 0, count: newCount };
+    }
+
+    async searchPosts(query: string, index: number = 0, count: number = 10) {
+        const skip = index * count;
+
+        const posts = await this.prisma.post.findMany({
+            where: {
+                OR: [
+                    { content: { contains: query, mode: 'insensitive' } },
+                    { hashtags: { hasSome: [query] } },
+                ],
+            },
+            include: {
+                owner: true,
+            },
+            orderBy: { createdAt: 'desc' },
+            skip,
+            take: count,
+        });
+
+        const total = await this.prisma.post.count({
+            where: {
+                OR: [
+                    { content: { contains: query, mode: 'insensitive' } },
+                    { hashtags: { hasSome: [query] } },
+                ],
+            },
+        });
+
+        return {
+            data: posts,
+            total,
+            index,
+            count,
+        };
+    }
+
+    getSavedSearch(_userId: string) {
+        return [];
+    }
+
+    delSavedSearch(_searchId: string) {
+        return { message: 'Saved search deleted' };
+    }
 }

@@ -12,6 +12,9 @@ import {
     UseGuards,
 } from '@nestjs/common';
 import { UsersService } from './users.service.ts';
+import { ProfileService } from './profile.service.ts';
+import { AccountService } from './account.service.ts';
+import { BlockService } from './block.service.ts';
 import {
     CreateUserDto,
     UpdateUserDto,
@@ -61,14 +64,18 @@ export class UsersController {
 
 @Controller()
 export class UserInfoController {
-    constructor(private readonly usersService: UsersService) {}
+    constructor(
+        private readonly profileService: ProfileService,
+        private readonly accountService: AccountService,
+        private readonly blockService: BlockService,
+    ) {}
 
     @Post('get_user_info')
     @HttpCode(HttpStatus.OK)
     @UseGuards(TokenGuard)
     async getUserInfo(@Body() dto: GetUserInfoDto, @CurrentUser() user: User) {
         try {
-            const result = await this.usersService.getUserInfo(user, dto.userId);
+            const result = await this.profileService.getUserInfo(user, dto.userId);
             return ApiResponse.success(result);
         } catch (error) {
             if (error instanceof Error && error.message === 'User not found') {
@@ -83,7 +90,7 @@ export class UserInfoController {
     @UseGuards(TokenGuard)
     async setUserInfo(@Body() dto: SetUserInfoDto, @CurrentUser() user: User) {
         try {
-            const result = await this.usersService.setUserInfo(user, {
+            const result = await this.profileService.setUserInfo(user, {
                 username: dto.username,
                 avatar: dto.avatar,
                 coverImage: dto.coverImage,
@@ -103,7 +110,7 @@ export class UserInfoController {
     @UseGuards(TokenGuard)
     async changePassword(@Body() dto: ChangePasswordDto, @CurrentUser() user: User) {
         try {
-            const result = await this.usersService.changePassword(
+            const result = await this.accountService.changePassword(
                 user,
                 dto.password,
                 dto.newPassword,
@@ -122,7 +129,7 @@ export class UserInfoController {
     @UseGuards(TokenGuard)
     async setBlock(@Body() dto: SetBlockDto, @CurrentUser() user: User) {
         try {
-            const result = await this.usersService.setBlock(user, dto.userId, dto.type);
+            const result = await this.blockService.setBlock(user, dto.userId, dto.type);
             return ApiResponse.success(result);
         } catch (error) {
             if (error instanceof Error) {
@@ -137,7 +144,7 @@ export class UserInfoController {
     @UseGuards(TokenGuard)
     checkNewVersion(@Body() dto: CheckNewVersionDto, @CurrentUser() user: User) {
         try {
-            const result = this.usersService.checkNewVersion(user, dto.lastUpdate);
+            const result = this.accountService.checkNewVersion(user, dto.lastUpdate);
             return ApiResponse.success(result);
         } catch (error) {
             if (error instanceof Error) {

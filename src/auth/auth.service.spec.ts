@@ -1,39 +1,41 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthService } from './auth.service.ts';
-import { PrismaService } from '../prisma/prisma.service.ts';
 import { UserRole, UserStatus } from '@prisma/client';
 import { ResponseCode, ResponseMessage } from '../enums/response-code.enum.ts';
 
 import { TokenService } from './token.service.ts';
+import { UsersService } from '../users/users.service.ts';
+import { VerificationService } from './verification.service.ts';
 
 describe('AuthService', () => {
     let service: AuthService;
 
-    const mockPrismaService = {
-        user: {
-            findUnique: jest.fn(),
-            findFirst: jest.fn(),
-            create: jest.fn(),
-            update: jest.fn(),
-        },
-        verifyCode: {
-            findFirst: jest.fn(),
-            create: jest.fn(),
-            deleteMany: jest.fn(),
-        },
+    const mockUsersService = {
+        findByPhonenumber: jest.fn(),
+        create: jest.fn(),
+        updateToken: jest.fn(),
+        findByToken: jest.fn(),
+        update: jest.fn(),
     };
 
     const mockTokenService = {
         generateToken: jest.fn().mockReturnValue('mock-uuid-token'),
-        generateVerifyCode: jest.fn().mockReturnValue('ABC123'),
+    };
+
+    const mockVerificationService = {
+        generateAndStoreCode: jest.fn(),
+        getRecentCode: jest.fn(),
+        validateCode: jest.fn(),
+        deleteCodes: jest.fn(),
     };
 
     beforeEach(async () => {
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 AuthService,
-                { provide: PrismaService, useValue: mockPrismaService },
+                { provide: UsersService, useValue: mockUsersService },
                 { provide: TokenService, useValue: mockTokenService },
+                { provide: VerificationService, useValue: mockVerificationService },
             ],
         }).compile();
 
@@ -54,29 +56,26 @@ describe('AuthService', () => {
         };
 
         it('TC1: Đăng ký thành công với SĐT mới, mật khẩu hợp lệ, có role', async () => {
-            mockPrismaService.user.findUnique.mockResolvedValue(null);
-            mockPrismaService.user.create.mockResolvedValue({ id: 'user-1' });
-            mockPrismaService.verifyCode.deleteMany.mockResolvedValue({ count: 0 });
-            mockPrismaService.verifyCode.create.mockResolvedValue({});
+            mockUsersService.findByPhonenumber.mockResolvedValue(null);
+            mockUsersService.create.mockResolvedValue({ id: 'user-1' });
+            mockVerificationService.generateAndStoreCode.mockResolvedValue('ABC123');
+            mockVerificationService.deleteCodes.mockResolvedValue({ count: 0 });
 
             const result = await service.signup(validSignupDto);
 
             expect(result.code).toBe(ResponseCode.OK);
             expect(result.message).toBe(ResponseMessage[ResponseCode.OK]);
             expect(result.data).toHaveProperty('verify_code');
-            expect((result.data as { verify_code: string }).verify_code).toHaveLength(6);
-            expect(mockPrismaService.user.create).toHaveBeenCalledWith({
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-                data: expect.objectContaining({
-                    phonenumber: '0912345678',
-                    password: 'abc123',
-                    role: UserRole.HV,
-                }),
+            expect((result.data as { verify_code: string }).verify_code).toBe('ABC123');
+            expect(mockUsersService.create).toHaveBeenCalledWith({
+                phonenumber: '0912345678',
+                password: 'abc123',
+                role: UserRole.HV,
             });
         });
 
         it('TC2: SĐT đã đăng ký → 9996 User existed', async () => {
-            mockPrismaService.user.findUnique.mockResolvedValue({
+            mockUsersService.findByPhonenumber.mockResolvedValue({
                 id: 'existing-user',
                 phonenumber: '0912345678',
             });
@@ -99,10 +98,9 @@ describe('AuthService', () => {
         });
 
         it('TC1-GV: Đăng ký thành công với role GV', async () => {
-            mockPrismaService.user.findUnique.mockResolvedValue(null);
-            mockPrismaService.user.create.mockResolvedValue({ id: 'user-2' });
-            mockPrismaService.verifyCode.deleteMany.mockResolvedValue({ count: 0 });
-            mockPrismaService.verifyCode.create.mockResolvedValue({});
+            mockUsersService.findByPhonenumber.mockResolvedValue(null);
+            mockUsersService.create.mockResolvedValue({ id: 'user-2' });
+            mockVerificationService.generateAndStoreCode.mockResolvedValue('XYZ789');
 
             const result = await service.signup({
                 ...validSignupDto,
@@ -110,9 +108,10 @@ describe('AuthService', () => {
             });
 
             expect(result.code).toBe(ResponseCode.OK);
-            expect(mockPrismaService.user.create).toHaveBeenCalledWith({
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-                data: expect.objectContaining({ role: UserRole.GV }),
+            expect(mockUsersService.create).toHaveBeenCalledWith({
+                phonenumber: '0912345678',
+                password: 'abc123',
+                role: UserRole.GV,
             });
         });
     });
@@ -140,11 +139,8 @@ describe('AuthService', () => {
         };
 
         it('TC1: Đăng nhập thành công', async () => {
-            mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
-            mockPrismaService.user.update.mockResolvedValue({
-                ...mockUser,
-                token: 'mock-uuid-token',
-            });
+            mockUsersService.findByPhonenumber.mockResolvedValue(mockUser);
+            mockUsersService.updateToken.mockResolvedValue({});
 
             const result = await service.login(validLoginDto);
 
@@ -159,7 +155,7 @@ describe('AuthService', () => {
         });
 
         it('TC2: SĐT chưa đăng ký → 9995', async () => {
-            mockPrismaService.user.findUnique.mockResolvedValue(null);
+            mockUsersService.findByPhonenumber.mockResolvedValue(null);
 
             const result = await service.login(validLoginDto);
 
@@ -177,7 +173,7 @@ describe('AuthService', () => {
         });
 
         it('TC7: Đúng SĐT nhưng sai mật khẩu → 1004', async () => {
-            mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
+            mockUsersService.findByPhonenumber.mockResolvedValue(mockUser);
 
             const result = await service.login({
                 ...validLoginDto,
@@ -190,24 +186,22 @@ describe('AuthService', () => {
 
         it('TC8: Đăng nhập lần 2 → token cũ bị thay thế', async () => {
             const userWithToken = { ...mockUser, token: 'old-token' };
-            mockPrismaService.user.findUnique.mockResolvedValue(userWithToken);
-            mockPrismaService.user.update.mockResolvedValue({
-                ...userWithToken,
-                token: 'mock-uuid-token',
-            });
+            mockUsersService.findByPhonenumber.mockResolvedValue(userWithToken);
+            mockUsersService.updateToken.mockResolvedValue({});
 
             const result = await service.login(validLoginDto);
 
             expect(result.code).toBe(ResponseCode.OK);
             expect((result.data as { token: string }).token).toBe('mock-uuid-token');
-            expect(mockPrismaService.user.update).toHaveBeenCalledWith({
-                where: { id: 'user-1' },
-                data: { token: 'mock-uuid-token', online: true },
-            });
+            expect(mockUsersService.updateToken).toHaveBeenCalledWith(
+                'user-1',
+                'mock-uuid-token',
+                true,
+            );
         });
 
         it('Tài khoản bị khóa → 9991', async () => {
-            mockPrismaService.user.findUnique.mockResolvedValue({
+            mockUsersService.findByPhonenumber.mockResolvedValue({
                 ...mockUser,
                 status: UserStatus.LOCKED,
             });
@@ -223,23 +217,20 @@ describe('AuthService', () => {
     // ==============================================================
     describe('logout', () => {
         it('TC1: Token hợp lệ → đăng xuất thành công', async () => {
-            mockPrismaService.user.findFirst.mockResolvedValue({
+            mockUsersService.findByToken.mockResolvedValue({
                 id: 'user-1',
                 token: 'valid-token',
             });
-            mockPrismaService.user.update.mockResolvedValue({});
+            mockUsersService.updateToken.mockResolvedValue({});
 
             const result = await service.logout('valid-token');
 
             expect(result.code).toBe(ResponseCode.OK);
-            expect(mockPrismaService.user.update).toHaveBeenCalledWith({
-                where: { id: 'user-1' },
-                data: { token: null, online: false },
-            });
+            expect(mockUsersService.updateToken).toHaveBeenCalledWith('user-1', null, false);
         });
 
         it('TC2: Token không hợp lệ → 9998', async () => {
-            mockPrismaService.user.findFirst.mockResolvedValue(null);
+            mockUsersService.findByToken.mockResolvedValue(null);
 
             const result = await service.logout('invalid-token');
 
@@ -252,14 +243,13 @@ describe('AuthService', () => {
     // ==============================================================
     describe('getVerifyCode', () => {
         it('TC1: SĐT đã signup chưa verify → trả về verify code', async () => {
-            mockPrismaService.user.findUnique.mockResolvedValue({
+            mockUsersService.findByPhonenumber.mockResolvedValue({
                 id: 'user-1',
                 phonenumber: '0912345678',
                 token: null,
             });
-            mockPrismaService.verifyCode.findFirst.mockResolvedValue(null);
-            mockPrismaService.verifyCode.deleteMany.mockResolvedValue({ count: 0 });
-            mockPrismaService.verifyCode.create.mockResolvedValue({});
+            mockVerificationService.getRecentCode.mockResolvedValue(null);
+            mockVerificationService.generateAndStoreCode.mockResolvedValue('ABC123');
 
             const result = await service.getVerifyCode('0912345678');
 
@@ -268,11 +258,11 @@ describe('AuthService', () => {
         });
 
         it('TC2: Gửi lại trong < 120s → trả về mã cũ', async () => {
-            mockPrismaService.user.findUnique.mockResolvedValue({
+            mockUsersService.findByPhonenumber.mockResolvedValue({
                 id: 'user-1',
                 token: null,
             });
-            mockPrismaService.verifyCode.findFirst.mockResolvedValue({
+            mockVerificationService.getRecentCode.mockResolvedValue({
                 code: 'ABC123',
                 createdAt: new Date(), // vừa tạo
             });
@@ -284,7 +274,7 @@ describe('AuthService', () => {
         });
 
         it('TC3: SĐT đã verify xong (có token) → 1010', async () => {
-            mockPrismaService.user.findUnique.mockResolvedValue({
+            mockUsersService.findByPhonenumber.mockResolvedValue({
                 id: 'user-1',
                 token: 'active-token',
             });
@@ -295,7 +285,7 @@ describe('AuthService', () => {
         });
 
         it('TC4: SĐT chưa đăng ký → 9995', async () => {
-            mockPrismaService.user.findUnique.mockResolvedValue(null);
+            mockUsersService.findByPhonenumber.mockResolvedValue(null);
 
             const result = await service.getVerifyCode('0912345678');
 
@@ -308,17 +298,14 @@ describe('AuthService', () => {
     // ==============================================================
     describe('checkVerifyCode', () => {
         it('TC1: SĐT + mã xác thực đúng → 1000 OK', async () => {
-            mockPrismaService.user.findUnique.mockResolvedValue({
+            mockUsersService.findByPhonenumber.mockResolvedValue({
                 id: 'user-1',
                 phonenumber: '0912345678',
                 token: null,
             });
-            mockPrismaService.verifyCode.findFirst.mockResolvedValue({
-                code: 'ABC123',
-                phonenumber: '0912345678',
-            });
-            mockPrismaService.verifyCode.deleteMany.mockResolvedValue({ count: 1 });
-            mockPrismaService.user.update.mockResolvedValue({});
+            mockVerificationService.validateCode.mockResolvedValue(true);
+            mockVerificationService.deleteCodes.mockResolvedValue({ count: 1 });
+            mockUsersService.updateToken.mockResolvedValue({});
 
             const result = await service.checkVerifyCode({
                 phonenumber: '0912345678',
@@ -331,7 +318,7 @@ describe('AuthService', () => {
         });
 
         it('TC3: SĐT không có trong danh sách → 9995', async () => {
-            mockPrismaService.user.findUnique.mockResolvedValue(null);
+            mockUsersService.findByPhonenumber.mockResolvedValue(null);
 
             const result = await service.checkVerifyCode({
                 phonenumber: '0999999999',
@@ -342,7 +329,7 @@ describe('AuthService', () => {
         });
 
         it('TC4: SĐT đã verify trước đó (có token) → 9996', async () => {
-            mockPrismaService.user.findUnique.mockResolvedValue({
+            mockUsersService.findByPhonenumber.mockResolvedValue({
                 id: 'user-1',
                 token: 'existing-token',
             });
@@ -356,14 +343,11 @@ describe('AuthService', () => {
         });
 
         it('TC5: Đúng SĐT + sai mã xác thực → 9993', async () => {
-            mockPrismaService.user.findUnique.mockResolvedValue({
+            mockUsersService.findByPhonenumber.mockResolvedValue({
                 id: 'user-1',
                 token: null,
             });
-            mockPrismaService.verifyCode.findFirst.mockResolvedValue({
-                code: 'ABC123',
-                phonenumber: '0912345678',
-            });
+            mockVerificationService.validateCode.mockResolvedValue(false);
 
             const result = await service.checkVerifyCode({
                 phonenumber: '0912345678',
@@ -388,8 +372,8 @@ describe('AuthService', () => {
         };
 
         it('TC1: Token hợp lệ + thông tin đúng → 1000 OK', async () => {
-            mockPrismaService.user.findFirst.mockResolvedValue(mockUser);
-            mockPrismaService.user.update.mockResolvedValue({
+            mockUsersService.findByToken.mockResolvedValue(mockUser);
+            mockUsersService.update.mockResolvedValue({
                 ...mockUser,
                 username: 'NewUser',
                 avatar: 'new-avatar.png',
@@ -413,7 +397,7 @@ describe('AuthService', () => {
         });
 
         it('TC2: Token không hợp lệ → 9998', async () => {
-            mockPrismaService.user.findFirst.mockResolvedValue(null);
+            mockUsersService.findByToken.mockResolvedValue(null);
 
             const result = await service.changeInfoAfterSignup({
                 token: 'invalid-token',
@@ -424,7 +408,7 @@ describe('AuthService', () => {
         });
 
         it('TC4: Username trùng SĐT → 1004', async () => {
-            mockPrismaService.user.findFirst.mockResolvedValue(mockUser);
+            mockUsersService.findByToken.mockResolvedValue(mockUser);
 
             const result = await service.changeInfoAfterSignup({
                 token: 'valid-token',

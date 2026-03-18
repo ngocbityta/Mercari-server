@@ -14,9 +14,7 @@ async function bootstrap() {
         }),
     );
     app.useGlobalFilters(new HttpExceptionFilter());
-
     app.enableCors();
-
     app.setGlobalPrefix('api');
 
     const port = process.env.PORT ?? 3000;
