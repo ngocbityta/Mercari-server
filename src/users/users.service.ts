@@ -2,9 +2,10 @@ import { Injectable, NotFoundException, ConflictException } from '@nestjs/common
 import { PrismaService } from '../prisma/prisma.service.ts';
 import { CreateUserDto, UpdateUserDto } from './users.dto.ts';
 import { User } from '@prisma/client';
+import { IUserQuery, IUserCommand } from './users.interfaces.ts';
 
 @Injectable()
-export class UsersService {
+export class UsersService implements IUserQuery, IUserCommand {
     constructor(private readonly prisma: PrismaService) {}
 
     async create(createUserDto: CreateUserDto): Promise<User> {

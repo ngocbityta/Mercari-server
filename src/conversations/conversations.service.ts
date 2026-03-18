@@ -3,9 +3,10 @@ import { PrismaService } from '../prisma/prisma.service.ts';
 import { User, Conversation } from '@prisma/client';
 import { EventsGateway } from '../events/events.gateway.ts';
 import { UserStatus } from '../enums/users.enum.ts';
+import { IConversationQuery, IConversationCommand } from './conversations.interfaces.ts';
 
 @Injectable()
-export class ConversationsService {
+export class ConversationsService implements IConversationQuery, IConversationCommand {
     constructor(
         private readonly prisma: PrismaService,
         private readonly eventsGateway: EventsGateway,
@@ -28,8 +29,6 @@ export class ConversationsService {
             take: count,
         });
 
-        // Count for unread messages.
-        // Prisma group by can count DISTINCT conversationId for messages where receiverId = user and isRead = false.
         const numNewMessageCount = await this.prisma.message.groupBy({
             by: ['conversationId'],
             where: {

@@ -5,9 +5,10 @@ import { UserStatus } from '@prisma/client';
 import { TokenService } from './token.service.ts';
 import { UsersService } from '../users/users.service.ts';
 import { VerificationService } from './verification.service.ts';
+import { IAuthActions, IVerificationActions } from './auth.interfaces.ts';
 
 @Injectable()
-export class AuthService {
+export class AuthService implements IAuthActions, IVerificationActions {
     constructor(
         private readonly usersService: UsersService,
         private readonly tokenService: TokenService,

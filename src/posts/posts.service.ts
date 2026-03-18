@@ -1,9 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
+import { IPostQuery, IPostCommand } from './posts.interfaces.ts';
 
 @Injectable()
-export class PostsService {
+export class PostsService implements IPostQuery, IPostCommand {
     constructor(private prisma: PrismaService) {}
 
     async addPost(ownerId: string, content: string, media: string[], hashtags?: string[]) {

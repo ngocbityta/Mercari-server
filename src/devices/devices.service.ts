@@ -1,9 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.ts';
 import { User } from '@prisma/client';
+import { IDeviceCommand } from './devices.interfaces.ts';
 
 @Injectable()
-export class DevicesService {
+export class DevicesService implements IDeviceCommand {
     constructor(private readonly prisma: PrismaService) {}
 
     async setDevtoken(user: User, devtype: number, devtoken: string) {

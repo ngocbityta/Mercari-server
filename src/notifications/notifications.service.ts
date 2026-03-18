@@ -2,9 +2,10 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.ts';
 import { User } from '@prisma/client';
 import { EventsGateway } from '../events/events.gateway.ts';
+import { INotificationQuery, INotificationCommand } from './notifications.interfaces.ts';
 
 @Injectable()
-export class NotificationsService {
+export class NotificationsService implements INotificationQuery, INotificationCommand {
     constructor(
         private readonly prisma: PrismaService,
         private readonly eventsGateway: EventsGateway,
