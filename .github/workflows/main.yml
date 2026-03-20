@@ -19,8 +19,11 @@ jobs:
         node-version: 24.14.0 # Latest LTS (for now)
 
     - name: npm install, build and test
+      env:
+        DATABASE_URL: ${{ secrets.PRISMA_DATABASE_URL }}
       run: |
         npm install
-        DISABLE_ESLINT_PLUGIN=true npm run build 
-        npm run test
+        npx prisma generate
+        npx nest build 
+        npx jest
             
