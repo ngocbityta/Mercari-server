@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1
+
 # Build stage
 FROM node:24-alpine AS builder
 
@@ -14,6 +16,8 @@ RUN --mount=type=secret,id=DATABASE_URL \
 
 RUN npm run build
 
+RUN npm prune --omit=dev
+
 # Production stage
 FROM node:24-alpine
 
@@ -21,7 +25,7 @@ WORKDIR /app
 
 COPY package*.json ./
 
-RUN npm ci --only=production
+COPY --from=builder /app/node_modules ./node_modules
 
 COPY --from=builder /app/dist ./dist
 
