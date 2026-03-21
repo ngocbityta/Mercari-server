@@ -78,6 +78,6 @@ jobs:
         script: |
           cd /home/deploy/group1
           docker compose pull
-          docker compose up -d
+          DATABASE_URL='${{ secrets.PRISMA_DATABASE_URL }}' docker compose up -d
 
     

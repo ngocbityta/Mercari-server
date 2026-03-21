@@ -3,7 +3,9 @@ services:
     image: ghcr.io/ngocbityta/mercari-server:latest
     restart: unless-stopped
     environment:
-      - NODE_ENV=production node dist/src/main.js
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+    command: node dist/src/main.js
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.group1-backend.rule=Host(`group1.it4788.sukkaito.id.vn`)"
