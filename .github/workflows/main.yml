@@ -26,4 +26,45 @@ jobs:
         npx prisma generate
         npx nest build 
         npx jest
-            
+        
+  iamge-build:
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v6.0.2
+
+    - name: Login to GHCR
+      run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+    - name: Build image
+      run: |
+        docker build -t ghcr.io/ngocbityta/Mercari-server:latest .
+
+    - name: Push image
+      run: |
+        docker push ghcr.io/ngocbityta/Mercari-server:latest
+        
+  deploy:
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Scp compose file
+      uses: appleboy/scp-action@v1.0.0
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.ACTION_DEPLOY_USERNAME }}
+        key: ${{ secrets.ACTION_DEPLOY_SSH_KEY }}
+        source: "compose.yml"
+        target: "/home/deploy/group1"
+
+    - name: Deploy
+      uses: appleboy/ssh-action@v1.2.5
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.ACTION_DEPLOY_USERNAME }}
+        key: ${{ secrets.ACTION_DEPLOY_SSH_KEY }}
+        script: |
+          cd /home/deploy/gropu1
+          docker compose pull
+          docker compose up -d
+
+    
