@@ -32,6 +32,7 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: read #This is required for actions/checkout
+      packages: write #This is required for pushing to GHCR
     steps:
     - name: Checkout
       uses: actions/checkout@v6.0.2
