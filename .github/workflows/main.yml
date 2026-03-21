@@ -40,6 +40,8 @@ jobs:
       run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
     - name: Build image
+      env:
+        DATABASE_URL: ${{ secrets.PRISMA_DATABASE_URL }}
       run: |
         docker build -t ghcr.io/ngocbityta/mercari-server:latest .
 
