@@ -9,7 +9,8 @@ RUN npm ci
 
 COPY . .
 
-RUN npx prisma generate
+RUN --mount=type=secret,id=DATABASE_URL \
+	DATABASE_URL="$(cat /run/secrets/DATABASE_URL)" npx prisma generate
 
 RUN npm run build
 

@@ -41,9 +41,10 @@ jobs:
 
     - name: Build image
       env:
-        DATABASE_URL: ${{ secrets.PRISMA_DATABASE_URL }}
+        PRISMA_DATABASE_URL: ${{ secrets.PRISMA_DATABASE_URL }}
+        DOCKER_BUILDKIT: 1
       run: |
-        docker build -t ghcr.io/ngocbityta/mercari-server:latest .
+        docker build --secret id=DATABASE_URL,env=PRISMA_DATABASE_URL -t ghcr.io/ngocbityta/mercari-server:latest .
 
     - name: Push image
       run: |
