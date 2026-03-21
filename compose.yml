@@ -1,0 +1,20 @@
+services:
+  group1-backend:
+    image: ghcr.io/ngocbityta/Mercari-server:latest
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production node dist/src/main.js
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.group1-backend.rule=Host(`group1.it4788.sukkaito.id.vn`)"
+      - "traefik.http.routers.group1-backend.entrypoints=web"
+    networks:
+      - proxy-net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          
+networks:
+  proxy-net:
+    external: true
