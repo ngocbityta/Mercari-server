@@ -21,32 +21,32 @@ enum UserStatus {
 }
 
 model User {
-  id           String    @id @default(uuid()) @db.Uuid
-  phonenumber  String    @unique @db.VarChar
-  password     String    @db.VarChar
-  username     String?   @db.VarChar
-  avatar       String?   @db.VarChar
-  coverImage   String?   @map("cover_image") @db.VarChar
-  description  String?   @db.Text
-  role         UserRole
-  token        String?   @db.VarChar
-  height       String?   @db.VarChar
-  status       UserStatus @default(ACTIVE)
-  online       Boolean    @default(false)
-  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz
+  id             String          @id @default(uuid()) @db.Uuid
+  phonenumber    String          @unique @db.VarChar
+  password       String          @db.VarChar
+  username       String?         @db.VarChar
+  avatar         String?         @db.VarChar
+  coverImage     String?         @map("cover_image") @db.VarChar
+  description    String?         @db.Text
+  role           UserRole
+  token          String?         @db.VarChar
+  height         String?         @db.VarChar
+  status         UserStatus      @default(ACTIVE)
+  online         Boolean         @default(false)
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime        @updatedAt @map("updated_at") @db.Timestamptz
 
-  blocks           Block[]        @relation("blocker")
-  blockedBy        Block[]        @relation("blocked")
-  conversationsA   Conversation[] @relation("partnerA")
-  conversationsB   Conversation[] @relation("partnerB")
-  sentMessages     Message[]      @relation("sender")
-  receivedMessages Message[]      @relation("receiver")
-  devices          Device[]
-  notifications    Notification[]
-  pushSetting      PushSetting?
-  posts            Post[]
-  comments         Comment[]
+  blocks         Block[]         @relation("blocker")
+  blockedBy      Block[]         @relation("blocked")
+  conversationsA Conversation[]  @relation("partnerA")
+  conversationsB Conversation[]  @relation("partnerB")
+  sentMessages   Message[]       @relation("sender")
+  receivedMessages Message[]     @relation("receiver")
+  devices        Device[]
+  notifications  Notification[]
+  pushSetting    PushSetting?
+  posts          Post[]
+  comments       Comment[]
 
   @@map("users")
 }
@@ -63,11 +63,11 @@ model Block {
 }
 
 model Conversation {
-  id         String   @id @default(uuid()) @db.Uuid
-  partnerAId String   @map("partner_a_id") @db.Uuid
-  partnerBId String   @map("partner_b_id") @db.Uuid
-  isDeleted  Boolean  @default(false) @map("is_deleted")
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id         String    @id @default(uuid()) @db.Uuid
+  partnerAId String    @map("partner_a_id") @db.Uuid
+  partnerBId String    @map("partner_b_id") @db.Uuid
+  isDeleted  Boolean   @default(false) @map("is_deleted")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
   partnerA User @relation("partnerA", fields: [partnerAId], references: [id], onDelete: Cascade)
   partnerB User @relation("partnerB", fields: [partnerBId], references: [id], onDelete: Cascade)
@@ -79,27 +79,27 @@ model Conversation {
 }
 
 model Message {
-  id             String   @id @default(uuid()) @db.Uuid
-  conversationId String   @map("conversation_id") @db.Uuid
-  senderId       String   @map("sender_id") @db.Uuid
-  receiverId     String   @map("receiver_id") @db.Uuid
-  content        String?  @db.Text
-  isRead         Boolean  @default(false) @map("is_read")
-  isDeleted      Boolean  @default(false) @map("is_deleted")
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id           String    @id @default(uuid()) @db.Uuid
+  conversationId String  @map("conversation_id") @db.Uuid
+  senderId     String    @map("sender_id") @db.Uuid
+  receiverId   String    @map("receiver_id") @db.Uuid
+  content      String?   @db.Text
+  isRead       Boolean   @default(false) @map("is_read")
+  isDeleted    Boolean   @default(false) @map("is_deleted")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender       User         @relation("sender", fields: [senderId], references: [id], onDelete: Cascade)
-  receiver     User         @relation("receiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  sender       User       @relation("sender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver     User       @relation("receiver", fields: [receiverId], references: [id], onDelete: Cascade)
 
   @@map("messages")
 }
 
 model Device {
-  id       String @id @default(uuid()) @db.Uuid
-  userId   String @map("user_id") @db.Uuid
-  devtype  Int    @default(0)
-  devToken String @map("dev_token") @db.VarChar
+  id       String   @id @default(uuid()) @db.Uuid
+  userId   String   @map("user_id") @db.Uuid
+  devtype  Int      @default(0)
+  devToken String   @map("dev_token") @db.VarChar
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -145,17 +145,23 @@ model PushSetting {
 }
 
 model Post {
-  id         String   @id @default(uuid()) @db.Uuid
-  ownerId    String   @map("owner_id") @db.Uuid
-  content    String   @db.Text
-  media      String[] @db.VarChar
-  hashtags   String[] @db.VarChar @default([])
-  commentIds String[] @map("comment_ids") @db.Uuid @default([])
-  likeIds    String[] @map("like_ids") @db.Uuid @default([])
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  id           String    @id @default(uuid()) @db.Uuid
+  ownerId      String    @map("owner_id") @db.Uuid
+  content      String    @db.Text
+  media        String[]  @db.VarChar
+  hashtags     String[]  @db.VarChar @default([])
+  commentIds   String[]  @map("comment_ids") @db.Uuid @default([])
+  likeIds      String[]  @map("like_ids") @db.Uuid @default([])
+  courseId     String?   @map("course_id") @db.Uuid
+  exerciseId   String?   @map("exercise_id") @db.Uuid
+  deviceMaster String    @map("device_master") @db.Uuid
+  deviceSlave  String?   @map("device_slave") @db.Uuid
+  leftVideo    String?   @map("left_video") @db.VarChar
+  rightVideo   String?   @map("right_video") @db.VarChar
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
-  owner    User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  owner   User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   comments Comment[]
 
   @@map("posts")
@@ -168,18 +174,17 @@ model Comment {
   content   String   @db.Text
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
-  author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
 
   @@map("comments")
 }
 
 model VerifyCode {
-  id          String   @id @default(uuid()) @db.Uuid
-  phonenumber String   @db.VarChar
-  code        String   @db.VarChar(6)
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id         String   @id @default(uuid()) @db.Uuid
+  phonenumber String  @db.VarChar
+  code       String   @db.VarChar(6)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   @@map("verify_codes")
 }

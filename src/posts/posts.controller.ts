@@ -1,66 +1,74 @@
 import { Controller, Post, Get, Patch, Delete, Body, Param, Query } from '@nestjs/common';
 import { PostsService } from './posts.service';
 import {
-    AddPostDto,
-    EditPostDto,
-    GetListPostsDto,
-    CheckNewItemDto,
-    GetSavedSearchDto,
-    SearchPostsDto,
+	AddPostDto,
+	GetPostDto,
+	EditPostDto,
+	GetListPostsDto,
+	CheckNewItemDto,
+	GetSavedSearchDto,
+	SearchPostsDto,
 } from './posts.dto';
 
 @Controller('api')
 export class PostsController {
-    constructor(private postsService: PostsService) {}
+	constructor(private postsService: PostsService) { }
 
-    @Post('add_post')
-    async addPost(@Body() body: AddPostDto) {
-        const { ownerId, content, media, hashtags } = body;
-        return this.postsService.addPost(ownerId, content, media, hashtags);
-    }
+	@Post('add_post')
+	async addPost(@Body() body: AddPostDto) {
+		const { token, left_video, right_video, course_id, exercise_id, described, device_slave, device_master } = body;
+		return this.postsService.addPost(token, left_video, right_video, course_id, exercise_id, described, device_slave, device_master);
+	}
 
-    @Patch('edit_post/:id')
-    async editPost(@Param('id') postId: string, @Body() body: EditPostDto) {
-        const { content, media, hashtags } = body;
-        return this.postsService.editPost(postId, content, media, hashtags);
-    }
+	@Post('get_post')
+	async getPost(@Body() body: GetPostDto) {
+		const { token, id, user_id } = body;
+		return this.postsService.getPost(token, id, user_id);
+	}
 
-    @Delete('delete_post/:id')
-    async deletePost(@Param('id') postId: string) {
-        return this.postsService.deletePost(postId);
-    }
+	@Post('edit_post')
+	async editPost(@Body() body: EditPostDto) {
+		const { token, id, described, video_indices, left_video, right_video } = body;
+		return this.postsService.editPost(token, id, described, video_indices, left_video, right_video);
+	}
 
-    @Get('get_post/:id')
-    async getPost(@Param('id') postId: string) {
-        return this.postsService.getPost(postId);
-    }
+	@Delete('delete_post/:id')
+	async deletePost(@Param('id') postId: string) {
+		return this.postsService.deletePost(postId);
+	}
 
-    @Post('get_list_posts')
-    async getListPosts(@Body() body: GetListPostsDto) {
-        const { index, count, lastId } = body;
-        return this.postsService.getListPosts(index, count, lastId);
-    }
+	@Get('get_post/:id')
+	async getPostLegacy(@Param('id') postId: string) {
+		// Legacy endpoint for backward compatibility
+		return this.postsService.getPost('', postId);
+	}
 
-    @Post('check_new_item')
-    async checkNewItem(@Body() body: CheckNewItemDto) {
-        const { lastId } = body;
-        return this.postsService.checkNewItem(lastId);
-    }
+	@Post('get_list_posts')
+	async getListPosts(@Body() body: GetListPostsDto) {
+		const { index, count, lastId } = body;
+		return this.postsService.getListPosts(index, count, lastId);
+	}
 
-    @Get('search')
-    async search(@Query() query: SearchPostsDto) {
-        const { q, index, count } = query;
-        return this.postsService.searchPosts(q, index, count);
-    }
+	@Post('check_new_item')
+	async checkNewItem(@Body() body: CheckNewItemDto) {
+		const { lastId } = body;
+		return this.postsService.checkNewItem(lastId);
+	}
 
-    @Post('get_saved_search')
-    getSavedSearch(@Body() body: GetSavedSearchDto) {
-        const { userId } = body;
-        return this.postsService.getSavedSearch(userId);
-    }
+	@Get('search')
+	async search(@Query() query: SearchPostsDto) {
+		const { q, index, count } = query;
+		return this.postsService.searchPosts(q, index, count);
+	}
 
-    @Delete('del_saved_search/:id')
-    delSavedSearch(@Param('id') searchId: string) {
-        return this.postsService.delSavedSearch(searchId);
-    }
+	@Post('get_saved_search')
+	getSavedSearch(@Body() body: GetSavedSearchDto) {
+		const { userId } = body;
+		return this.postsService.getSavedSearch(userId);
+	}
+
+	@Delete('del_saved_search/:id')
+	delSavedSearch(@Param('id') searchId: string) {
+		return this.postsService.delSavedSearch(searchId);
+	}
 }
