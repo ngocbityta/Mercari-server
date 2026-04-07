@@ -174,7 +174,7 @@ export class AuthService implements IAuthActions, IVerificationActions {
         );
         if (!isValid) {
             return {
-                code: ResponseCode.INVALID_PARAMETER_VALUE,
+                code: ResponseCode.CODE_VERIFY_INCORRECT,
                 message: 'Code verify is incorrect',
             };
         }

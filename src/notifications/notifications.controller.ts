@@ -43,7 +43,10 @@ export class NotificationsController {
                 dto.notificationId,
             );
             return ApiResponse.success(result);
-        } catch {
+        } catch (error) {
+            if (error instanceof Error && error.message === 'Notification not found') {
+                return ApiResponse.error(ResponseCode.NO_DATA, 'Notification not found');
+            }
             return ApiResponse.error(ResponseCode.EXCEPTION_ERROR, 'Exception error');
         }
     }

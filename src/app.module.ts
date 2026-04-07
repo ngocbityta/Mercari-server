@@ -8,6 +8,7 @@ import { ConversationsModule } from './conversations/conversations.module.ts';
 import { EventsModule } from './events/events.module.ts';
 import { PostsModule } from './posts/posts.module.ts';
 import { AuthModule } from './auth/auth.module.ts';
+import { SettingsModule } from './settings/settings.module.ts';
 
 @Module({
     imports: [
@@ -23,6 +24,7 @@ import { AuthModule } from './auth/auth.module.ts';
         DevicesModule,
         ConversationsModule,
         PostsModule,
+        SettingsModule,
     ],
 })
 export class AppModule {}
