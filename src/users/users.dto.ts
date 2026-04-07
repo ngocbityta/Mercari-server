@@ -1,4 +1,13 @@
-import { IsBoolean, IsEnum, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
+import {
+    IsBoolean,
+    IsEnum,
+    IsNotEmpty,
+    IsOptional,
+    IsString,
+    MinLength,
+    MaxLength,
+    Matches,
+} from 'class-validator';
 import { UserRole, UserStatus } from '../enums/users.enum.ts';
 
 export class CreateUserDto {
@@ -125,11 +134,17 @@ export class ChangePasswordDto {
     token: string;
 
     @IsString()
-    @IsNotEmpty()
+    @IsNotEmpty({ message: 'Mật khẩu cũ không được để trống' })
+    @MinLength(6, { message: 'Mật khẩu cũ quá ngắn' })
+    @MaxLength(10, { message: 'Mật khẩu cũ quá dài' })
+    @Matches(/^[a-zA-Z0-9]+$/, { message: 'Mật khẩu cũ không được chứa ký tự đặc biệt' })
     password: string;
 
     @IsString()
-    @IsNotEmpty()
+    @IsNotEmpty({ message: 'Mật khẩu mới không được để trống' })
+    @MinLength(6, { message: 'Mật khẩu mới quá ngắn' })
+    @MaxLength(10, { message: 'Mật khẩu mới quá dài' })
+    @Matches(/^[a-zA-Z0-9]+$/, { message: 'Mật khẩu mới không được chứa ký tự đặc biệt' })
     newPassword: string;
 }
 

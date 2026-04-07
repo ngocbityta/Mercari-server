@@ -33,7 +33,7 @@ describe('AuthController', () => {
             const expectedResult = {
                 code: ResponseCode.OK,
                 message: ResponseMessage[ResponseCode.OK],
-                data: { verify_code: 'ABC123' },
+                data: { verifyCode: 'ABC123' },
             };
             mockAuthService.signup.mockResolvedValue(expectedResult);
 
@@ -83,7 +83,7 @@ describe('AuthController', () => {
             const expectedResult = {
                 code: ResponseCode.OK,
                 message: ResponseMessage[ResponseCode.OK],
-                data: { verify_code: 'XYZ789' },
+                data: { verifyCode: 'XYZ789' },
             };
             mockAuthService.getVerifyCode.mockResolvedValue(expectedResult);
 
@@ -96,7 +96,7 @@ describe('AuthController', () => {
 
     describe('checkVerifyCode', () => {
         it('should call authService.checkVerifyCode with correct dto', async () => {
-            const dto = { phonenumber: '0912345678', code_verify: 'ABC123' };
+            const dto = { phonenumber: '0912345678', codeVerify: 'ABC123' };
             const expectedResult = {
                 code: ResponseCode.OK,
                 message: ResponseMessage[ResponseCode.OK],

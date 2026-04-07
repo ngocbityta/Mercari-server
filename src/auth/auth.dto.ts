@@ -25,6 +25,10 @@ export class SignupDto {
     @IsEnum(UserRole, { message: 'Loại tài khoản phải là HV hoặc GV' })
     @IsNotEmpty({ message: 'Loại tài khoản không được để trống' })
     role: UserRole;
+
+    @IsString()
+    @IsNotEmpty({ message: 'UUID thiết bị không được để trống' })
+    uuid: string;
 }
 
 export class LoginDto {
@@ -66,12 +70,13 @@ export class CheckVerifyCodeDto {
 
     @IsString()
     @IsNotEmpty({ message: 'Mã xác thực không được để trống' })
-    code_verify: string;
+    codeVerify: string;
 }
 
 export class ChangeInfoAfterSignupDto {
     @IsString()
     @IsNotEmpty({ message: 'Token không được để trống' })
+    @MinLength(36, { message: 'Token không đúng định dạng (quá ngắn)' })
     token: string;
 
     @IsString()

@@ -1,74 +1,99 @@
-import { Controller, Post, Get, Patch, Delete, Body, Param, Query } from '@nestjs/common';
+import { Controller, Post, Get, Delete, Body, Param, Query } from '@nestjs/common';
 import { PostsService } from './posts.service';
 import {
-	AddPostDto,
-	GetPostDto,
-	EditPostDto,
-	GetListPostsDto,
-	CheckNewItemDto,
-	GetSavedSearchDto,
-	SearchPostsDto,
+    AddPostDto,
+    GetPostDto,
+    EditPostDto,
+    GetListPostsDto,
+    CheckNewItemDto,
+    GetSavedSearchDto,
+    SearchPostsDto,
 } from './posts.dto';
 
 @Controller('api')
 export class PostsController {
-	constructor(private postsService: PostsService) { }
+    constructor(private postsService: PostsService) {}
 
-	@Post('add_post')
-	async addPost(@Body() body: AddPostDto) {
-		const { token, left_video, right_video, course_id, exercise_id, described, device_slave, device_master } = body;
-		return this.postsService.addPost(token, left_video, right_video, course_id, exercise_id, described, device_slave, device_master);
-	}
+    @Post('add_post')
+    async addPost(@Body() body: AddPostDto) {
+        const {
+            token,
+            left_video,
+            right_video,
+            course_id,
+            exercise_id,
+            described,
+            device_slave,
+            device_master,
+        } = body;
+        return this.postsService.addPost(
+            token,
+            left_video,
+            right_video,
+            course_id,
+            exercise_id,
+            described,
+            device_slave,
+            device_master,
+        );
+    }
 
-	@Post('get_post')
-	async getPost(@Body() body: GetPostDto) {
-		const { token, id, user_id } = body;
-		return this.postsService.getPost(token, id, user_id);
-	}
+    @Post('get_post')
+    async getPost(@Body() body: GetPostDto) {
+        const { token, id, user_id } = body;
+        return this.postsService.getPost(token, id, user_id);
+    }
 
-	@Post('edit_post')
-	async editPost(@Body() body: EditPostDto) {
-		const { token, id, described, video_indices, left_video, right_video } = body;
-		return this.postsService.editPost(token, id, described, video_indices, left_video, right_video);
-	}
+    @Post('edit_post')
+    async editPost(@Body() body: EditPostDto) {
+        const { token, id, described, video_indices, left_video, right_video } = body;
+        return this.postsService.editPost(
+            token,
+            id,
+            described,
+            video_indices,
+            left_video,
+            right_video,
+        );
+    }
 
-	@Delete('delete_post/:id')
-	async deletePost(@Param('id') postId: string) {
-		return this.postsService.deletePost(postId);
-	}
+    @Delete('delete_post/:id')
+    async deletePost(@Param('id') postId: string) {
+        return this.postsService.deletePost(postId);
+    }
 
-	@Get('get_post/:id')
-	async getPostLegacy(@Param('id') postId: string) {
-		// Legacy endpoint for backward compatibility
-		return this.postsService.getPost('', postId);
-	}
+    @Get('get_post/:id')
+    async getPostLegacy(@Param('id') postId: string) {
+        // Legacy endpoint for backward compatibility
+        return this.postsService.getPost('', postId);
+    }
 
-	@Post('get_list_posts')
-	async getListPosts(@Body() body: GetListPostsDto) {
-		const { index, count, lastId } = body;
-		return this.postsService.getListPosts(index, count, lastId);
-	}
+    @Post('get_list_posts')
+    async getListPosts(@Body() body: GetListPostsDto) {
+        const { index, count, lastId } = body;
+        return this.postsService.getListPosts(index, count, lastId);
+    }
 
-	@Post('check_new_item')
-	async checkNewItem(@Body() body: CheckNewItemDto) {
-		const { lastId } = body;
-		return this.postsService.checkNewItem(lastId);
-	}
+    @Post('check_new_item')
+    async checkNewItem(@Body() body: CheckNewItemDto) {
+        const { lastId } = body;
+        return this.postsService.checkNewItem(lastId);
+    }
 
-	@Get('search')
-	async search(@Query() query: SearchPostsDto) {
-		const { q, index, count } = query;
-		return this.postsService.searchPosts(q, index, count);
-	}
+    @Get('search')
+    async search(@Query() query: SearchPostsDto) {
+        const { q, index, count } = query;
+        return this.postsService.searchPosts(q, index, count);
+    }
 
-	@Post('get_saved_search')
-	getSavedSearch(@Body() body: GetSavedSearchDto) {
-		const { userId } = body;
-		return this.postsService.getSavedSearch(userId);
-	}
+    @Post('get_saved_search')
+    getSavedSearch(@Body() body: GetSavedSearchDto) {
+        const { userId } = body;
+        return this.postsService.getSavedSearch(userId);
+    }
 
-	@Delete('del_saved_search/:id')
-	delSavedSearch(@Param('id') searchId: string) {
-		return this.postsService.delSavedSearch(searchId);
-	}
+    @Delete('del_saved_search/:id')
+    delSavedSearch(@Param('id') searchId: string) {
+        return this.postsService.delSavedSearch(searchId);
+    }
 }

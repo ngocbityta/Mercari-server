@@ -19,7 +19,7 @@ describe('AuthService', () => {
     };
 
     const mockTokenService = {
-        generateToken: jest.fn().mockReturnValue('mock-uuid-token'),
+        generateToken: jest.fn().mockReturnValue('00000000-0000-0000-0000-000000000000'),
     };
 
     const mockVerificationService = {
@@ -65,8 +65,8 @@ describe('AuthService', () => {
 
             expect(result.code).toBe(ResponseCode.OK);
             expect(result.message).toBe(ResponseMessage[ResponseCode.OK]);
-            expect(result.data).toHaveProperty('verify_code');
-            expect((result.data as { verify_code: string }).verify_code).toBe('ABC123');
+            expect(result.data).toHaveProperty('verifyCode');
+            expect((result.data as { verifyCode: string }).verifyCode).toBe('ABC123');
             expect(mockUsersService.create).toHaveBeenCalledWith({
                 phonenumber: '0912345678',
                 password: 'abc123',
@@ -148,7 +148,7 @@ describe('AuthService', () => {
             expect(result.data).toEqual({
                 id: 'user-1',
                 username: 'TestUser',
-                token: 'mock-uuid-token',
+                token: '00000000-0000-0000-0000-000000000000',
                 avatar: 'avatar.png',
                 role: UserRole.HV,
             });
@@ -185,17 +185,19 @@ describe('AuthService', () => {
         });
 
         it('TC8: Đăng nhập lần 2 → token cũ bị thay thế', async () => {
-            const userWithToken = { ...mockUser, token: 'old-token' };
+            const userWithToken = { ...mockUser, token: 'old-token-12345678-1234-1234-1234567' };
             mockUsersService.findByPhonenumber.mockResolvedValue(userWithToken);
             mockUsersService.updateToken.mockResolvedValue({});
 
             const result = await service.login(validLoginDto);
 
             expect(result.code).toBe(ResponseCode.OK);
-            expect((result.data as { token: string }).token).toBe('mock-uuid-token');
+            expect((result.data as { token: string }).token).toBe(
+                '00000000-0000-0000-0000-000000000000',
+            );
             expect(mockUsersService.updateToken).toHaveBeenCalledWith(
                 'user-1',
-                'mock-uuid-token',
+                '00000000-0000-0000-0000-000000000000',
                 true,
             );
         });
@@ -219,11 +221,11 @@ describe('AuthService', () => {
         it('TC1: Token hợp lệ → đăng xuất thành công', async () => {
             mockUsersService.findByToken.mockResolvedValue({
                 id: 'user-1',
-                token: 'valid-token',
+                token: '12345678-1234-1234-1234-123456789012',
             });
             mockUsersService.updateToken.mockResolvedValue({});
 
-            const result = await service.logout('valid-token');
+            const result = await service.logout('12345678-1234-1234-1234-123456789012');
 
             expect(result.code).toBe(ResponseCode.OK);
             expect(mockUsersService.updateToken).toHaveBeenCalledWith('user-1', null, false);
@@ -232,7 +234,7 @@ describe('AuthService', () => {
         it('TC2: Token không hợp lệ → 9998', async () => {
             mockUsersService.findByToken.mockResolvedValue(null);
 
-            const result = await service.logout('invalid-token');
+            const result = await service.logout('missing-or-invalid-token-1234567890');
 
             expect(result.code).toBe(ResponseCode.TOKEN_INVALID);
         });
@@ -254,7 +256,7 @@ describe('AuthService', () => {
             const result = await service.getVerifyCode('0912345678');
 
             expect(result.code).toBe(ResponseCode.OK);
-            expect(result.data).toHaveProperty('verify_code');
+            expect(result.data).toHaveProperty('verifyCode');
         });
 
         it('TC2: Gửi lại trong < 120s → trả về mã cũ', async () => {
@@ -270,18 +272,18 @@ describe('AuthService', () => {
             const result = await service.getVerifyCode('0912345678');
 
             expect(result.code).toBe(ResponseCode.OK);
-            expect((result.data as { verify_code: string }).verify_code).toBe('ABC123');
+            expect((result.data as { verifyCode: string }).verifyCode).toBe('ABC123');
         });
 
         it('TC3: SĐT đã verify xong (có token) → 1010', async () => {
             mockUsersService.findByPhonenumber.mockResolvedValue({
                 id: 'user-1',
-                token: 'active-token',
+                token: 'active-token-12345678-1234-12345678',
             });
 
             const result = await service.getVerifyCode('0912345678');
 
-            expect(result.code).toBe(ResponseCode.ACTION_NOT_VALID);
+            expect(result.code).toBe(ResponseCode.ACTION_DONE_PREVIOUSLY);
         });
 
         it('TC4: SĐT chưa đăng ký → 9995', async () => {
@@ -309,7 +311,7 @@ describe('AuthService', () => {
 
             const result = await service.checkVerifyCode({
                 phonenumber: '0912345678',
-                code_verify: 'ABC123',
+                codeVerify: 'ABC123',
             });
 
             expect(result.code).toBe(ResponseCode.OK);
@@ -322,7 +324,7 @@ describe('AuthService', () => {
 
             const result = await service.checkVerifyCode({
                 phonenumber: '0999999999',
-                code_verify: 'ABC123',
+                codeVerify: 'ABC123',
             });
 
             expect(result.code).toBe(ResponseCode.USER_NOT_VALIDATED);
@@ -331,18 +333,18 @@ describe('AuthService', () => {
         it('TC4: SĐT đã verify trước đó (có token) → 9996', async () => {
             mockUsersService.findByPhonenumber.mockResolvedValue({
                 id: 'user-1',
-                token: 'existing-token',
+                token: 'existing-token-12345678-1234-123456',
             });
 
             const result = await service.checkVerifyCode({
                 phonenumber: '0912345678',
-                code_verify: 'ABC123',
+                codeVerify: 'ABC123',
             });
 
             expect(result.code).toBe(ResponseCode.USER_EXISTED);
         });
 
-        it('TC5: Đúng SĐT + sai mã xác thực → 9993', async () => {
+        it('TC5: Đúng SĐT + sai mã xác thực → 1004', async () => {
             mockUsersService.findByPhonenumber.mockResolvedValue({
                 id: 'user-1',
                 token: null,
@@ -351,10 +353,10 @@ describe('AuthService', () => {
 
             const result = await service.checkVerifyCode({
                 phonenumber: '0912345678',
-                code_verify: 'WRONG1',
+                codeVerify: 'WRONG1',
             });
 
-            expect(result.code).toBe(ResponseCode.CODE_VERIFY_INCORRECT);
+            expect(result.code).toBe(ResponseCode.INVALID_PARAMETER_VALUE);
         });
     });
 
@@ -367,7 +369,7 @@ describe('AuthService', () => {
             phonenumber: '0912345678',
             username: null,
             avatar: null,
-            token: 'valid-token',
+            token: '12345678-1234-1234-1234-123456789012',
             createdAt: new Date('2026-01-01'),
         };
 
@@ -380,7 +382,7 @@ describe('AuthService', () => {
             });
 
             const result = await service.changeInfoAfterSignup({
-                token: 'valid-token',
+                token: '12345678-1234-1234-1234-123456789012',
                 username: 'NewUser',
                 avatar: 'new-avatar.png',
             });
@@ -400,7 +402,7 @@ describe('AuthService', () => {
             mockUsersService.findByToken.mockResolvedValue(null);
 
             const result = await service.changeInfoAfterSignup({
-                token: 'invalid-token',
+                token: 'missing-or-invalid-token-1234567890',
                 username: 'NewUser',
             });
 
@@ -411,7 +413,7 @@ describe('AuthService', () => {
             mockUsersService.findByToken.mockResolvedValue(mockUser);
 
             const result = await service.changeInfoAfterSignup({
-                token: 'valid-token',
+                token: '12345678-1234-1234-1234-123456789012',
                 username: '0912345678',
             });
 

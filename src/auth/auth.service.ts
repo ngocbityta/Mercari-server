@@ -43,7 +43,7 @@ export class AuthService implements IAuthActions, IVerificationActions {
             code: ResponseCode.OK,
             message: ResponseMessage[ResponseCode.OK],
             data: {
-                verify_code: verifyCode,
+                verifyCode: verifyCode,
             },
         };
     }
@@ -122,7 +122,7 @@ export class AuthService implements IAuthActions, IVerificationActions {
 
         if (user.token) {
             return {
-                code: ResponseCode.ACTION_NOT_VALID,
+                code: ResponseCode.ACTION_DONE_PREVIOUSLY,
                 message: 'Action is not valid',
             };
         }
@@ -135,7 +135,7 @@ export class AuthService implements IAuthActions, IVerificationActions {
                     code: ResponseCode.OK,
                     message: ResponseMessage[ResponseCode.OK],
                     data: {
-                        verify_code: existingCode.code,
+                        verifyCode: existingCode.code,
                     },
                 };
             }
@@ -147,7 +147,7 @@ export class AuthService implements IAuthActions, IVerificationActions {
             code: ResponseCode.OK,
             message: ResponseMessage[ResponseCode.OK],
             data: {
-                verify_code: verifyCode,
+                verifyCode: verifyCode,
             },
         };
     }
@@ -170,11 +170,11 @@ export class AuthService implements IAuthActions, IVerificationActions {
 
         const isValid = await this.verificationService.validateCode(
             dto.phonenumber,
-            dto.code_verify,
+            dto.codeVerify,
         );
         if (!isValid) {
             return {
-                code: ResponseCode.CODE_VERIFY_INCORRECT,
+                code: ResponseCode.INVALID_PARAMETER_VALUE,
                 message: 'Code verify is incorrect',
             };
         }
