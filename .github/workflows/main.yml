@@ -1,0 +1,83 @@
+name: Build and test NestJS project
+on:
+  push:
+    branches:
+      - dev/cicd
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read #This is required for actions/checkout
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v6.0.2
+    
+    - name: Setup Node.js environment
+      uses: actions/setup-node@v6.3.0
+      with:
+        # Version Spec of the version to use. Examples: 12.x, 10.15.1, >=10.15.0.
+        node-version: 24.14.0 # Latest LTS (for now)
+
+    - name: npm install, build and test
+      env:
+        DATABASE_URL: ${{ secrets.PRISMA_DATABASE_URL }}
+      run: |
+        npm install
+        npx prisma generate
+        npx nest build 
+        npx jest
+        
+  image-build:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read #This is required for actions/checkout
+      packages: write #This is required for pushing to GHCR
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v6.0.2
+
+    - name: Login to GHCR
+      run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+    - name: Build image
+      env:
+        PRISMA_DATABASE_URL: ${{ secrets.PRISMA_DATABASE_URL }}
+        DOCKER_BUILDKIT: 1
+      run: |
+        docker build --secret id=DATABASE_URL,env=PRISMA_DATABASE_URL -t ghcr.io/ngocbityta/mercari-server:latest .
+
+    - name: Push image
+      run: |
+        docker push ghcr.io/ngocbityta/mercari-server:latest
+        
+  deploy:
+    needs: [build, image-build]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read #This is required for actions/checkout
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v6.0.2
+      
+    - name: Scp compose file
+      uses: appleboy/scp-action@v1.0.0
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.ACTION_DEPLOY_USERNAME }}
+        key: ${{ secrets.ACTION_DEPLOY_SSH_KEY }}
+        source: "compose.yml"
+        target: "/home/deploy/group1"
+
+    - name: Deploy
+      uses: appleboy/ssh-action@v1.2.5
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.ACTION_DEPLOY_USERNAME }}
+        key: ${{ secrets.ACTION_DEPLOY_SSH_KEY }}
+        script: |
+          cd /home/deploy/group1
+          docker compose pull
+          DATABASE_URL='${{ secrets.PRISMA_DATABASE_URL }}' docker compose up -d
+
+    
