@@ -7,6 +7,102 @@ import { ICourseQuery } from './courses.interfaces';
 export class CoursesService implements ICourseQuery {
     constructor(private prisma: PrismaService) {}
 
+    async getListStudents(token: string, index: number, count: number, user_id?: string) {
+        const requester = await this.prisma.user.findFirst({ where: { token } });
+        if (!requester) {
+            return {
+                code: ResponseCode.TOKEN_INVALID,
+                message: ResponseMessage[ResponseCode.TOKEN_INVALID],
+            };
+        }
+
+        if (requester.status === 'LOCKED') {
+            return {
+                code: ResponseCode.ACCOUNT_LOCKED,
+                message: ResponseMessage[ResponseCode.ACCOUNT_LOCKED],
+            };
+        }
+
+        let teacher = requester;
+        if (user_id) {
+            if (requester.role !== 'GV') {
+                return {
+                    code: ResponseCode.NOT_ACCESS,
+                    message: ResponseMessage[ResponseCode.NOT_ACCESS],
+                };
+            }
+            const targetUser = await this.prisma.user.findUnique({ where: { id: user_id } });
+            if (!targetUser) {
+                return {
+                    code: ResponseCode.USER_NOT_VALIDATED,
+                    message: ResponseMessage[ResponseCode.USER_NOT_VALIDATED],
+                };
+            }
+            teacher = targetUser;
+        }
+
+        if (teacher.role !== 'GV') {
+            return {
+                code: ResponseCode.NOT_ACCESS,
+                message: ResponseMessage[ResponseCode.NOT_ACCESS],
+            };
+        }
+
+        if (isNaN(index) || isNaN(count) || index < 0 || count <= 0) {
+            return {
+                code: ResponseCode.INVALID_PARAMETER_VALUE,
+                message: ResponseMessage[ResponseCode.INVALID_PARAMETER_VALUE],
+            };
+        }
+
+        try {
+            const skip = index * count;
+            const where = { teacherId: teacher.id };
+
+            const [enrollments, total] = await Promise.all([
+                this.prisma.enrollment.findMany({
+                    where,
+                    include: {
+                        student: {
+                            select: { id: true, username: true, avatar: true },
+                        },
+                    },
+                    orderBy: { student: { username: 'asc' } },
+                    skip,
+                    take: count,
+                }),
+                this.prisma.enrollment.count({ where }),
+            ]);
+
+            if (enrollments.length === 0 && index === 0) {
+                return {
+                    code: ResponseCode.NO_DATA,
+                    message: ResponseMessage[ResponseCode.NO_DATA],
+                };
+            }
+
+            const students = enrollments.map((e) => ({
+                id: e.student.id,
+                name: e.student.username ?? '',
+                avatar: e.student.avatar ?? '',
+            }));
+
+            return {
+                code: ResponseCode.OK,
+                message: ResponseMessage[ResponseCode.OK],
+                data: {
+                    total: total.toString(),
+                    students,
+                },
+            };
+        } catch {
+            return {
+                code: ResponseCode.CAN_NOT_CONNECT,
+                message: ResponseMessage[ResponseCode.CAN_NOT_CONNECT],
+            };
+        }
+    }
+
     async getRequestedEnrollment(token: string, index: number, count: number, user_id?: string) {
         const requester = await this.prisma.user.findFirst({ where: { token } });
         if (!requester) {

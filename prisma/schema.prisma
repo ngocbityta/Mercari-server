@@ -48,6 +48,8 @@ model User {
   posts                Post[]
   comments             Comment[]
   reports              Report[]
+  enrollments          Enrollment[]        @relation("student_enrollments")
+  teachingEnrollments  Enrollment[]        @relation("teacher_enrollments")
   enrollmentRequests   EnrollmentRequest[] @relation("student_requests")
   receivedEnrollments  EnrollmentRequest[] @relation("teacher_requests")
 
@@ -200,6 +202,19 @@ model Report {
 
   @@unique([postId, userId])
   @@map("reports")
+}
+
+model Enrollment {
+  id        String   @id @default(uuid()) @db.Uuid
+  studentId String   @map("student_id") @db.Uuid
+  teacherId String   @map("teacher_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  student User @relation("student_enrollments", fields: [studentId], references: [id], onDelete: Cascade)
+  teacher User @relation("teacher_enrollments", fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, teacherId])
+  @@map("enrollments")
 }
 
 model EnrollmentRequest {
