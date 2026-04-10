@@ -9,6 +9,7 @@ import { EventsModule } from './events/events.module.ts';
 import { PostsModule } from './posts/posts.module.ts';
 import { AuthModule } from './auth/auth.module.ts';
 import { SettingsModule } from './settings/settings.module.ts';
+import { CoursesModule } from './courses/courses.module.ts';
 
 @Module({
     imports: [
@@ -25,6 +26,7 @@ import { SettingsModule } from './settings/settings.module.ts';
         ConversationsModule,
         PostsModule,
         SettingsModule,
+        CoursesModule,
     ],
 })
 export class AppModule {}

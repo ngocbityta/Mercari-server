@@ -45,9 +45,11 @@ model User {
   devices        Device[]
   notifications  Notification[]
   pushSetting    PushSetting?
-  posts          Post[]
-  comments       Comment[]
-  reports        Report[]
+  posts                Post[]
+  comments             Comment[]
+  reports              Report[]
+  enrollmentRequests   EnrollmentRequest[] @relation("student_requests")
+  receivedEnrollments  EnrollmentRequest[] @relation("teacher_requests")
 
   @@map("users")
 }
@@ -198,6 +200,19 @@ model Report {
 
   @@unique([postId, userId])
   @@map("reports")
+}
+
+model EnrollmentRequest {
+  id        String   @id @default(uuid()) @db.Uuid
+  studentId String   @map("student_id") @db.Uuid
+  teacherId String   @map("teacher_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  student User @relation("student_requests", fields: [studentId], references: [id], onDelete: Cascade)
+  teacher User @relation("teacher_requests", fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, teacherId])
+  @@map("enrollment_requests")
 }
 
 model VerifyCode {
