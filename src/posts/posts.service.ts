@@ -642,7 +642,6 @@ export class PostsService implements IPostQuery, IPostCommand {
         });
 
         try {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             await this.prisma.comment.create({
                 data: {
                     postId,
