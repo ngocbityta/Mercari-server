@@ -119,6 +119,28 @@ export class SearchPostsDto {
     count?: number;
 }
 
+export class GetCommentDto {
+    @IsString()
+    @IsNotEmpty()
+    token: string;
+
+    @IsString()
+    @IsNotEmpty()
+    id: string;
+
+    @IsString()
+    @IsNotEmpty()
+    index: string;
+
+    @IsString()
+    @IsNotEmpty()
+    count: string;
+
+    @IsOptional()
+    @IsString()
+    user_id?: string;
+}
+
 export class LikePostDto {
     @IsString()
     @IsNotEmpty()
@@ -145,4 +167,34 @@ export class ReportPostDto {
     @IsString()
     @IsNotEmpty()
     details: string;
+}
+
+export class SetCommentDto {
+    @IsString()
+    @IsNotEmpty()
+    token: string;
+
+    @IsString()
+    @IsNotEmpty()
+    id: string;
+
+    @IsOptional()
+    @IsString()
+    comment?: string;
+
+    @IsString()
+    @IsNotEmpty()
+    index: string;
+
+    @IsString()
+    @IsNotEmpty()
+    count: string;
+
+    @IsOptional()
+    @IsString()
+    score?: string;
+
+    @IsOptional()
+    @IsString()
+    detail_mistakes?: string;
 }

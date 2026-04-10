@@ -8,8 +8,10 @@ import {
     CheckNewItemDto,
     GetSavedSearchDto,
     SearchPostsDto,
+    GetCommentDto,
     LikePostDto,
     ReportPostDto,
+    SetCommentDto,
 } from './posts.dto';
 
 @Controller()
@@ -99,6 +101,17 @@ export class PostsController {
         return this.postsService.delSavedSearch(searchId);
     }
 
+    @Post('get_comment')
+    async getComment(@Body() body: GetCommentDto) {
+        return this.postsService.getComment(
+            body.token,
+            body.id,
+            parseInt(body.index),
+            parseInt(body.count),
+            body.user_id,
+        );
+    }
+
     @Post('like_post')
     async likePost(@Body() body: LikePostDto) {
         return this.postsService.likePost(body.token, body.id);
@@ -107,5 +120,18 @@ export class PostsController {
     @Post('report_post')
     async reportPost(@Body() body: ReportPostDto) {
         return this.postsService.reportPost(body.token, body.id, body.subject, body.details);
+    }
+
+    @Post('set_comment')
+    async setComment(@Body() body: SetCommentDto) {
+        return this.postsService.setComment(
+            body.token,
+            body.id,
+            parseInt(body.index),
+            parseInt(body.count),
+            body.comment,
+            body.score,
+            body.detail_mistakes,
+        );
     }
 }
