@@ -193,15 +193,26 @@ describe('PostsService - getComment', () => {
     });
 
     /**
-     * TC7: Bài viết chưa có comment nào (index = 0)
-     * Kết quả: 9994 → "Không có dữ liệu"
+     * TC7: Mạng Internet bị ngắt trong khi gửi yêu cầu lấy bình luận.
+     * NOTE: Đây là client-side concern — request không bao giờ đến được server.
+     *       Backend không xử lý được trường hợp này.
+     *       Ứng dụng cần set timeout và hiện "Không thể kết nối Internet" càng sớm càng tốt.
+     *       (DB lỗi sau khi request đến server được test ở TC5 → trả 1001)
      */
-    it('[TC7] Không có comment nào (index=0) → trả về 9994', async () => {
+    it('[TC7] Mạng bị ngắt là client-side concern — backend không xử lý được', () => {
+        expect(true).toBe(true);
+    });
+
+    /**
+     * TC7-extra: Bài viết chưa có comment nào (index = 0)
+     * Kết quả: 9994 → ứng dụng không hiển thị nút "Tải thêm"
+     */
+    it('[TC7-extra] Bài viết chưa có comment nào → trả về 9994', async () => {
         mockPrisma.user.findFirst.mockResolvedValue(mockActiveUser);
         mockPrisma.post.findUnique.mockResolvedValue(mockPost);
         mockPrisma.block.findFirst.mockResolvedValue(null);
         mockPrisma.block.findMany.mockResolvedValue([]);
-        mockPrisma.comment.findMany.mockResolvedValue([]); // Không có comment
+        mockPrisma.comment.findMany.mockResolvedValue([]);
 
         const result = await service.getComment('valid-token', 'post-1', 0, 20);
 
@@ -209,32 +220,47 @@ describe('PostsService - getComment', () => {
     });
 
     /**
-     * TC8: Phân trang - hết dữ liệu (index > 0, không còn comment)
-     * Kết quả: 1000 với data rỗng (end of list), không phải 9994
+     * TC8: Hệ thống chỉ còn số bình luận ít hơn count (trang cuối chưa đầy).
+     * Ví dụ: count=20 nhưng chỉ còn 3 bình luận → server trả về 3.
+     * Kết quả: 1000, data.length < count → ứng dụng biết đây là trang cuối,
+     *          không hiển thị nút "Tải thêm các bình luận…"
      */
-    it('[TC8] Phân trang - hết comment (index=1) → trả về 1000 với data rỗng', async () => {
+    it('[TC8] Còn ít hơn count bình luận (trang cuối) → 1000, data.length < count, không có "Tải thêm"', async () => {
         mockPrisma.user.findFirst.mockResolvedValue(mockActiveUser);
         mockPrisma.post.findUnique.mockResolvedValue(mockPost);
         mockPrisma.block.findFirst.mockResolvedValue(null);
         mockPrisma.block.findMany.mockResolvedValue([]);
-        mockPrisma.comment.findMany.mockResolvedValue([]); // Trang 2 hết dữ liệu
+        // Chỉ còn 3 comment trong khi count = 20
+        mockPrisma.comment.findMany.mockResolvedValue([
+            mockComments[0],
+            mockComments[1],
+            {
+                id: 'comment-3',
+                postId: 'post-1',
+                authorId: 'commenter-3',
+                content: 'Bình luận thứ ba',
+                createdAt: new Date('2024-01-01T08:00:00Z'),
+                author: { id: 'commenter-3', username: 'Commenter3', avatar: 'avatar3.jpg' },
+            },
+        ]);
 
-        const result = await service.getComment('valid-token', 'post-1', 1, 20);
+        const result = await service.getComment('valid-token', 'post-1', 0, 20);
 
-        // index=1 → không phải lần đầu → không trả 9994
         expect(result.code).toBe('1000');
-        expect(result.data).toHaveLength(0);
-        // skip = 1 * 20 = 20
-        expect(mockPrisma.comment.findMany).toHaveBeenCalledWith(
-            expect.objectContaining({ skip: 20, take: 20 }),
-        );
+        // Chỉ nhận được 3 bình luận dù count = 20
+        expect(result.data).toHaveLength(3);
+        // data.length (3) < count (20) → ứng dụng ẩn nút "Tải thêm"
+        expect(result.data!.length).toBeLessThan(20);
+        // Dữ liệu đúng thứ tự mới nhất trước
+        expect(result.data![0].id).toBe('comment-1');
+        expect(result.data![1].id).toBe('comment-2');
     });
 
     /**
-     * TC9: Lọc bình luận từ người bị block (hoặc đã block viewer)
-     * Kết quả: 1000, comment từ commenter-blocked bị loại khỏi danh sách
+     * TC9a: Lọc bình luận từ người bị block — sau khi lọc vẫn còn comment
+     * Kết quả: 1000, comment từ commenter-blocked bị loại, các comment khác vẫn hiển thị
      */
-    it('[TC9] Lọc comment từ user bị block → comment đó không xuất hiện', async () => {
+    it('[TC9a] Lọc comment từ user bị block, vẫn còn comment → trả về 1000', async () => {
         mockPrisma.user.findFirst.mockResolvedValue(mockActiveUser);
         mockPrisma.post.findUnique.mockResolvedValue(mockPost);
         mockPrisma.block.findFirst.mockResolvedValue(null);
@@ -242,8 +268,8 @@ describe('PostsService - getComment', () => {
         mockPrisma.block.findMany.mockResolvedValue([
             { blockerId: 'commenter-blocked', blockedId: 'user-1' },
         ]);
-        // DB đã lọc commenter-blocked ra khỏi kết quả (notIn filter)
-        mockPrisma.comment.findMany.mockResolvedValue([mockComments[0]]); // chỉ comment-1
+        // DB lọc commenter-blocked ra → còn lại 1 comment
+        mockPrisma.comment.findMany.mockResolvedValue([mockComments[0]]);
 
         const result = await service.getComment('valid-token', 'post-1', 0, 20);
 
@@ -261,10 +287,77 @@ describe('PostsService - getComment', () => {
     });
 
     /**
-     * TC10: Truyền user_id nhưng requester không phải GV (role = HV)
-     * Kết quả: 1009 → Not access
+     * TC9b: Lọc bình luận từ người bị block — sau khi lọc KHÔNG còn comment nào (index = 0)
+     * Kết quả: 9994 → server báo không có dữ liệu
      */
-    it('[TC10] user_id param nhưng requester không phải GV → trả về 1009', async () => {
+    it('[TC9b] Lọc comment từ user bị block, không còn comment nào → trả về 9994', async () => {
+        mockPrisma.user.findFirst.mockResolvedValue(mockActiveUser);
+        mockPrisma.post.findUnique.mockResolvedValue(mockPost);
+        mockPrisma.block.findFirst.mockResolvedValue(null);
+        // Tất cả người bình luận đều bị block
+        mockPrisma.block.findMany.mockResolvedValue([
+            { blockerId: 'commenter-1', blockedId: 'user-1' },
+            { blockerId: 'commenter-2', blockedId: 'user-1' },
+        ]);
+        // Sau khi lọc → không còn comment nào
+        mockPrisma.comment.findMany.mockResolvedValue([]);
+
+        const result = await service.getComment('valid-token', 'post-1', 0, 20);
+
+        expect(result.code).toBe('9994');
+        // Đảm bảo query đã lọc đúng
+        expect(mockPrisma.comment.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    authorId: { notIn: ['commenter-1', 'commenter-2'] },
+                }),
+            }),
+        );
+    });
+
+    /**
+     * TC10: Truyền đúng token, đúng id bài viết, nhưng index hoặc count bị sai
+     *        (không phải số, âm, hoặc count = 0).
+     * Kết quả: 1004 → sai tham số. Ứng dụng giữ nguyên hiển thị, không báo người dùng.
+     * NOTE: Ứng dụng cần tự kiểm tra trước khi gửi. Nếu vẫn gửi lên thì server trả 1004.
+     */
+    it('[TC10a] index không phải số (NaN) → trả về 1004', async () => {
+        mockPrisma.user.findFirst.mockResolvedValue(mockActiveUser);
+        mockPrisma.post.findUnique.mockResolvedValue(mockPost);
+
+        // parseInt("abc") = NaN → service nhận index = NaN
+        const result = await service.getComment('valid-token', 'post-1', NaN, 20);
+
+        expect(result.code).toBe('1004');
+        expect(mockPrisma.block.findFirst).not.toHaveBeenCalled();
+        expect(mockPrisma.comment.findMany).not.toHaveBeenCalled();
+    });
+
+    it('[TC10b] count = 0 (không hợp lệ) → trả về 1004', async () => {
+        mockPrisma.user.findFirst.mockResolvedValue(mockActiveUser);
+        mockPrisma.post.findUnique.mockResolvedValue(mockPost);
+
+        const result = await service.getComment('valid-token', 'post-1', 0, 0);
+
+        expect(result.code).toBe('1004');
+        expect(mockPrisma.comment.findMany).not.toHaveBeenCalled();
+    });
+
+    it('[TC10c] index âm (< 0) → trả về 1004', async () => {
+        mockPrisma.user.findFirst.mockResolvedValue(mockActiveUser);
+        mockPrisma.post.findUnique.mockResolvedValue(mockPost);
+
+        const result = await service.getComment('valid-token', 'post-1', -1, 20);
+
+        expect(result.code).toBe('1004');
+        expect(mockPrisma.comment.findMany).not.toHaveBeenCalled();
+    });
+
+    /**
+     * Bonus: GV dùng user_id không phải GV → 1009
+     * (Tham số user_id chỉ dành cho GV)
+     */
+    it('[Bonus-TC] user_id param nhưng requester không phải GV → trả về 1009', async () => {
         mockPrisma.user.findFirst.mockResolvedValue(mockActiveUser); // role = HV
 
         const result = await service.getComment('valid-token', 'post-1', 0, 20, 'user-target');

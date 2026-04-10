@@ -501,6 +501,13 @@ export class PostsService implements IPostQuery, IPostCommand {
             };
         }
 
+        if (isNaN(index) || isNaN(count) || index < 0 || count <= 0) {
+            return {
+                code: ResponseCode.INVALID_PARAMETER_VALUE,
+                message: ResponseMessage[ResponseCode.INVALID_PARAMETER_VALUE],
+            };
+        }
+
         const isBlocked = await this.prisma.block.findFirst({
             where: {
                 OR: [
