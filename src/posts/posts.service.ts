@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
+import { ResponseCode, ResponseMessage } from '../enums/response-code.enum';
 import { IPostQuery, IPostCommand } from './posts.interfaces.ts';
 
 @Injectable()
@@ -443,5 +444,125 @@ export class PostsService implements IPostQuery, IPostCommand {
 
     delSavedSearch(_searchId: string) {
         return { message: 'Saved search deleted' };
+    }
+
+    async likePost(token: string, postId: string) {
+        const user = await this.prisma.user.findFirst({ where: { token } });
+        if (!user) {
+            return {
+                code: ResponseCode.TOKEN_INVALID,
+                message: ResponseMessage[ResponseCode.TOKEN_INVALID],
+            };
+        }
+
+        if (user.status === 'LOCKED') {
+            return {
+                code: ResponseCode.ACCOUNT_LOCKED,
+                message: ResponseMessage[ResponseCode.ACCOUNT_LOCKED],
+            };
+        }
+
+        const post = await this.prisma.post.findUnique({ where: { id: postId } });
+        if (!post) {
+            return {
+                code: ResponseCode.POST_NOT_FOUND,
+                message: ResponseMessage[ResponseCode.POST_NOT_FOUND],
+            };
+        }
+
+        if (post.isLocked) {
+            return {
+                code: ResponseCode.ACTION_DONE_PREVIOUSLY,
+                message: ResponseMessage[ResponseCode.ACTION_DONE_PREVIOUSLY],
+            };
+        }
+
+        try {
+            const alreadyLiked = post.likeIds.includes(user.id);
+
+            const updated = await this.prisma.post.update({
+                where: { id: postId },
+                data: {
+                    likeIds: alreadyLiked
+                        ? { set: post.likeIds.filter((id) => id !== user.id) }
+                        : { push: user.id },
+                },
+            });
+
+            const rawCount = updated.likeIds.length;
+            const safeCount = Math.max(0, rawCount);
+
+            const isLiked = alreadyLiked ? '0' : '1';
+            const correctedCount = isLiked === '1' && safeCount === 0 ? '1' : safeCount.toString();
+
+            return {
+                code: ResponseCode.OK,
+                message: ResponseMessage[ResponseCode.OK],
+                data: {
+                    like: correctedCount,
+                    is_liked: isLiked,
+                },
+            };
+        } catch {
+            return {
+                code: ResponseCode.CAN_NOT_CONNECT,
+                message: ResponseMessage[ResponseCode.CAN_NOT_CONNECT],
+            };
+        }
+    }
+
+    async reportPost(token: string, postId: string, subject: string, details: string) {
+        const user = await this.prisma.user.findFirst({ where: { token } });
+        if (!user) {
+            return {
+                code: ResponseCode.TOKEN_INVALID,
+                message: ResponseMessage[ResponseCode.TOKEN_INVALID],
+            };
+        }
+
+        if (user.status === 'LOCKED') {
+            return {
+                code: ResponseCode.ACCOUNT_LOCKED,
+                message: ResponseMessage[ResponseCode.ACCOUNT_LOCKED],
+            };
+        }
+
+        const post = await this.prisma.post.findUnique({ where: { id: postId } });
+        if (!post) {
+            return {
+                code: ResponseCode.POST_NOT_FOUND,
+                message: ResponseMessage[ResponseCode.POST_NOT_FOUND],
+            };
+        }
+
+        if (post.isLocked) {
+            return {
+                code: ResponseCode.ACTION_DONE_PREVIOUSLY,
+                message: ResponseMessage[ResponseCode.ACTION_DONE_PREVIOUSLY],
+            };
+        }
+
+        try {
+            const existed = await this.prisma.report.findUnique({
+                where: { postId_userId: { postId, userId: user.id } },
+            });
+            if (existed) {
+                return {
+                    code: ResponseCode.ACTION_DONE_PREVIOUSLY,
+                    message: ResponseMessage[ResponseCode.ACTION_DONE_PREVIOUSLY],
+                };
+            }
+
+            await this.prisma.report.create({
+                data: { postId, userId: user.id, subject, details },
+            });
+
+            return { code: ResponseCode.OK, message: ResponseMessage[ResponseCode.OK] };
+        } catch {
+            return {
+                code: ResponseCode.CAN_NOT_CONNECT,
+                message: ResponseMessage[ResponseCode.CAN_NOT_CONNECT],
+            };
+        }
     }
 }

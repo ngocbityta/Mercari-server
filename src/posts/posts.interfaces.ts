@@ -27,4 +27,6 @@ export interface IPostCommand {
     ): Promise<any>;
     deletePost(postId: string): Promise<any>;
     delSavedSearch(searchId: string): any;
+    reportPost(token: string, postId: string, subject: string, details: string): Promise<any>;
+    likePost(token: string, postId: string): Promise<any>;
 }
