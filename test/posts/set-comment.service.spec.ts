@@ -346,14 +346,7 @@ describe('PostsService - setComment', () => {
         mockPrisma.user.findFirst.mockResolvedValue(mockActiveUser);
         mockPrisma.post.findUnique.mockResolvedValue(mockPost);
 
-        const result = await service.setComment(
-            'valid-token',
-            'post-1',
-            0,
-            20,
-            'Bình luận',
-            '85',
-        );
+        const result = await service.setComment('valid-token', 'post-1', 0, 20, 'Bình luận', '85');
 
         expect(result.code).toBe('1004');
         expect(mockPrisma.comment.create).not.toHaveBeenCalled();
