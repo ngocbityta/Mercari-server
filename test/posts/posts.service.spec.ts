@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PostsService } from '../../src/posts/posts.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
-import { ResponseCode } from '../../src/enums/response-code.enum';
 
 // Mock data
 const mockActiveUser = {
@@ -55,10 +54,7 @@ const mockLockedPost = {
 const mockPrisma = {
     user: { findFirst: jest.fn() },
     post: { findUnique: jest.fn() },
-    report: {
-        findUnique: jest.fn(),
-        create: jest.fn(),
-    },
+    report: { findUnique: jest.fn(), create: jest.fn() },
 };
 
 describe('PostsService - reportPost', () => {
@@ -66,10 +62,7 @@ describe('PostsService - reportPost', () => {
 
     beforeEach(async () => {
         const module: TestingModule = await Test.createTestingModule({
-            providers: [
-                PostsService,
-                { provide: PrismaService, useValue: mockPrisma },
-            ],
+            providers: [PostsService, { provide: PrismaService, useValue: mockPrisma }],
         }).compile();
 
         service = module.get<PostsService>(PostsService);
@@ -110,7 +103,7 @@ describe('PostsService - reportPost', () => {
      * Kết quả mong đợi: 9998 → ứng dụng đẩy sang trang đăng nhập
      */
     it('[TC2] Token không hợp lệ (sai/trống/cũ) → trả về 9998', async () => {
-        mockPrisma.user.findFirst.mockResolvedValue(null); // Không tìm thấy user
+        mockPrisma.user.findFirst.mockResolvedValue(null);
 
         const result = await service.reportPost(
             'invalid-or-expired-token',
@@ -120,7 +113,7 @@ describe('PostsService - reportPost', () => {
         );
 
         expect(result.code).toBe('9998');
-        expect(mockPrisma.post.findUnique).not.toHaveBeenCalled(); // Không cần check post nữa
+        expect(mockPrisma.post.findUnique).not.toHaveBeenCalled();
     });
 
     /**
@@ -129,7 +122,7 @@ describe('PostsService - reportPost', () => {
      */
     it('[TC3] Bài viết bị khóa/hạn chế → trả về 1010', async () => {
         mockPrisma.user.findFirst.mockResolvedValue(mockActiveUser);
-        mockPrisma.post.findUnique.mockResolvedValue(mockLockedPost); // isLocked = true
+        mockPrisma.post.findUnique.mockResolvedValue(mockLockedPost);
 
         const result = await service.reportPost(
             'valid-token',
@@ -139,7 +132,7 @@ describe('PostsService - reportPost', () => {
         );
 
         expect(result.code).toBe('1010');
-        expect(mockPrisma.report.create).not.toHaveBeenCalled(); // Không tạo report
+        expect(mockPrisma.report.create).not.toHaveBeenCalled();
     });
 
     /**
@@ -147,7 +140,7 @@ describe('PostsService - reportPost', () => {
      * Kết quả mong đợi: 9991 → ứng dụng đẩy sang trang đăng nhập
      */
     it('[TC4] Tài khoản bị khóa → trả về 9991', async () => {
-        mockPrisma.user.findFirst.mockResolvedValue(mockLockedUser); // status = LOCKED
+        mockPrisma.user.findFirst.mockResolvedValue(mockLockedUser);
 
         const result = await service.reportPost(
             'locked-user-token',
@@ -170,12 +163,7 @@ describe('PostsService - reportPost', () => {
         mockPrisma.post.findUnique.mockResolvedValue(mockPost);
         mockPrisma.report.findUnique.mockRejectedValue(new Error('DB connection failed'));
 
-        const result = await service.reportPost(
-            'valid-token',
-            'post-1',
-            'Vi phạm',
-            'Chi tiết',
-        );
+        const result = await service.reportPost('valid-token', 'post-1', 'Vi phạm', 'Chi tiết');
 
         expect(result.code).toBe('1001');
     });
@@ -186,7 +174,7 @@ describe('PostsService - reportPost', () => {
      */
     it('[TC6] Post id không tồn tại → trả về 9992', async () => {
         mockPrisma.user.findFirst.mockResolvedValue(mockActiveUser);
-        mockPrisma.post.findUnique.mockResolvedValue(null); // Không tìm thấy post
+        mockPrisma.post.findUnique.mockResolvedValue(null);
 
         const result = await service.reportPost(
             'valid-token',
@@ -202,14 +190,9 @@ describe('PostsService - reportPost', () => {
     /**
      * Test case 7: Mạng bị ngắt giữa chừng
      * NOTE: Đây là lỗi phía client/network, không thể test ở service layer.
-     * Phía ứng dụng (mobile/web) cần tự handle timeout và hiện thông báo
-     * "Không thể kết nối Internet" khi request bị lỗi network.
-     * Test case 5 (DB lỗi) là trường hợp gần nhất có thể test ở backend.
+     * Client (mobile/web app) cần handle: request timeout → hiện "Không thể kết nối Internet"
      */
-    it('[TC7] NOTE: Lỗi mạng là client-side concern - backend trả về 1001 khi không kết nối được', () => {
-        // Khi mạng đứt, request không đến được server
-        // Client (mobile/web app) cần handle: request timeout → hiện "Không thể kết nối Internet"
-        // Không cần test ở service layer
+    it('[TC7] Lỗi mạng là client-side concern - backend trả về 1001 khi không kết nối được', () => {
         expect(true).toBe(true);
     });
 });

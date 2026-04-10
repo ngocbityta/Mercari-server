@@ -11,7 +11,7 @@ import {
     ReportPostDto,
 } from './posts.dto';
 
-@Controller('api')
+@Controller()
 export class PostsController {
     constructor(private postsService: PostsService) {}
 
