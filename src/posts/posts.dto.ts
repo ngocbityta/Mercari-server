@@ -168,3 +168,33 @@ export class ReportPostDto {
     @IsNotEmpty()
     details: string;
 }
+
+export class SetCommentDto {
+    @IsString()
+    @IsNotEmpty()
+    token: string;
+
+    @IsString()
+    @IsNotEmpty()
+    id: string;
+
+    @IsOptional()
+    @IsString()
+    comment?: string;
+
+    @IsString()
+    @IsNotEmpty()
+    index: string;
+
+    @IsString()
+    @IsNotEmpty()
+    count: string;
+
+    @IsOptional()
+    @IsString()
+    score?: string;
+
+    @IsOptional()
+    @IsString()
+    detail_mistakes?: string;
+}

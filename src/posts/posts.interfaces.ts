@@ -36,4 +36,13 @@ export interface IPostCommand {
     delSavedSearch(searchId: string): any;
     reportPost(token: string, postId: string, subject: string, details: string): Promise<any>;
     likePost(token: string, postId: string): Promise<any>;
+    setComment(
+        token: string,
+        postId: string,
+        index: number,
+        count: number,
+        comment?: string,
+        score?: string,
+        detail_mistakes?: string,
+    ): Promise<any>;
 }

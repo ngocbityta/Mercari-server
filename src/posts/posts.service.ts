@@ -569,6 +569,133 @@ export class PostsService implements IPostQuery, IPostCommand {
         }
     }
 
+    async setComment(
+        token: string,
+        postId: string,
+        index: number,
+        count: number,
+        comment?: string,
+        score?: string,
+        detail_mistakes?: string,
+    ) {
+        const user = await this.prisma.user.findFirst({ where: { token } });
+        if (!user) {
+            return {
+                code: ResponseCode.TOKEN_INVALID,
+                message: ResponseMessage[ResponseCode.TOKEN_INVALID],
+            };
+        }
+
+        if (user.status === 'LOCKED') {
+            return {
+                code: ResponseCode.ACCOUNT_LOCKED,
+                message: ResponseMessage[ResponseCode.ACCOUNT_LOCKED],
+            };
+        }
+
+        const post = await this.prisma.post.findUnique({ where: { id: postId } });
+        if (!post) {
+            return {
+                code: ResponseCode.POST_NOT_FOUND,
+                message: ResponseMessage[ResponseCode.POST_NOT_FOUND],
+            };
+        }
+
+        if (post.isLocked) {
+            return {
+                code: ResponseCode.ACTION_DONE_PREVIOUSLY,
+                message: ResponseMessage[ResponseCode.ACTION_DONE_PREVIOUSLY],
+            };
+        }
+
+        const hasComment = comment !== undefined && comment.trim() !== '';
+        const hasScore = score !== undefined && score.trim() !== '';
+
+        if (!hasComment && !hasScore) {
+            return {
+                code: ResponseCode.MISSING_PARAMETER,
+                message: ResponseMessage[ResponseCode.MISSING_PARAMETER],
+            };
+        }
+
+        if (hasComment && hasScore) {
+            return {
+                code: ResponseCode.INVALID_PARAMETER_VALUE,
+                message: ResponseMessage[ResponseCode.INVALID_PARAMETER_VALUE],
+            };
+        }
+
+        const isBlocked = await this.prisma.block.findFirst({
+            where: {
+                OR: [
+                    { blockerId: post.ownerId, blockedId: user.id },
+                    { blockerId: user.id, blockedId: post.ownerId },
+                ],
+            },
+        });
+
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await this.prisma.comment.create({
+                data: {
+                    postId,
+                    authorId: user.id,
+                    ...(hasComment
+                        ? { content: comment }
+                        : { score, detailMistakes: detail_mistakes ?? null }),
+                } as any,
+            });
+
+            const allBlocks = await this.prisma.block.findMany({
+                where: {
+                    OR: [{ blockerId: user.id }, { blockedId: user.id }],
+                },
+            });
+            const blockedUserIds = allBlocks
+                .flatMap((b) => [b.blockerId, b.blockedId])
+                .filter((id) => id !== user.id);
+
+            const skip = index * count;
+            const comments = await this.prisma.comment.findMany({
+                where: {
+                    postId,
+                    ...(blockedUserIds.length > 0 ? { authorId: { notIn: blockedUserIds } } : {}),
+                },
+                include: {
+                    author: {
+                        select: { id: true, username: true, avatar: true },
+                    },
+                },
+                orderBy: { createdAt: 'desc' },
+                skip,
+                take: count,
+            });
+
+            const data = comments.map((c) => ({
+                id: c.id,
+                comment: c.content ?? '',
+                created: c.createdAt.toISOString(),
+                poster: {
+                    id: c.author.id,
+                    name: c.author.username ?? '',
+                    avatar: c.author.avatar ?? '',
+                },
+            }));
+
+            return {
+                code: ResponseCode.OK,
+                message: ResponseMessage[ResponseCode.OK],
+                data,
+                is_blocked: isBlocked ? '1' : '0',
+            };
+        } catch {
+            return {
+                code: ResponseCode.CAN_NOT_CONNECT,
+                message: ResponseMessage[ResponseCode.CAN_NOT_CONNECT],
+            };
+        }
+    }
+
     async likePost(token: string, postId: string) {
         const user = await this.prisma.user.findFirst({ where: { token } });
         if (!user) {

@@ -11,6 +11,7 @@ import {
     GetCommentDto,
     LikePostDto,
     ReportPostDto,
+    SetCommentDto,
 } from './posts.dto';
 
 @Controller()
@@ -119,5 +120,18 @@ export class PostsController {
     @Post('report_post')
     async reportPost(@Body() body: ReportPostDto) {
         return this.postsService.reportPost(body.token, body.id, body.subject, body.details);
+    }
+
+    @Post('set_comment')
+    async setComment(@Body() body: SetCommentDto) {
+        return this.postsService.setComment(
+            body.token,
+            body.id,
+            parseInt(body.index),
+            parseInt(body.count),
+            body.comment,
+            body.score,
+            body.detail_mistakes,
+        );
     }
 }
