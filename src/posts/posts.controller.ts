@@ -8,6 +8,7 @@ import {
     CheckNewItemDto,
     GetSavedSearchDto,
     SearchPostsDto,
+    ReportPostDto,
 } from './posts.dto';
 
 @Controller('api')
@@ -95,5 +96,10 @@ export class PostsController {
     @Delete('del_saved_search/:id')
     delSavedSearch(@Param('id') searchId: string) {
         return this.postsService.delSavedSearch(searchId);
+    }
+
+    @Post('report_post')
+    async reportPost(@Body() body: ReportPostDto) {
+        return this.postsService.reportPost(body.token, body.id, body.subject, body.details);
     }
 }

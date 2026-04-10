@@ -118,3 +118,21 @@ export class SearchPostsDto {
     @Type(() => Number)
     count?: number;
 }
+
+export class ReportPostDto {
+    @IsString()
+    @IsNotEmpty()
+    token: string;
+
+    @IsString()
+    @IsNotEmpty()
+    id: string;
+
+    @IsString()
+    @IsNotEmpty()
+    subject: string;
+
+    @IsString()
+    @IsNotEmpty()
+    details: string;
+}

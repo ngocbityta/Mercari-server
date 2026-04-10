@@ -47,6 +47,7 @@ model User {
   pushSetting    PushSetting?
   posts          Post[]
   comments       Comment[]
+  reports        Report[]
 
   @@map("users")
 }
@@ -158,11 +159,13 @@ model Post {
   deviceSlave  String?   @map("device_slave") @db.Uuid
   leftVideo    String?   @map("left_video") @db.VarChar
   rightVideo   String?   @map("right_video") @db.VarChar
+  isLocked     Boolean   @default(false) @map("is_locked")
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
-  owner   User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  owner    User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   comments Comment[]
+  reports  Report[]
 
   @@map("posts")
 }
@@ -178,6 +181,21 @@ model Comment {
   author User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
 
   @@map("comments")
+}
+
+model Report {
+  id        String   @id @default(uuid()) @db.Uuid
+  postId    String   @map("post_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  subject   String   @db.VarChar
+  details   String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@map("reports")
 }
 
 model VerifyCode {
