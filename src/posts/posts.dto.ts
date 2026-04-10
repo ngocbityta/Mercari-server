@@ -119,6 +119,28 @@ export class SearchPostsDto {
     count?: number;
 }
 
+export class GetCommentDto {
+    @IsString()
+    @IsNotEmpty()
+    token: string;
+
+    @IsString()
+    @IsNotEmpty()
+    id: string;
+
+    @IsString()
+    @IsNotEmpty()
+    index: string;
+
+    @IsString()
+    @IsNotEmpty()
+    count: string;
+
+    @IsOptional()
+    @IsString()
+    user_id?: string;
+}
+
 export class LikePostDto {
     @IsString()
     @IsNotEmpty()

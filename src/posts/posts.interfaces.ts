@@ -4,6 +4,13 @@ export interface IPostQuery {
     checkNewItem(lastId: string): Promise<any>;
     searchPosts(query: string, index?: number, count?: number): Promise<any>;
     getSavedSearch(userId: string): any[];
+    getComment(
+        token: string,
+        postId: string,
+        index: number,
+        count: number,
+        user_id?: string,
+    ): Promise<any>;
 }
 
 export interface IPostCommand {
