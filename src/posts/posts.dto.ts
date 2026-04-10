@@ -119,6 +119,16 @@ export class SearchPostsDto {
     count?: number;
 }
 
+export class LikePostDto {
+    @IsString()
+    @IsNotEmpty()
+    token: string;
+
+    @IsString()
+    @IsNotEmpty()
+    id: string;
+}
+
 export class ReportPostDto {
     @IsString()
     @IsNotEmpty()
