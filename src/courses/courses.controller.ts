@@ -1,6 +1,6 @@
 import { Controller, Post, Body } from '@nestjs/common';
 import { CoursesService } from './courses.service';
-import { GetListStudentsDto, GetRequestedEnrollmentDto } from './courses.dto';
+import { GetListStudentsDto, GetRequestedEnrollmentDto, SetRequestCourseDto } from './courses.dto';
 
 @Controller()
 export class CoursesController {
@@ -24,5 +24,10 @@ export class CoursesController {
             parseInt(body.count),
             body.user_id,
         );
+    }
+
+    @Post('set_request_coures')
+    async setRequestCourse(@Body() body: SetRequestCourseDto) {
+        return this.coursesService.setRequestCourse(body.token, body.course_id, body.user_id);
     }
 }

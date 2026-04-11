@@ -350,13 +350,22 @@ describe('CoursesService - getListStudents', () => {
 
     // --- Bonus: Các trường hợp kỹ thuật bổ sung ---
 
-    it('[Bonus] DB lỗi → trả về 1001', async () => {
+    it('[Bonus] DB lỗi khi findMany → trả về 1001', async () => {
         mockPrisma.user.findFirst.mockResolvedValue(mockGVUser);
         mockPrisma.enrollment.findMany.mockRejectedValue(new Error('DB error'));
 
         const result = await service.getListStudents('gv-token', 0, 20);
 
         expect(result.code).toBe('1001');
+    });
+
+    it('[Bonus] DB lỗi ngay khi tra cứu token (findFirst throw) → trả về 1001', async () => {
+        mockPrisma.user.findFirst.mockRejectedValue(new Error('Connection timeout'));
+
+        const result = await service.getListStudents('gv-token', 0, 20);
+
+        expect(result.code).toBe('1001');
+        expect(mockPrisma.enrollment.findMany).not.toHaveBeenCalled();
     });
 
     it('[Bonus] HV gọi API → trả về 1009', async () => {

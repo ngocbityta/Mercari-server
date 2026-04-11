@@ -1,5 +1,19 @@
 import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
 
+export class SetRequestCourseDto {
+    @IsString()
+    @IsNotEmpty()
+    token: string;
+
+    @IsString()
+    @IsNotEmpty()
+    course_id: string;
+
+    @IsString()
+    @IsNotEmpty()
+    user_id: string;
+}
+
 export class GetListStudentsDto {
     @IsString()
     @IsNotEmpty()

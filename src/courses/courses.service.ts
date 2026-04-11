@@ -8,54 +8,54 @@ export class CoursesService implements ICourseQuery {
     constructor(private prisma: PrismaService) {}
 
     async getListStudents(token: string, index: number, count: number, user_id?: string) {
-        const requester = await this.prisma.user.findFirst({ where: { token } });
-        if (!requester) {
-            return {
-                code: ResponseCode.TOKEN_INVALID,
-                message: ResponseMessage[ResponseCode.TOKEN_INVALID],
-            };
-        }
+        try {
+            const requester = await this.prisma.user.findFirst({ where: { token } });
+            if (!requester) {
+                return {
+                    code: ResponseCode.TOKEN_INVALID,
+                    message: ResponseMessage[ResponseCode.TOKEN_INVALID],
+                };
+            }
 
-        if (requester.status === 'LOCKED') {
-            return {
-                code: ResponseCode.ACCOUNT_LOCKED,
-                message: ResponseMessage[ResponseCode.ACCOUNT_LOCKED],
-            };
-        }
+            if (requester.status === 'LOCKED') {
+                return {
+                    code: ResponseCode.ACCOUNT_LOCKED,
+                    message: ResponseMessage[ResponseCode.ACCOUNT_LOCKED],
+                };
+            }
 
-        let teacher = requester;
-        if (user_id) {
-            if (requester.role !== 'GV') {
+            let teacher = requester;
+            if (user_id) {
+                if (requester.role !== 'GV') {
+                    return {
+                        code: ResponseCode.NOT_ACCESS,
+                        message: ResponseMessage[ResponseCode.NOT_ACCESS],
+                    };
+                }
+                const targetUser = await this.prisma.user.findUnique({ where: { id: user_id } });
+                if (!targetUser) {
+                    return {
+                        code: ResponseCode.USER_NOT_VALIDATED,
+                        message: ResponseMessage[ResponseCode.USER_NOT_VALIDATED],
+                    };
+                }
+                teacher = targetUser;
+            }
+
+            if (teacher.role !== 'GV') {
                 return {
                     code: ResponseCode.NOT_ACCESS,
                     message: ResponseMessage[ResponseCode.NOT_ACCESS],
                 };
             }
-            const targetUser = await this.prisma.user.findUnique({ where: { id: user_id } });
-            if (!targetUser) {
+
+            if (isNaN(index) || isNaN(count) || index < 0 || count <= 0) {
                 return {
-                    code: ResponseCode.USER_NOT_VALIDATED,
-                    message: ResponseMessage[ResponseCode.USER_NOT_VALIDATED],
+                    code: ResponseCode.INVALID_PARAMETER_VALUE,
+                    message: ResponseMessage[ResponseCode.INVALID_PARAMETER_VALUE],
                 };
             }
-            teacher = targetUser;
-        }
 
-        if (teacher.role !== 'GV') {
-            return {
-                code: ResponseCode.NOT_ACCESS,
-                message: ResponseMessage[ResponseCode.NOT_ACCESS],
-            };
-        }
-
-        if (isNaN(index) || isNaN(count) || index < 0 || count <= 0) {
-            return {
-                code: ResponseCode.INVALID_PARAMETER_VALUE,
-                message: ResponseMessage[ResponseCode.INVALID_PARAMETER_VALUE],
-            };
-        }
-
-        try {
             const skip = index * count;
             const where = { teacherId: teacher.id };
 
@@ -104,54 +104,54 @@ export class CoursesService implements ICourseQuery {
     }
 
     async getRequestedEnrollment(token: string, index: number, count: number, user_id?: string) {
-        const requester = await this.prisma.user.findFirst({ where: { token } });
-        if (!requester) {
-            return {
-                code: ResponseCode.TOKEN_INVALID,
-                message: ResponseMessage[ResponseCode.TOKEN_INVALID],
-            };
-        }
+        try {
+            const requester = await this.prisma.user.findFirst({ where: { token } });
+            if (!requester) {
+                return {
+                    code: ResponseCode.TOKEN_INVALID,
+                    message: ResponseMessage[ResponseCode.TOKEN_INVALID],
+                };
+            }
 
-        if (requester.status === 'LOCKED') {
-            return {
-                code: ResponseCode.ACCOUNT_LOCKED,
-                message: ResponseMessage[ResponseCode.ACCOUNT_LOCKED],
-            };
-        }
+            if (requester.status === 'LOCKED') {
+                return {
+                    code: ResponseCode.ACCOUNT_LOCKED,
+                    message: ResponseMessage[ResponseCode.ACCOUNT_LOCKED],
+                };
+            }
 
-        let teacher = requester;
-        if (user_id) {
-            if (requester.role !== 'GV') {
+            let teacher = requester;
+            if (user_id) {
+                if (requester.role !== 'GV') {
+                    return {
+                        code: ResponseCode.NOT_ACCESS,
+                        message: ResponseMessage[ResponseCode.NOT_ACCESS],
+                    };
+                }
+                const targetUser = await this.prisma.user.findUnique({ where: { id: user_id } });
+                if (!targetUser) {
+                    return {
+                        code: ResponseCode.USER_NOT_VALIDATED,
+                        message: ResponseMessage[ResponseCode.USER_NOT_VALIDATED],
+                    };
+                }
+                teacher = targetUser;
+            }
+
+            if (teacher.role !== 'GV') {
                 return {
                     code: ResponseCode.NOT_ACCESS,
                     message: ResponseMessage[ResponseCode.NOT_ACCESS],
                 };
             }
-            const targetUser = await this.prisma.user.findUnique({ where: { id: user_id } });
-            if (!targetUser) {
+
+            if (isNaN(index) || isNaN(count) || index < 0 || count <= 0) {
                 return {
-                    code: ResponseCode.USER_NOT_VALIDATED,
-                    message: ResponseMessage[ResponseCode.USER_NOT_VALIDATED],
+                    code: ResponseCode.INVALID_PARAMETER_VALUE,
+                    message: ResponseMessage[ResponseCode.INVALID_PARAMETER_VALUE],
                 };
             }
-            teacher = targetUser;
-        }
 
-        if (teacher.role !== 'GV') {
-            return {
-                code: ResponseCode.NOT_ACCESS,
-                message: ResponseMessage[ResponseCode.NOT_ACCESS],
-            };
-        }
-
-        if (isNaN(index) || isNaN(count) || index < 0 || count <= 0) {
-            return {
-                code: ResponseCode.INVALID_PARAMETER_VALUE,
-                message: ResponseMessage[ResponseCode.INVALID_PARAMETER_VALUE],
-            };
-        }
-
-        try {
             const skip = index * count;
             const where = { teacherId: teacher.id };
 
@@ -191,6 +191,59 @@ export class CoursesService implements ICourseQuery {
                 message: ResponseMessage[ResponseCode.OK],
                 data,
                 total,
+            };
+        } catch {
+            return {
+                code: ResponseCode.CAN_NOT_CONNECT,
+                message: ResponseMessage[ResponseCode.CAN_NOT_CONNECT],
+            };
+        }
+    }
+
+    async setRequestCourse(token: string, course_id: string, user_id: string) {
+        try {
+            const requester = await this.prisma.user.findFirst({ where: { token } });
+            if (!requester) {
+                return {
+                    code: ResponseCode.TOKEN_INVALID,
+                    message: ResponseMessage[ResponseCode.TOKEN_INVALID],
+                };
+            }
+
+            if (requester.status === 'LOCKED') {
+                return {
+                    code: ResponseCode.ACCOUNT_LOCKED,
+                    message: ResponseMessage[ResponseCode.ACCOUNT_LOCKED],
+                };
+            }
+
+            const teacher = await this.prisma.user.findUnique({ where: { id: course_id } });
+            if (!teacher || teacher.role !== 'GV') {
+                return {
+                    code: ResponseCode.USER_NOT_VALIDATED,
+                    message: ResponseMessage[ResponseCode.USER_NOT_VALIDATED],
+                };
+            }
+
+            const student = await this.prisma.user.findUnique({ where: { id: user_id } });
+            if (!student) {
+                return {
+                    code: ResponseCode.USER_NOT_VALIDATED,
+                    message: ResponseMessage[ResponseCode.USER_NOT_VALIDATED],
+                };
+            }
+
+            await this.prisma.enrollmentRequest.create({
+                data: {
+                    teacherId: course_id,
+                    studentId: user_id,
+                } as any,
+            });
+
+            return {
+                code: ResponseCode.OK,
+                message: ResponseMessage[ResponseCode.OK],
+                data: { id: teacher.id },
             };
         } catch {
             return {
