@@ -7,6 +7,8 @@ import {
     Param,
     Delete,
     ParseUUIDPipe,
+    BadRequestException,
+    NotFoundException,
     HttpCode,
     HttpStatus,
     UseGuards,
@@ -23,6 +25,7 @@ import {
     ChangePasswordDto,
     SetBlockDto,
     CheckNewVersionDto,
+    GetListBlocksDto,
 } from './users.dto.ts';
 import { TokenGuard } from '../common/guards/token.guard.ts';
 import { CurrentUser } from '../common/decorators/current-user.decorator.ts';
@@ -128,14 +131,19 @@ export class UserInfoController {
     @HttpCode(HttpStatus.OK)
     @UseGuards(TokenGuard)
     async setBlock(@Body() dto: SetBlockDto, @CurrentUser() user: User) {
+        if (user.status === 'LOCKED') {
+            return ApiResponse.error(ResponseCode.ACCOUNT_LOCKED, 'User account is locked');
+        }
+
         try {
             const result = await this.blockService.setBlock(user, dto.userId, dto.type);
             return ApiResponse.success(result);
         } catch (error) {
-            if (error instanceof Error) {
+            if (error instanceof BadRequestException || error instanceof NotFoundException) {
                 return ApiResponse.error(ResponseCode.INVALID_PARAMETER_VALUE, error.message);
             }
-            return ApiResponse.error(ResponseCode.EXCEPTION_ERROR, 'Exception error');
+            // For DB connection errors or other exceptions
+            return ApiResponse.error(ResponseCode.CAN_NOT_CONNECT, 'Không thể kết nối Internet');
         }
     }
 
@@ -145,6 +153,26 @@ export class UserInfoController {
     checkNewVersion(@Body() dto: CheckNewVersionDto, @CurrentUser() user: User) {
         try {
             const result = this.accountService.checkNewVersion(user, dto.lastUpdate);
+            return ApiResponse.success(result);
+        } catch (error) {
+            if (error instanceof Error) {
+                return ApiResponse.error(ResponseCode.INVALID_PARAMETER_VALUE, error.message);
+            }
+            return ApiResponse.error(ResponseCode.EXCEPTION_ERROR, 'Exception error');
+        }
+    }
+
+    @Post('get_list_blocks')
+    @HttpCode(HttpStatus.OK)
+    @UseGuards(TokenGuard)
+    async getListBlocks(@Body() dto: GetListBlocksDto, @CurrentUser() user: User) {
+        try {
+            const result = await this.blockService.getListBlocks(
+                user,
+                dto.index,
+                dto.count,
+                dto.user_id,
+            );
             return ApiResponse.success(result);
         } catch (error) {
             if (error instanceof Error) {

@@ -1,168 +1,170 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException, BadRequestException } from '@nestjs/common';
-import { BlockService } from '../../src/users/block.service.ts';
-import { PrismaService } from '../../src/prisma/prisma.service.ts';
-import { UserRole, UserStatus } from '../../src/enums/users.enum.ts';
-import { User } from '@prisma/client';
+import { BlockService } from '../../src/users/block.service';
+import { PrismaService } from '../../src/prisma/prisma.service';
+import { BadRequestException } from '@nestjs/common';
 
-const mockUser: User = {
-    id: 'user-a',
-    phonenumber: '0123456789',
-    password: 'hash',
-    username: 'userA',
-    avatar: null,
-    coverImage: null,
-    description: null,
-    role: UserRole.HV,
-    token: 'tok-a',
-    height: null,
-    status: UserStatus.ACTIVE,
-    online: false,
-    createdAt: new Date('2026-01-01'),
-    updatedAt: new Date('2026-01-01'),
-};
-
-const mockTarget: User = {
-    ...mockUser,
-    id: 'user-b',
-    phonenumber: '0987654321',
-    username: 'userB',
-    token: 'tok-b',
-};
-
-const mockLockedTarget: User = {
-    ...mockTarget,
-    id: 'user-locked',
-    status: UserStatus.LOCKED,
-};
-
-const mockPrisma = {
-    user: {
-        findUnique: jest.fn(),
-    },
-    block: {
-        findUnique: jest.fn(),
-        create: jest.fn(),
-        delete: jest.fn(),
-    },
-};
-
-describe('BlockService', () => {
+describe('BlockService - getListBlocks', () => {
     let service: BlockService;
-    let prisma: typeof mockPrisma;
+    let prisma: PrismaService;
 
     beforeEach(async () => {
-        jest.clearAllMocks();
         const module: TestingModule = await Test.createTestingModule({
-            providers: [BlockService, { provide: PrismaService, useValue: mockPrisma }],
+            providers: [
+                BlockService,
+                {
+                    provide: PrismaService,
+                    useValue: {
+                        block: {
+                            findMany: jest.fn(),
+                            count: jest.fn(),
+                        },
+                        user: {
+                            findUnique: jest.fn(),
+                        }
+                    },
+                },
+            ],
         }).compile();
 
         service = module.get<BlockService>(BlockService);
-        prisma = module.get(PrismaService);
+        prisma = module.get<PrismaService>(PrismaService);
     });
 
-    describe('setBlock', () => {
-        it('TC1: should block user successfully (type=0)', async () => {
-            prisma.user.findUnique.mockResolvedValue(mockTarget);
-            prisma.block.findUnique.mockResolvedValue(null);
-            prisma.block.create.mockResolvedValue({
-                blockerId: mockUser.id,
-                blockedId: mockTarget.id,
-            });
+    const mockUser = { id: 'user1', role: 'HV', username: 'user1' };
+    const mockAdmin = { id: 'admin1', role: 'GV', username: 'admin1' };
 
-            const result = await service.setBlock(mockUser, mockTarget.id, '0');
+    it('should return list of blocks for current user', async () => {
+        const mockBlocks = [
+            {
+                blocked: { id: 'target1', username: 'Target One', avatar: 'avatar1.jpg' }
+            }
+        ];
+        jest.spyOn(prisma.block, 'findMany').mockResolvedValue(mockBlocks as any);
+        jest.spyOn(prisma.block, 'count').mockResolvedValue(1);
 
-            expect(prisma.block.create).toHaveBeenCalledWith({
-                data: {
-                    blockerId: mockUser.id,
-                    blockedId: mockTarget.id,
+        const result = await service.getListBlocks(mockUser as any);
+        
+        expect(result.total).toBe('1');
+        expect(result.users).toHaveLength(1);
+        expect(result.users[0].name).toBe('Target One');
+    });
+
+    it('should allow admin to see other user blocks', async () => {
+        jest.spyOn(prisma.block, 'findMany').mockResolvedValue([]);
+        jest.spyOn(prisma.block, 'count').mockResolvedValue(0);
+        const findManySpy = jest.spyOn(prisma.block, 'findMany');
+
+        await service.getListBlocks(mockAdmin as any, '0', '20', 'user2');
+        
+        expect(findManySpy).toHaveBeenCalledWith(expect.objectContaining({
+            where: { blockerId: 'user2' }
+        }));
+    });
+
+    it('should throw error if non-admin tries to see other user blocks', async () => {
+        await expect(service.getListBlocks(mockUser as any, '0', '20', 'user2'))
+            .rejects.toThrow(BadRequestException);
+    });
+
+    it('should handle pagination correctly', async () => {
+        const findManySpy = jest.spyOn(prisma.block, 'findMany').mockResolvedValue([]);
+        jest.spyOn(prisma.block, 'count').mockResolvedValue(0);
+
+        await service.getListBlocks(mockUser as any, '10', '5');
+
+        expect(findManySpy).toHaveBeenCalledWith(expect.objectContaining({
+            skip: 10,
+            take: 5
+        }));
+    });
+});
+
+describe('BlockService - setBlock', () => {
+    let service: BlockService;
+    let prisma: PrismaService;
+
+    beforeEach(async () => {
+        const module: TestingModule = await Test.createTestingModule({
+            providers: [
+                BlockService,
+                {
+                    provide: PrismaService,
+                    useValue: {
+                        block: {
+                            findUnique: jest.fn(),
+                            create: jest.fn(),
+                            delete: jest.fn(),
+                        },
+                        user: {
+                            findUnique: jest.fn(),
+                        }
+                    },
                 },
-            });
-            expect(result).toEqual({});
-        });
+            ],
+        }).compile();
 
-        it('TC1b: should unblock user successfully (type=1)', async () => {
-            prisma.user.findUnique.mockResolvedValue(mockTarget);
-            prisma.block.findUnique.mockResolvedValue({
-                blockerId: mockUser.id,
-                blockedId: mockTarget.id,
-            });
-            prisma.block.delete.mockResolvedValue({});
-
-            const result = await service.setBlock(mockUser, mockTarget.id, '1');
-
-            expect(prisma.block.delete).toHaveBeenCalled();
-            expect(result).toEqual({});
-        });
-
-        it('TC5: should throw error when trying to block yourself', async () => {
-            await expect(service.setBlock(mockUser, mockUser.id, '0')).rejects.toThrow(
-                BadRequestException,
-            );
-        });
-
-        it('TC6: should throw error when target user does not exist', async () => {
-            prisma.user.findUnique.mockResolvedValue(null);
-
-            await expect(service.setBlock(mockUser, 'nonexistent-id', '0')).rejects.toThrow(
-                NotFoundException,
-            );
-        });
-
-        it('TC7: should throw error when target user is locked', async () => {
-            prisma.user.findUnique.mockResolvedValue(mockLockedTarget);
-
-            await expect(service.setBlock(mockUser, mockLockedTarget.id, '0')).rejects.toThrow(
-                BadRequestException,
-            );
-        });
-
-        it('TC8: should throw error when type is invalid (not 0 or 1)', async () => {
-            prisma.user.findUnique.mockResolvedValue(mockTarget);
-
-            await expect(service.setBlock(mockUser, mockTarget.id, '2')).rejects.toThrow(
-                BadRequestException,
-            );
-        });
-
-        it('TC9a: should throw error when blocking already blocked user', async () => {
-            prisma.user.findUnique.mockResolvedValue(mockTarget);
-            prisma.block.findUnique.mockResolvedValue({
-                blockerId: mockUser.id,
-                blockedId: mockTarget.id,
-            });
-
-            await expect(service.setBlock(mockUser, mockTarget.id, '0')).rejects.toThrow(
-                BadRequestException,
-            );
-        });
-
-        it('TC9b: should throw error when unblocking user who was never blocked', async () => {
-            prisma.user.findUnique.mockResolvedValue(mockTarget);
-            prisma.block.findUnique.mockResolvedValue(null);
-
-            await expect(service.setBlock(mockUser, mockTarget.id, '1')).rejects.toThrow(
-                BadRequestException,
-            );
-        });
+        service = module.get<BlockService>(BlockService);
+        prisma = module.get<PrismaService>(PrismaService);
     });
 
-    describe('isBlocked', () => {
-        it('should return true if block exists', async () => {
-            prisma.block.findUnique.mockResolvedValue({
-                blockerId: mockUser.id,
-                blockedId: mockTarget.id,
-            });
+    const mockUser = { id: 'user1', status: 'ACTIVE' };
+    const targetUser = { id: 'user2', status: 'ACTIVE' };
 
-            const result = await service.isBlocked(mockUser.id, mockTarget.id);
-            expect(result).toBe(true);
-        });
+    it('should block a user successfully', async () => {
+        jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(targetUser as any);
+        jest.spyOn(prisma.block, 'findUnique').mockResolvedValue(null);
+        const createSpy = jest.spyOn(prisma.block, 'create').mockResolvedValue({} as any);
 
-        it('should return false if block does not exist', async () => {
-            prisma.block.findUnique.mockResolvedValue(null);
+        await service.setBlock(mockUser as any, 'user2', '0');
 
-            const result = await service.isBlocked(mockUser.id, mockTarget.id);
-            expect(result).toBe(false);
-        });
+        expect(createSpy).toHaveBeenCalled();
+    });
+
+    it('should unblock a user successfully', async () => {
+        jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(targetUser as any);
+        jest.spyOn(prisma.block, 'findUnique').mockResolvedValue({ blockerId: 'user1', blockedId: 'user2' } as any);
+        const deleteSpy = jest.spyOn(prisma.block, 'delete').mockResolvedValue({} as any);
+
+        await service.setBlock(mockUser as any, 'user2', '1');
+
+        expect(deleteSpy).toHaveBeenCalled();
+    });
+
+    it('should throw error when blocking self (TC 5)', async () => {
+        await expect(service.setBlock(mockUser as any, 'user1', '0'))
+            .rejects.toThrow('Bạn không thể chặn chính mình');
+    });
+
+    it('should throw error when user not found (TC 6)', async () => {
+        jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(null);
+        await expect(service.setBlock(mockUser as any, 'unknown', '0'))
+            .rejects.toThrow('Người dùng không tồn tại');
+    });
+
+    it('should throw error when target user is locked (TC 7)', async () => {
+        const lockedUser = { id: 'user2', status: 'LOCKED' };
+        jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(lockedUser as any);
+        await expect(service.setBlock(mockUser as any, 'user2', '0'))
+            .rejects.toThrow('Người dùng này đã bị khóa');
+    });
+
+    it('should throw error for invalid type (TC 8)', async () => {
+        jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(targetUser as any);
+        await expect(service.setBlock(mockUser as any, 'user2', '3'))
+            .rejects.toThrow('Loại hành động không hợp lệ');
+    });
+
+    it('should throw error if blocking already blocked user (TC 9)', async () => {
+        jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(targetUser as any);
+        jest.spyOn(prisma.block, 'findUnique').mockResolvedValue({} as any);
+        await expect(service.setBlock(mockUser as any, 'user2', '0'))
+            .rejects.toThrow('Bạn đã chặn người này rồi');
+    });
+
+    it('should throw error if unblocking user never blocked (TC 9)', async () => {
+        jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(targetUser as any);
+        jest.spyOn(prisma.block, 'findUnique').mockResolvedValue(null);
+        await expect(service.setBlock(mockUser as any, 'user2', '1'))
+            .rejects.toThrow('Bạn chưa từng chặn người này');
     });
 });

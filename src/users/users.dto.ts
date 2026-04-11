@@ -175,3 +175,20 @@ export class CheckNewVersionDto {
     @IsOptional()
     userId?: string;
 }
+export class GetListBlocksDto {
+    @IsString()
+    @IsNotEmpty()
+    token: string;
+
+    @IsString()
+    @IsOptional()
+    index?: string;
+
+    @IsString()
+    @IsOptional()
+    count?: string;
+
+    @IsString()
+    @IsOptional()
+    user_id?: string;
+}
