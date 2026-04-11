@@ -47,7 +47,7 @@ export class CoursesController {
         return this.coursesService.setApproveEnrollment(body.token, body.user_id, body.is_accept);
     }
 
-    @Post('set_request_coures')
+    @Post('set_request_course')
     async setRequestCourse(@Body() body: SetRequestCourseDto) {
         return this.coursesService.setRequestCourse(body.token, body.course_id, body.user_id);
     }
