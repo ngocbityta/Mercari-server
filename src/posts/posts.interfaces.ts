@@ -1,6 +1,13 @@
 export interface IPostQuery {
     getPost(token: string, postId: string, user_id?: string): Promise<any>;
-    getListPosts(index?: number, count?: number, lastId?: string): Promise<any>;
+    getListPosts(
+        token?: string,
+        category_id?: string,
+        last_id?: string,
+        index?: number,
+        count?: number,
+        user_id?: string,
+    ): Promise<any>;
     checkNewItem(lastId: string): Promise<any>;
     searchPosts(query: string, index?: number, count?: number): Promise<any>;
     getSavedSearch(userId: string): any[];
