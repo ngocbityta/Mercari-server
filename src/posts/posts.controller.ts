@@ -8,6 +8,7 @@ import {
     CheckNewItemDto,
     GetSavedSearchDto,
     SearchPostsDto,
+    DelSavedSearchDto,
     GetCommentDto,
     LikePostDto,
     ReportPostDto,
@@ -89,21 +90,37 @@ export class PostsController {
         return this.postsService.checkNewItem(body.last_id, body.category_id);
     }
 
-    @Get('search')
-    async search(@Query() query: SearchPostsDto) {
-        const { q, index, count } = query;
-        return this.postsService.searchPosts(q, index, count);
+    @Post('search')
+    async search(@Body() body: SearchPostsDto) {
+        return this.postsService.searchPosts(
+            body.token,
+            body.keyword,
+            body.category_id,
+            body.duration_min,
+            body.duration_max,
+            body.user_id,
+            body.index,
+            body.count,
+        );
     }
 
     @Post('get_saved_search')
-    getSavedSearch(@Body() body: GetSavedSearchDto) {
-        const { userId } = body;
-        return this.postsService.getSavedSearch(userId);
+    async getSavedSearch(@Body() body: GetSavedSearchDto) {
+        return this.postsService.getSavedSearch(
+            body.token,
+            body.index,
+            body.count,
+            body.user_id,
+        );
     }
 
-    @Delete('del_saved_search/:id')
-    delSavedSearch(@Param('id') searchId: string) {
-        return this.postsService.delSavedSearch(searchId);
+    @Post('del_saved_search')
+    async delSavedSearch(@Body() body: DelSavedSearchDto) {
+        return this.postsService.delSavedSearch(
+            body.token,
+            body.search_id,
+            body.all,
+        );
     }
 
     @Post('get_comment')
