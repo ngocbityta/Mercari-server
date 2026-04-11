@@ -17,10 +17,7 @@ describe('CoursesService - setRequestCourse', () => {
 
     beforeEach(async () => {
         const module: TestingModule = await Test.createTestingModule({
-            providers: [
-                CoursesService,
-                { provide: PrismaService, useValue: mockPrisma },
-            ],
+            providers: [CoursesService, { provide: PrismaService, useValue: mockPrisma }],
         }).compile();
 
         service = module.get<CoursesService>(CoursesService);
@@ -35,8 +32,8 @@ describe('CoursesService - setRequestCourse', () => {
 
         mockPrisma.user.findFirst.mockResolvedValue(requester);
         mockPrisma.user.findUnique
-            .mockResolvedValueOnce(teacher)   // course_id lookup
-            .mockResolvedValueOnce(student);  // user_id lookup
+            .mockResolvedValueOnce(teacher) // course_id lookup
+            .mockResolvedValueOnce(student); // user_id lookup
         mockPrisma.enrollmentRequest.create.mockResolvedValue({
             id: 'req-1',
             teacherId: teacher.id,
@@ -120,9 +117,7 @@ describe('CoursesService - setRequestCourse', () => {
         const requester = { id: 'student-1', token: 'valid-token', status: 'ACTIVE', role: 'HV' };
 
         mockPrisma.user.findFirst.mockResolvedValue(requester);
-        mockPrisma.user.findUnique
-            .mockResolvedValueOnce(teacher)
-            .mockResolvedValueOnce(student);
+        mockPrisma.user.findUnique.mockResolvedValueOnce(teacher).mockResolvedValueOnce(student);
         mockPrisma.enrollmentRequest.create.mockRejectedValue(new Error('DB connection failed'));
 
         const result = await service.setRequestCourse('valid-token', teacher.id, student.id);
@@ -147,10 +142,14 @@ describe('CoursesService - setRequestCourse', () => {
 
         mockPrisma.user.findFirst.mockResolvedValue(requester);
         mockPrisma.user.findUnique
-            .mockResolvedValueOnce(teacher)    // course_id lookup → thành công
-            .mockResolvedValueOnce(null);      // user_id lookup → không tìm thấy
+            .mockResolvedValueOnce(teacher) // course_id lookup → thành công
+            .mockResolvedValueOnce(null); // user_id lookup → không tìm thấy
 
-        const result = await service.setRequestCourse('valid-token', teacher.id, 'nonexistent-student');
+        const result = await service.setRequestCourse(
+            'valid-token',
+            teacher.id,
+            'nonexistent-student',
+        );
 
         expect(result.code).toBe('9995');
         expect(mockPrisma.enrollmentRequest.create).not.toHaveBeenCalled();

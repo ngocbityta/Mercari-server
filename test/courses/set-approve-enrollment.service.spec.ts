@@ -34,10 +34,7 @@ describe('CoursesService - setApproveEnrollment', () => {
 
     beforeEach(async () => {
         const module: TestingModule = await Test.createTestingModule({
-            providers: [
-                CoursesService,
-                { provide: PrismaService, useValue: mockPrisma },
-            ],
+            providers: [CoursesService, { provide: PrismaService, useValue: mockPrisma }],
         }).compile();
 
         service = module.get<CoursesService>(CoursesService);

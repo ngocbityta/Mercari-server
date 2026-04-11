@@ -148,7 +148,12 @@ describe('CoursesService - getListCoursesOfStudent', () => {
         mockPrisma.user.findFirst.mockResolvedValue(mockRequester);
         mockPrisma.user.findUnique.mockResolvedValue(null);
 
-        const result = await service.getListCoursesOfStudent('valid-token', 0, 20, 'nonexistent-id');
+        const result = await service.getListCoursesOfStudent(
+            'valid-token',
+            0,
+            20,
+            'nonexistent-id',
+        );
 
         expect(result.code).toBe('9995');
         expect(mockPrisma.enrollment.findMany).not.toHaveBeenCalled();
@@ -198,9 +203,10 @@ describe('CoursesService - getListCoursesOfStudent', () => {
         expect(result.code).toBe('1000');
         expect(parseInt(result.data!.total)).toBeGreaterThanOrEqual(0);
         // App: nếu total bị lỗi → fallback = courses.length
-        const safeTotalApp = isNaN(parseInt(result.data!.total)) || parseInt(result.data!.total) < 0
-            ? result.data!.courses.length
-            : parseInt(result.data!.total);
+        const safeTotalApp =
+            isNaN(parseInt(result.data!.total)) || parseInt(result.data!.total) < 0
+                ? result.data!.courses.length
+                : parseInt(result.data!.total);
         expect(safeTotalApp).toBe(1);
     });
 
