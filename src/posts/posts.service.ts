@@ -42,8 +42,12 @@ export class PostsService implements IPostQuery, IPostCommand {
             throw new Error('course_id must match user ID for teacher posting');
         }
 
-        // Validate that if exercise_id is provided, the post exists and is owned by a teacher
+        // [REQ]: GV không làm bài tập của GV khác
         if (exercise_id) {
+            if (user.role === 'GV') {
+                throw new Error('Giảng viên không được làm bài tập');
+            }
+
             const exercisePost = await this.prisma.post.findUnique({
                 where: { id: exercise_id },
             });
@@ -345,6 +349,12 @@ export class PostsService implements IPostQuery, IPostCommand {
             (responseData as any).time_series_poses = timeSeriesPoses;
         }
 
+        // Calculate counts
+        const commentCount = await this.prisma.comment.count({ where: { postId: post.id } });
+        responseData.like = (post.likeIds?.length || 0).toString();
+        responseData.comment = commentCount.toString();
+        responseData.is_liked = (post.likeIds || []).includes(viewer.id) ? '1' : '0';
+
         return responseData;
     }
 
@@ -388,7 +398,19 @@ export class PostsService implements IPostQuery, IPostCommand {
             }
         }
 
-        const where: Prisma.PostWhereInput = {};
+        // [REQ]: Không hiển thị bài của những người bị chặn
+        const blockedUsers = await this.prisma.block.findMany({
+            where: {
+                OR: [{ blockerId: viewer.id }, { blockedId: viewer.id }],
+            },
+        });
+        const blockedIds = blockedUsers.map((b) =>
+            b.blockerId === viewer.id ? b.blockedId : b.blockerId,
+        );
+
+        const where: Prisma.PostWhereInput = {
+            ownerId: { notIn: blockedIds },
+        };
 
         // Category filter (if implemented in schema, currently not used)
         if (category_id && category_id !== '0') {
@@ -405,19 +427,69 @@ export class PostsService implements IPostQuery, IPostCommand {
             }
         }
 
-        const skip = index * count;
-
-        const posts = await this.prisma.post.findMany({
-            where,
-            include: {
-                owner: true,
-            },
-            orderBy: { createdAt: 'desc' },
-            skip,
-            take: count,
+        // [REQ]: Ưu tiên các bài viết của khóa học đã đăng ký
+        const enrollments = await (this.prisma as any).enrollment.findMany({
+            where: { studentId: viewer.id },
+            select: { teacherId: true },
         });
+        const teacherIds = enrollments.map((e) => e.teacherId);
 
-        if (posts.length === 0 && index === 0) {
+        const skipTotal = (index || 0) * count;
+        const takeTotal = count;
+
+        let finalPosts: any[] = [];
+
+        // 1. Prepare teacher filter
+        const teacherWhere: Prisma.PostWhereInput = {
+            ...where,
+            ownerId: { in: teacherIds },
+        };
+        const totalTeacherPosts = await this.prisma.post.count({ where: teacherWhere });
+
+        // 2. Prepare others filter
+        const othersWhere: Prisma.PostWhereInput = {
+            ...where,
+            ownerId: { notIn: [...blockedIds, ...teacherIds] },
+        };
+
+        if (skipTotal < totalTeacherPosts) {
+            // Fetch from teachers first
+            const tPosts = await this.prisma.post.findMany({
+                where: teacherWhere,
+                include: { owner: true },
+                orderBy: { createdAt: 'desc' },
+                skip: skipTotal,
+                take: takeTotal,
+            });
+            finalPosts = [...tPosts];
+
+            if (finalPosts.length < takeTotal) {
+                // Need more from others to fill the page
+                const remaining = takeTotal - finalPosts.length;
+                const oPosts = await this.prisma.post.findMany({
+                    where: othersWhere,
+                    include: { owner: true },
+                    orderBy: { createdAt: 'desc' },
+                    skip: 0,
+                    take: remaining,
+                });
+                finalPosts = [...finalPosts, ...oPosts];
+            }
+        } else {
+            // Skip past teacher posts, fetch only from others
+            const othersSkip = skipTotal - totalTeacherPosts;
+            finalPosts = await this.prisma.post.findMany({
+                where: othersWhere,
+                include: { owner: true },
+                orderBy: { createdAt: 'desc' },
+                skip: othersSkip,
+                take: takeTotal,
+            });
+        }
+
+        const posts = finalPosts;
+
+        if (posts.length === 0 && (index || 0) === 0) {
             return {
                 code: ResponseCode.NO_DATA,
                 message: ResponseMessage[ResponseCode.NO_DATA],

@@ -71,4 +71,48 @@ export class BlockService {
         });
         return !!block;
     }
+
+    async getListBlocks(currentUser: User, index?: string, count?: string, userId?: string) {
+        let targetUserId = currentUser.id;
+
+        if (userId && userId !== currentUser.id) {
+            // Check if admin (GV)
+            if (currentUser.role !== 'GV') {
+                throw new BadRequestException('Bạn không có quyền xem danh sách chặn của người khác');
+            }
+            targetUserId = userId;
+        }
+
+        const skip = index ? parseInt(index) : 0;
+        const take = count ? parseInt(count) : 20;
+
+        const [blocks, total] = await Promise.all([
+            this.prisma.block.findMany({
+                where: { blockerId: targetUserId },
+                include: {
+                    blocked: {
+                        select: {
+                            id: true,
+                            username: true,
+                            avatar: true,
+                        },
+                    },
+                },
+                skip,
+                take,
+            }),
+            this.prisma.block.count({
+                where: { blockerId: targetUserId },
+            }),
+        ]);
+
+        return {
+            total: total.toString(),
+            users: blocks.map((b) => ({
+                id: b.blocked.id,
+                name: b.blocked.username || '',
+                avatar: b.blocked.avatar || '',
+            })),
+        };
+    }
 }
