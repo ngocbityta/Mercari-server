@@ -7,6 +7,78 @@ import { ICourseQuery } from './courses.interfaces';
 export class CoursesService implements ICourseQuery {
     constructor(private prisma: PrismaService) {}
 
+    async setApproveEnrollment(token: string, user_id: string, is_accept: string) {
+        try {
+            const requester = await this.prisma.user.findFirst({ where: { token } });
+            if (!requester) {
+                return {
+                    code: ResponseCode.TOKEN_INVALID,
+                    message: ResponseMessage[ResponseCode.TOKEN_INVALID],
+                };
+            }
+
+            if (requester.status === 'LOCKED') {
+                return {
+                    code: ResponseCode.ACCOUNT_LOCKED,
+                    message: ResponseMessage[ResponseCode.ACCOUNT_LOCKED],
+                };
+            }
+
+            if (requester.role !== 'GV') {
+                return {
+                    code: ResponseCode.NOT_ACCESS,
+                    message: ResponseMessage[ResponseCode.NOT_ACCESS],
+                };
+            }
+
+            if (is_accept !== '0' && is_accept !== '1') {
+                return {
+                    code: ResponseCode.INVALID_PARAMETER_VALUE,
+                    message: ResponseMessage[ResponseCode.INVALID_PARAMETER_VALUE],
+                };
+            }
+
+            const request = await this.prisma.enrollmentRequest.findFirst({
+                where: { studentId: user_id, teacherId: requester.id },
+                include: { student: { select: { status: true } } },
+            });
+            if (!request) {
+                return {
+                    code: ResponseCode.USER_NOT_VALIDATED,
+                    message: ResponseMessage[ResponseCode.USER_NOT_VALIDATED],
+                };
+            }
+
+            if (request.student.status === 'LOCKED') {
+                return {
+                    code: ResponseCode.USER_NOT_VALIDATED,
+                    message: ResponseMessage[ResponseCode.USER_NOT_VALIDATED],
+                };
+            }
+
+            if (is_accept === '1') {
+                await this.prisma.$transaction(async (tx) => {
+                    await (tx as any).enrollment.create({
+                        data: { studentId: user_id, teacherId: requester.id } as any,
+                    });
+                    await (tx as any).enrollmentRequest.delete({ where: { id: request.id } });
+                });
+            } else {
+                await this.prisma.enrollmentRequest.delete({ where: { id: request.id } });
+            }
+
+            return {
+                code: ResponseCode.OK,
+                message: ResponseMessage[ResponseCode.OK],
+            };
+        } catch {
+            return {
+                code: ResponseCode.CAN_NOT_CONNECT,
+                message: ResponseMessage[ResponseCode.CAN_NOT_CONNECT],
+            };
+        }
+    }
+
     async getListStudents(token: string, index: number, count: number, user_id?: string) {
         try {
             const requester = await this.prisma.user.findFirst({ where: { token } });

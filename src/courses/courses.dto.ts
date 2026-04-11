@@ -1,5 +1,19 @@
 import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
 
+export class SetApproveEnrollmentDto {
+    @IsString()
+    @IsNotEmpty()
+    token: string;
+
+    @IsString()
+    @IsNotEmpty()
+    user_id: string;
+
+    @IsString()
+    @IsNotEmpty()
+    is_accept: string;
+}
+
 export class SetRequestCourseDto {
     @IsString()
     @IsNotEmpty()

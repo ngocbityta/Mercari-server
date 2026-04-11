@@ -1,4 +1,5 @@
 export interface ICourseQuery {
+    setApproveEnrollment(token: string, user_id: string, is_accept: string): Promise<any>;
     getListStudents(token: string, index: number, count: number, user_id?: string): Promise<any>;
     getRequestedEnrollment(
         token: string,
