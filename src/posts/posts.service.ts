@@ -436,55 +436,57 @@ export class PostsService implements IPostQuery, IPostCommand {
             });
         }
 
-        const mappedPosts = (await Promise.all(
-            posts.map(async (post) => {
-                const content = post.content || '';
-                const media = post.media || [];
+        const mappedPosts = (
+            await Promise.all(
+                posts.map(async (post) => {
+                    const content = post.content || '';
+                    const media = post.media || [];
 
-                const isLiked = viewer ? (post.likeIds || []).includes(viewer.id) : false;
-                
-                let isBlocked = false;
-                if (viewer) {
-                    const blockRelationship = await this.prisma.block.findFirst({
-                        where: {
-                            OR: [
-                                { blockerId: post.ownerId, blockedId: viewer.id },
-                                { blockerId: viewer.id, blockedId: post.ownerId },
-                            ],
+                    const isLiked = viewer ? (post.likeIds || []).includes(viewer.id) : false;
+
+                    let isBlocked = false;
+                    if (viewer) {
+                        const blockRelationship = await this.prisma.block.findFirst({
+                            where: {
+                                OR: [
+                                    { blockerId: post.ownerId, blockedId: viewer.id },
+                                    { blockerId: viewer.id, blockedId: post.ownerId },
+                                ],
+                            },
+                        });
+                        isBlocked = !!blockRelationship;
+                    }
+
+                    const canEdit = viewer ? post.ownerId === viewer.id && !post.isLocked : false;
+                    const canComment = !post.isLocked;
+
+                    return {
+                        id: post.id,
+                        described: content,
+                        video: media.map((url, idx) => ({
+                            url,
+                            thumb: `thumbnail_${idx}.jpg`,
+                        })),
+                        created: post.createdAt.toISOString(),
+                        like: (post.likeIds?.length || 0).toString(),
+                        comment: (post.commentIds?.length || 0).toString(),
+                        is_liked: isLiked ? '1' : '0',
+                        is_blocked: isBlocked ? '1' : '0',
+                        can_comment: canComment ? '1' : '0',
+                        can_edit: canEdit ? '1' : '0',
+                        banned: post.owner.status === 'LOCKED' ? '1' : '0',
+                        author: {
+                            id: post.owner.id,
+                            name: post.owner.username || '',
+                            avatar: post.owner.avatar || '',
+                            role: post.owner.role,
                         },
-                    });
-                    isBlocked = !!blockRelationship;
-                }
-
-                const canEdit = viewer ? (post.ownerId === viewer.id && !post.isLocked) : false;
-                const canComment = !post.isLocked;
-
-                return {
-                    id: post.id,
-                    described: content,
-                    video: media.map((url, idx) => ({
-                        url,
-                        thumb: `thumbnail_${idx}.jpg`,
-                    })),
-                    created: post.createdAt.toISOString(),
-                    like: (post.likeIds?.length || 0).toString(),
-                    comment: (post.commentIds?.length || 0).toString(),
-                    is_liked: isLiked ? '1' : '0',
-                    is_blocked: isBlocked ? '1' : '0',
-                    can_comment: canComment ? '1' : '0',
-                    can_edit: canEdit ? '1' : '0',
-                    banned: post.owner.status === 'LOCKED' ? '1' : '0',
-                    author: {
-                        id: post.owner.id,
-                        name: post.owner.username || '',
-                        avatar: post.owner.avatar || '',
-                        role: post.owner.role,
-                    },
-                    exercise_id: post.exerciseId || '',
-                    time_series_poses: post.owner.role === 'GV' ? [] : undefined,
-                };
-            }),
-        )).filter(post => post.described !== '' || post.video.length > 0);
+                        exercise_id: post.exerciseId || '',
+                        time_series_poses: post.owner.role === 'GV' ? [] : undefined,
+                    };
+                }),
+            )
+        ).filter((post) => post.described !== '' || post.video.length > 0);
 
         if (mappedPosts.length === 0 && posts.length > 0 && index === 0) {
             return {
