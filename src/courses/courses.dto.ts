@@ -46,6 +46,24 @@ export class GetListStudentsDto {
     user_id?: string;
 }
 
+export class GetListCoursesOfStudentDto {
+    @IsString()
+    @IsNotEmpty()
+    token: string;
+
+    @IsString()
+    @IsNotEmpty()
+    index: string;
+
+    @IsString()
+    @IsNotEmpty()
+    count: string;
+
+    @IsString()
+    @IsNotEmpty()
+    user_id: string;
+}
+
 export class GetRequestedEnrollmentDto {
     @IsString()
     @IsNotEmpty()

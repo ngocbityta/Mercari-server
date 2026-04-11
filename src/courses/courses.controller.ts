@@ -1,6 +1,7 @@
 import { Controller, Post, Body } from '@nestjs/common';
 import { CoursesService } from './courses.service';
 import {
+    GetListCoursesOfStudentDto,
     GetListStudentsDto,
     GetRequestedEnrollmentDto,
     SetApproveEnrollmentDto,
@@ -24,6 +25,16 @@ export class CoursesController {
     @Post('get_requested_enrollment')
     async getRequestedEnrollment(@Body() body: GetRequestedEnrollmentDto) {
         return this.coursesService.getRequestedEnrollment(
+            body.token,
+            parseInt(body.index),
+            parseInt(body.count),
+            body.user_id,
+        );
+    }
+
+    @Post('get_list_courses_of_student')
+    async getListCoursesOfStudent(@Body() body: GetListCoursesOfStudentDto) {
+        return this.coursesService.getListCoursesOfStudent(
             body.token,
             parseInt(body.index),
             parseInt(body.count),

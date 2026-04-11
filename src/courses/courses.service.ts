@@ -79,6 +79,85 @@ export class CoursesService implements ICourseQuery {
         }
     }
 
+    async getListCoursesOfStudent(token: string, index: number, count: number, user_id: string) {
+        try {
+            const requester = await this.prisma.user.findFirst({ where: { token } });
+            if (!requester) {
+                return {
+                    code: ResponseCode.TOKEN_INVALID,
+                    message: ResponseMessage[ResponseCode.TOKEN_INVALID],
+                };
+            }
+
+            if (requester.status === 'LOCKED') {
+                return {
+                    code: ResponseCode.ACCOUNT_LOCKED,
+                    message: ResponseMessage[ResponseCode.ACCOUNT_LOCKED],
+                };
+            }
+
+            const student = await this.prisma.user.findUnique({ where: { id: user_id } });
+            if (!student) {
+                return {
+                    code: ResponseCode.USER_NOT_VALIDATED,
+                    message: ResponseMessage[ResponseCode.USER_NOT_VALIDATED],
+                };
+            }
+
+            if (isNaN(index) || isNaN(count) || index < 0 || count <= 0) {
+                return {
+                    code: ResponseCode.INVALID_PARAMETER_VALUE,
+                    message: ResponseMessage[ResponseCode.INVALID_PARAMETER_VALUE],
+                };
+            }
+
+            const skip = index * count;
+            const where = { studentId: student.id };
+
+            const [enrollments, total] = await Promise.all([
+                this.prisma.enrollment.findMany({
+                    where,
+                    include: {
+                        teacher: {
+                            select: { id: true, username: true, avatar: true },
+                        },
+                    },
+                    orderBy: { createdAt: 'desc' },
+                    skip,
+                    take: count,
+                }),
+                this.prisma.enrollment.count({ where }),
+            ]);
+
+            if (enrollments.length === 0 && index === 0) {
+                return {
+                    code: ResponseCode.NO_DATA,
+                    message: ResponseMessage[ResponseCode.NO_DATA],
+                };
+            }
+
+            const courses = enrollments.map((e) => ({
+                id: e.teacher.id,
+                name: e.teacher.username ?? '',
+                avatar: e.teacher.avatar ?? '',
+            }));
+
+            return {
+                code: ResponseCode.OK,
+                message: ResponseMessage[ResponseCode.OK],
+                data: {
+                    total: total.toString(),
+                    courses,
+                },
+            };
+        } catch {
+            return {
+                code: ResponseCode.CAN_NOT_CONNECT,
+                message: ResponseMessage[ResponseCode.CAN_NOT_CONNECT],
+            };
+        }
+    }
+
     async getListStudents(token: string, index: number, count: number, user_id?: string) {
         try {
             const requester = await this.prisma.user.findFirst({ where: { token } });
