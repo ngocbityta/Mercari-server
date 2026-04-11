@@ -77,6 +77,18 @@ export class EditPostDto {
 
 export class GetListPostsDto {
     @IsOptional()
+    @IsString()
+    token?: string;
+
+    @IsOptional()
+    @IsString()
+    id?: string;
+
+    @IsOptional()
+    @IsString()
+    category_id?: string;
+
+    @IsOptional()
     @IsNumber()
     @Type(() => Number)
     index?: number;
@@ -88,13 +100,20 @@ export class GetListPostsDto {
 
     @IsOptional()
     @IsString()
-    lastId?: string;
+    last_id?: string;
+
+    @IsOptional()
+    @IsString()
+    user_id?: string;
 }
 
 export class CheckNewItemDto {
+    @IsOptional()
     @IsString()
-    @IsNotEmpty()
-    lastId: string;
+    last_id?: string;
+
+    @IsString()
+    category_id: string;
 }
 
 export class GetSavedSearchDto {

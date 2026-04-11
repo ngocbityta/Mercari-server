@@ -348,18 +348,64 @@ export class PostsService implements IPostQuery, IPostCommand {
         return responseData;
     }
 
-    async getListPosts(index: number = 0, count: number = 10, lastId?: string) {
-        const skip = index * count;
+    async getListPosts(
+        token?: string,
+        category_id?: string,
+        last_id?: string,
+        index: number = 0,
+        count: number = 10,
+        user_id?: string,
+    ) {
+        if (!token) {
+            return {
+                code: ResponseCode.TOKEN_INVALID,
+                message: ResponseMessage[ResponseCode.TOKEN_INVALID],
+            };
+        }
+
+        const requester = await this.prisma.user.findFirst({ where: { token } });
+        if (!requester) {
+            return {
+                code: ResponseCode.TOKEN_INVALID,
+                message: ResponseMessage[ResponseCode.TOKEN_INVALID],
+            };
+        }
+
+        if (requester.status === 'LOCKED') {
+            return {
+                code: ResponseCode.ACCOUNT_LOCKED,
+                message: ResponseMessage[ResponseCode.ACCOUNT_LOCKED],
+            };
+        }
+
+        let viewer = requester;
+        if (user_id) {
+            if (requester.role === 'GV') {
+                const targetUser = await this.prisma.user.findUnique({ where: { id: user_id } });
+                if (targetUser) {
+                    viewer = targetUser;
+                }
+            }
+        }
+
         const where: Prisma.PostWhereInput = {};
 
-        if (lastId) {
-            const lastPost = await this.prisma.post.findUnique({
-                where: { id: lastId },
+        // Category filter (if implemented in schema, currently not used)
+        if (category_id && category_id !== '0') {
+            // where.categoryId = category_id;
+        }
+
+        let lastPost: any = null;
+        if (last_id) {
+            lastPost = await this.prisma.post.findUnique({
+                where: { id: last_id },
             });
             if (lastPost && lastPost.createdAt) {
                 where.createdAt = { lt: lastPost.createdAt };
             }
         }
+
+        const skip = index * count;
 
         const posts = await this.prisma.post.findMany({
             where,
@@ -371,36 +417,132 @@ export class PostsService implements IPostQuery, IPostCommand {
             take: count,
         });
 
-        const total = await this.prisma.post.count({ where });
+        if (posts.length === 0 && index === 0) {
+            return {
+                code: ResponseCode.NO_DATA,
+                message: ResponseMessage[ResponseCode.NO_DATA],
+            };
+        }
+
+        const lastIdReported = posts.length > 0 ? posts[posts.length - 1].id : last_id;
+
+        // Calculate new_items count
+        let newItemsCount = 0;
+        if (lastPost) {
+            newItemsCount = await this.prisma.post.count({
+                where: {
+                    createdAt: { gt: lastPost.createdAt },
+                },
+            });
+        }
+
+        const mappedPosts = (await Promise.all(
+            posts.map(async (post) => {
+                const content = post.content || '';
+                const media = post.media || [];
+
+                const isLiked = viewer ? (post.likeIds || []).includes(viewer.id) : false;
+                
+                let isBlocked = false;
+                if (viewer) {
+                    const blockRelationship = await this.prisma.block.findFirst({
+                        where: {
+                            OR: [
+                                { blockerId: post.ownerId, blockedId: viewer.id },
+                                { blockerId: viewer.id, blockedId: post.ownerId },
+                            ],
+                        },
+                    });
+                    isBlocked = !!blockRelationship;
+                }
+
+                const canEdit = viewer ? (post.ownerId === viewer.id && !post.isLocked) : false;
+                const canComment = !post.isLocked;
+
+                return {
+                    id: post.id,
+                    described: content,
+                    video: media.map((url, idx) => ({
+                        url,
+                        thumb: `thumbnail_${idx}.jpg`,
+                    })),
+                    created: post.createdAt.toISOString(),
+                    like: (post.likeIds?.length || 0).toString(),
+                    comment: (post.commentIds?.length || 0).toString(),
+                    is_liked: isLiked ? '1' : '0',
+                    is_blocked: isBlocked ? '1' : '0',
+                    can_comment: canComment ? '1' : '0',
+                    can_edit: canEdit ? '1' : '0',
+                    banned: post.owner.status === 'LOCKED' ? '1' : '0',
+                    author: {
+                        id: post.owner.id,
+                        name: post.owner.username || '',
+                        avatar: post.owner.avatar || '',
+                        role: post.owner.role,
+                    },
+                    exercise_id: post.exerciseId || '',
+                    time_series_poses: post.owner.role === 'GV' ? [] : undefined,
+                };
+            }),
+        )).filter(post => post.described !== '' || post.video.length > 0);
+
+        if (mappedPosts.length === 0 && posts.length > 0 && index === 0) {
+            return {
+                code: ResponseCode.NO_DATA,
+                message: ResponseMessage[ResponseCode.NO_DATA],
+            };
+        }
 
         return {
-            data: posts,
-            total,
-            index,
-            count,
+            code: ResponseCode.OK,
+            message: ResponseMessage[ResponseCode.OK],
+            data: {
+                posts: mappedPosts,
+                new_items: newItemsCount.toString(),
+                last_id: lastIdReported || '',
+            },
         };
     }
 
-    async checkNewItem(lastId: string) {
-        if (!lastId) {
-            return { hasNew: false, count: 0 };
+    async checkNewItem(last_id?: string, _category_id?: string) {
+        try {
+            if (!last_id) {
+                return {
+                    code: ResponseCode.OK,
+                    message: ResponseMessage[ResponseCode.OK],
+                    data: { new_items: '0' },
+                };
+            }
+
+            const lastPost = await this.prisma.post.findUnique({
+                where: { id: last_id },
+            });
+
+            if (!lastPost || !lastPost.createdAt) {
+                return {
+                    code: ResponseCode.OK,
+                    message: ResponseMessage[ResponseCode.OK],
+                    data: { new_items: '0' },
+                };
+            }
+
+            const newCount = await this.prisma.post.count({
+                where: {
+                    createdAt: { gt: lastPost.createdAt },
+                },
+            });
+
+            return {
+                code: ResponseCode.OK,
+                message: ResponseMessage[ResponseCode.OK],
+                data: { new_items: newCount.toString() },
+            };
+        } catch {
+            return {
+                code: ResponseCode.CAN_NOT_CONNECT,
+                message: ResponseMessage[ResponseCode.CAN_NOT_CONNECT],
+            };
         }
-
-        const lastPost = await this.prisma.post.findUnique({
-            where: { id: lastId },
-        });
-
-        if (!lastPost || !lastPost.createdAt) {
-            return { hasNew: false, count: 0 };
-        }
-
-        const newCount = await this.prisma.post.count({
-            where: {
-                createdAt: { gt: lastPost.createdAt },
-            },
-        });
-
-        return { hasNew: newCount > 0, count: newCount };
     }
 
     async searchPosts(query: string, index: number = 0, count: number = 10) {
