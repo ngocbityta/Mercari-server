@@ -545,47 +545,335 @@ export class PostsService implements IPostQuery, IPostCommand {
         }
     }
 
-    async searchPosts(query: string, index: number = 0, count: number = 10) {
+    async searchPosts(
+        token?: string,
+        keyword?: string,
+        category_id?: string,
+        _duration_min?: string,
+        _duration_max?: string,
+        user_id?: string,
+        index: number = 0,
+        count: number = 10,
+    ) {
+        if (!keyword) {
+            return {
+                code: ResponseCode.INVALID_PARAMETER_VALUE,
+                message: ResponseMessage[ResponseCode.INVALID_PARAMETER_VALUE],
+            };
+        }
+
+        if (!token) {
+            return {
+                code: ResponseCode.TOKEN_INVALID,
+                message: ResponseMessage[ResponseCode.TOKEN_INVALID],
+            };
+        }
+
+        const requester = await this.prisma.user.findFirst({ where: { token } });
+        if (!requester) {
+            return {
+                code: ResponseCode.TOKEN_INVALID,
+                message: ResponseMessage[ResponseCode.TOKEN_INVALID],
+            };
+        }
+
+        if (requester.status === 'LOCKED') {
+            return {
+                code: ResponseCode.ACCOUNT_LOCKED,
+                message: ResponseMessage[ResponseCode.ACCOUNT_LOCKED],
+            };
+        }
+
+        // Save to SearchHistory (unless it's a hashtag)
+        if (keyword && !keyword.startsWith('#')) {
+            try {
+                await (this.prisma as any).searchHistory.create({
+                    data: {
+                        userId: requester.id,
+                        keyword: keyword,
+                        durationMin: _duration_min,
+                        durationMax: _duration_max,
+                    },
+                });
+            } catch (err) {
+                console.error('Failed to save search history:', err);
+            }
+        }
+
+        // [Test Case 13]: Kiểm tra index và count hợp lệ
+        if (index < 0 || count <= 0) {
+            return {
+                code: ResponseCode.INVALID_PARAMETER_VALUE,
+                message: ResponseMessage[ResponseCode.INVALID_PARAMETER_VALUE],
+            };
+        }
+
+        // Lấy danh sách những người liên quan đến block
+        const allBlocks = await this.prisma.block.findMany({
+            where: {
+                OR: [{ blockerId: requester.id }, { blockedId: requester.id }],
+            },
+        });
+        const blockedUserIds = allBlocks
+            .flatMap((b) => [b.blockerId, b.blockedId])
+            .filter((id) => id !== requester.id);
+
+        const where: Prisma.PostWhereInput = {
+            content: { contains: keyword, mode: 'insensitive' },
+            // Filter out blocked users
+            ...(blockedUserIds.length > 0 ? { ownerId: { notIn: blockedUserIds } } : {}),
+        };
+
+        if (user_id) {
+            const targetUser = await this.prisma.user.findUnique({ where: { id: user_id } });
+            if (!targetUser) {
+                return {
+                    code: ResponseCode.INVALID_PARAMETER_VALUE,
+                    message: ResponseMessage[ResponseCode.INVALID_PARAMETER_VALUE],
+                };
+            }
+            where.ownerId = user_id;
+        }
+
         const skip = index * count;
 
         const posts = await this.prisma.post.findMany({
-            where: {
-                OR: [
-                    { content: { contains: query, mode: 'insensitive' } },
-                    { hashtags: { hasSome: [query] } },
-                ],
-            },
-            include: {
-                owner: true,
-            },
+            where,
+            include: { owner: true },
             orderBy: { createdAt: 'desc' },
             skip,
             take: count,
         });
 
-        const total = await this.prisma.post.count({
-            where: {
-                OR: [
-                    { content: { contains: query, mode: 'insensitive' } },
-                    { hashtags: { hasSome: [query] } },
-                ],
-            },
-        });
+        if (posts.length === 0 && index === 0) {
+            return {
+                code: ResponseCode.NO_DATA,
+                message: ResponseMessage[ResponseCode.NO_DATA],
+            };
+        }
+
+        const mappedPosts = (await Promise.all(
+            posts.map(async (post) => {
+                if (!post.owner || !post.owner.id) return null;
+
+                const content = post.content || '';
+                const media = post.media || [];
+
+                const isLiked = (post.likeIds || []).includes(requester.id);
+                
+                const blockRelationship = await this.prisma.block.findFirst({
+                    where: {
+                        OR: [
+                            { blockerId: post.ownerId, blockedId: requester.id },
+                            { blockerId: requester.id, blockedId: post.ownerId },
+                        ],
+                    },
+                });
+                const isBlocked = !!blockRelationship;
+
+                const canEdit = post.ownerId === requester.id && !post.isLocked;
+                const canComment = !post.isLocked;
+
+                return {
+                    id: post.id,
+                    described: content,
+                    video: media.map((url, idx) => ({
+                        url,
+                        thumb: `thumbnail_${idx}.jpg`,
+                    })),
+                    created: post.createdAt.toISOString(),
+                    like: (post.likeIds?.length || 0).toString(),
+                    comment: (post.commentIds?.length || 0).toString(),
+                    is_liked: isLiked ? '1' : '0',
+                    is_blocked: isBlocked ? '1' : '0',
+                    can_comment: canComment ? '1' : '0',
+                    can_edit: canEdit ? '1' : '0',
+                    banned: post.owner.status === 'LOCKED' ? '1' : '0',
+                    author: {
+                        id: post.owner.id,
+                        name: post.owner.username || '',
+                        avatar: post.owner.avatar || '',
+                        role: post.owner.role,
+                    },
+                    exercise_id: post.exerciseId || '',
+                    time_series_poses: post.owner.role === 'GV' ? [] : undefined,
+                };
+            }),
+        )).filter(post => post !== null && (post.described !== '' || post.video.length > 0));
+
+        if (mappedPosts.length === 0 && posts.length > 0 && index === 0) {
+            return {
+                code: ResponseCode.NO_DATA,
+                message: ResponseMessage[ResponseCode.NO_DATA],
+            };
+        }
 
         return {
-            data: posts,
-            total,
-            index,
-            count,
+            code: ResponseCode.OK,
+            message: ResponseMessage[ResponseCode.OK],
+            data: { posts: mappedPosts },
         };
     }
 
-    getSavedSearch(_userId: string) {
-        return [];
+    async getSavedSearch(token: string, index?: string, count?: string, user_id?: string) {
+        if (!token) {
+            return {
+                code: ResponseCode.TOKEN_INVALID,
+                message: ResponseMessage[ResponseCode.TOKEN_INVALID],
+            };
+        }
+
+        const requester = await this.prisma.user.findFirst({ where: { token } });
+        if (!requester) {
+            return {
+                code: ResponseCode.TOKEN_INVALID,
+                message: ResponseMessage[ResponseCode.TOKEN_INVALID],
+            };
+        }
+
+        if (requester.status === 'LOCKED') {
+            return {
+                code: ResponseCode.ACCOUNT_LOCKED,
+                message: ResponseMessage[ResponseCode.ACCOUNT_LOCKED],
+            };
+        }
+
+        let targetUserId = requester.id;
+        if (user_id) {
+            // Admin only check
+            if (requester.role !== 'GV') {
+                return {
+                    code: ResponseCode.NOT_ACCESS,
+                    message: ResponseMessage[ResponseCode.NOT_ACCESS],
+                };
+            }
+            targetUserId = user_id;
+        }
+
+        const idx = index ? parseInt(index) : 0;
+        const cnt = count ? parseInt(count) : 20;
+
+        try {
+            const histories = await (this.prisma as any).searchHistory.findMany({
+                where: { userId: targetUserId },
+                orderBy: { createdAt: 'desc' },
+                skip: idx * cnt,
+                take: cnt,
+            });
+
+            if (histories.length === 0 && idx === 0) {
+                return {
+                    code: ResponseCode.NO_DATA,
+                    message: ResponseMessage[ResponseCode.NO_DATA],
+                    data: [],
+                };
+            }
+
+            const data = histories.map(h => ({
+                id: h.id,
+                keyword: h.keyword,
+                user_id: h.userId,
+                duration_min: h.durationMin || '0',
+                duration_max: h.durationMax || '0',
+                created: h.createdAt.toISOString(),
+            }));
+
+            return {
+                code: ResponseCode.OK,
+                message: ResponseMessage[ResponseCode.OK],
+                data,
+            };
+        } catch {
+            return {
+                code: ResponseCode.CAN_NOT_CONNECT,
+                message: ResponseMessage[ResponseCode.CAN_NOT_CONNECT],
+            };
+        }
     }
 
-    delSavedSearch(_searchId: string) {
-        return { message: 'Saved search deleted' };
+    async delSavedSearch(token: string, search_id?: string, all?: string) {
+        if (!token) {
+            return {
+                code: ResponseCode.TOKEN_INVALID,
+                message: ResponseMessage[ResponseCode.TOKEN_INVALID],
+            };
+        }
+
+        const requester = await this.prisma.user.findFirst({ where: { token } });
+        if (!requester) {
+            return {
+                code: ResponseCode.TOKEN_INVALID,
+                message: ResponseMessage[ResponseCode.TOKEN_INVALID],
+            };
+        }
+
+        if (requester.status === 'LOCKED') {
+            return {
+                code: ResponseCode.ACCOUNT_LOCKED,
+                message: ResponseMessage[ResponseCode.ACCOUNT_LOCKED],
+            };
+        }
+
+        try {
+            if (all === '1') {
+                // Check if history exists
+                const count = await (this.prisma as any).searchHistory.count({
+                    where: { userId: requester.id },
+                });
+
+                if (count === 0) {
+                    return {
+                        code: ResponseCode.NO_DATA,
+                        message: ResponseMessage[ResponseCode.NO_DATA],
+                    };
+                }
+
+                // Delete all history for this user
+                await (this.prisma as any).searchHistory.deleteMany({
+                    where: { userId: requester.id },
+                });
+            } else {
+                if (!search_id) {
+                    return {
+                        code: ResponseCode.INVALID_PARAMETER_VALUE,
+                        message: ResponseMessage[ResponseCode.INVALID_PARAMETER_VALUE],
+                    };
+                }
+
+                // Verify ownership and existence
+                const history = await (this.prisma as any).searchHistory.findUnique({
+                    where: { id: search_id },
+                });
+
+                if (!history) {
+                    return {
+                        code: ResponseCode.INVALID_PARAMETER_VALUE,
+                        message: ResponseMessage[ResponseCode.INVALID_PARAMETER_VALUE],
+                    };
+                }
+
+                if (history.userId !== requester.id) {
+                    return {
+                        code: ResponseCode.NOT_ACCESS,
+                        message: ResponseMessage[ResponseCode.NOT_ACCESS],
+                    };
+                }
+
+                await (this.prisma as any).searchHistory.delete({
+                    where: { id: search_id },
+                });
+            }
+
+            return {
+                code: ResponseCode.OK,
+                message: ResponseMessage[ResponseCode.OK],
+            };
+        } catch {
+            return {
+                code: ResponseCode.CAN_NOT_CONNECT,
+                message: ResponseMessage[ResponseCode.CAN_NOT_CONNECT],
+            };
+        }
     }
 
     async getComment(

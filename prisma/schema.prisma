@@ -208,3 +208,14 @@ model VerifyCode {
 
   @@map("verify_codes")
 }
+
+model SearchHistory {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  keyword     String   @db.VarChar
+  durationMin String?  @map("duration_min") @db.VarChar
+  durationMax String?  @map("duration_max") @db.VarChar
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("search_histories")
+}

@@ -117,15 +117,47 @@ export class CheckNewItemDto {
 }
 
 export class GetSavedSearchDto {
-    @IsString()
     @IsNotEmpty()
-    userId: string;
+    @IsString()
+    token: string;
+
+    @IsOptional()
+    @IsString()
+    index?: string;
+
+    @IsOptional()
+    @IsString()
+    count?: string;
+
+    @IsOptional()
+    @IsString()
+    user_id?: string;
 }
 
 export class SearchPostsDto {
+    @IsOptional()
+    @IsString()
+    token?: string;
+
+    @IsOptional()
+    @IsString()
+    keyword?: string;
+
     @IsString()
     @IsNotEmpty()
-    q: string;
+    category_id: string;
+
+    @IsString()
+    @IsNotEmpty()
+    duration_min: string;
+
+    @IsString()
+    @IsNotEmpty()
+    duration_max: string;
+
+    @IsOptional()
+    @IsString()
+    user_id?: string;
 
     @IsOptional()
     @IsNumber()
@@ -216,4 +248,18 @@ export class SetCommentDto {
     @IsOptional()
     @IsString()
     detail_mistakes?: string;
+}
+
+export class DelSavedSearchDto {
+    @IsNotEmpty()
+    @IsString()
+    token: string;
+
+    @IsOptional()
+    @IsString()
+    search_id?: string;
+
+    @IsNotEmpty()
+    @IsString()
+    all: string; // "1" for all, "0" for single
 }
