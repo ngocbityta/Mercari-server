@@ -74,14 +74,19 @@ export class PostsController {
 
     @Post('get_list_posts')
     async getListPosts(@Body() body: GetListPostsDto) {
-        const { index, count, lastId } = body;
-        return this.postsService.getListPosts(index, count, lastId);
+        return this.postsService.getListPosts(
+            body.token,
+            body.category_id,
+            body.last_id,
+            body.index,
+            body.count,
+            body.user_id,
+        );
     }
 
     @Post('check_new_item')
     async checkNewItem(@Body() body: CheckNewItemDto) {
-        const { lastId } = body;
-        return this.postsService.checkNewItem(lastId);
+        return this.postsService.checkNewItem(body.last_id, body.category_id);
     }
 
     @Get('search')
