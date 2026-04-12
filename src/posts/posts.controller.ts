@@ -1,5 +1,6 @@
 import { Controller, Post, Get, Delete, Body, Param } from '@nestjs/common';
 import { PostsService } from './posts.service';
+import { SearchHistoryService } from './search-history.service';
 import {
     AddPostDto,
     GetPostDto,
@@ -17,7 +18,10 @@ import {
 
 @Controller()
 export class PostsController {
-    constructor(private postsService: PostsService) {}
+    constructor(
+        private postsService: PostsService,
+        private searchHistoryService: SearchHistoryService,
+    ) {}
 
     @Post('add_post')
     async addPost(@Body() body: AddPostDto) {
@@ -35,10 +39,10 @@ export class PostsController {
             token,
             left_video,
             right_video,
-            course_id,
-            exercise_id,
             described,
             device_slave,
+            course_id,
+            exercise_id,
             device_master,
         );
     }
@@ -106,12 +110,12 @@ export class PostsController {
 
     @Post('get_saved_search')
     async getSavedSearch(@Body() body: GetSavedSearchDto) {
-        return this.postsService.getSavedSearch(body.token, body.index, body.count, body.user_id);
+        return this.searchHistoryService.getSavedSearch(body.token, body.index, body.count, body.user_id);
     }
 
     @Post('del_saved_search')
     async delSavedSearch(@Body() body: DelSavedSearchDto) {
-        return this.postsService.delSavedSearch(body.token, body.search_id, body.all);
+        return this.searchHistoryService.delSavedSearch(body.token, body.search_id, body.all);
     }
 
     @Post('get_comment')

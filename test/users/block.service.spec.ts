@@ -40,7 +40,7 @@ describe('BlockService - getListBlocks', () => {
                 blocked: { id: 'target1', username: 'Target One', avatar: 'avatar1.jpg' },
             },
         ];
-        jest.spyOn(prisma.block, 'findMany').mockResolvedValue(mockBlocks as unknown as any);
+        jest.spyOn(prisma.block, 'findMany').mockResolvedValue(mockBlocks as unknown as Block[]);
         jest.spyOn(prisma.block, 'count').mockResolvedValue(1);
 
         const result = await service.getListBlocks(mockUser as unknown as User);

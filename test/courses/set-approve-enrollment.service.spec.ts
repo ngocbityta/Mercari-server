@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CoursesService } from '../../src/courses/courses.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 
 const mockTx = {
     enrollment: { create: jest.fn() },
@@ -60,7 +61,10 @@ describe('CoursesService - setApproveEnrollment', () => {
         expect(result.code).toBe('1000');
         expect(mockPrisma.$transaction).toHaveBeenCalled();
         expect(mockTx.enrollment.create).toHaveBeenCalledWith({
-            data: expect.objectContaining({ studentId: 'hv-1', teacherId: 'gv-1' }),
+            data: expect.objectContaining({
+                studentId: 'hv-1',
+                teacherId: 'gv-1',
+            } as unknown as Prisma.EnrollmentCreateInput),
         });
         expect(mockTx.enrollmentRequest.delete).toHaveBeenCalledWith({
             where: { id: 'req-1' },

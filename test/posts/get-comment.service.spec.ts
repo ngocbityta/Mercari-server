@@ -283,7 +283,7 @@ describe('PostsService - getComment', () => {
                 where: expect.objectContaining({
                     authorId: { notIn: ['commenter-blocked'] },
                 } as unknown as Prisma.CommentWhereInput),
-            }),
+            } as any),
         );
     });
 
@@ -312,7 +312,7 @@ describe('PostsService - getComment', () => {
                 where: expect.objectContaining({
                     authorId: { notIn: ['commenter-1', 'commenter-2'] },
                 } as unknown as Prisma.CommentWhereInput),
-            }),
+            } as any),
         );
     });
 
@@ -421,12 +421,9 @@ describe('PostsService - getComment', () => {
         expect(mockPrisma.block.findMany).toHaveBeenCalledWith(
             expect.objectContaining({
                 where: expect.objectContaining({
-                    OR: expect.arrayContaining([
-                        { blockerId: 'user-target' } as unknown as Block,
-                        { blockedId: 'user-target' } as unknown as Block,
-                    ]),
+                    OR: [{ blockerId: 'user-target' }, { blockedId: 'user-target' }],
                 } as unknown as Prisma.BlockWhereInput),
-            }),
+            } as any),
         );
     });
 });

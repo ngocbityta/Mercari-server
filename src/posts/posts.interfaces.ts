@@ -19,7 +19,7 @@ export interface IPostQuery {
         index?: number,
         count?: number,
     ): Promise<any>;
-    getSavedSearch(token: string, index?: string, count?: string, user_id?: string): Promise<any>;
+
     getComment(
         token: string,
         postId: string,
@@ -49,7 +49,7 @@ export interface IPostCommand {
         right_video?: string,
     ): Promise<any>;
     deletePost(postId: string): Promise<any>;
-    delSavedSearch(token: string, search_id?: string, all?: string): Promise<any>;
+
     reportPost(token: string, postId: string, subject: string, details: string): Promise<any>;
     likePost(token: string, postId: string): Promise<any>;
     setComment(

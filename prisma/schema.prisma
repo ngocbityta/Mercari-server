@@ -159,7 +159,7 @@ model Post {
   likeIds      String[]  @map("like_ids") @db.Uuid @default([])
   courseId     String?   @map("course_id") @db.Uuid
   exerciseId   String?   @map("exercise_id") @db.Uuid
-  deviceMaster String    @map("device_master") @db.Uuid
+  deviceMaster String?   @map("device_master") @db.Uuid
   deviceSlave  String?   @map("device_slave") @db.Uuid
   leftVideo    String?   @map("left_video") @db.VarChar
   rightVideo   String?   @map("right_video") @db.VarChar

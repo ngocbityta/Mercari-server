@@ -1,17 +1,17 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { PostsService } from '../../src/posts/posts.service';
+import { SearchHistoryService } from '../../src/posts/search-history.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { ResponseCode } from '../../src/enums/response-code.enum';
 import { User, SearchHistory } from '@prisma/client';
 
-describe('PostsService - Search History', () => {
-    let service: PostsService;
+describe('SearchHistoryService', () => {
+    let service: SearchHistoryService;
     let prisma: PrismaService;
 
     beforeEach(async () => {
         const module: TestingModule = await Test.createTestingModule({
             providers: [
-                PostsService,
+                SearchHistoryService,
                 {
                     provide: PrismaService,
                     useValue: {
@@ -27,18 +27,12 @@ describe('PostsService - Search History', () => {
                             deleteMany: jest.fn(),
                             count: jest.fn(),
                         },
-                        block: {
-                            findMany: jest.fn(),
-                        },
-                        post: {
-                            findMany: jest.fn(),
-                        },
                     },
                 },
             ],
         }).compile();
 
-        service = module.get<PostsService>(PostsService);
+        service = module.get<SearchHistoryService>(SearchHistoryService);
         prisma = module.get<PrismaService>(PrismaService);
     });
 
@@ -47,14 +41,14 @@ describe('PostsService - Search History', () => {
 
     describe('getSavedSearch', () => {
         it('[TC1] should return search history for current user', async () => {
-            jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as any);
-            jest.spyOn((prisma as any).searchHistory, 'findMany').mockResolvedValue([
+            jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as unknown as User);
+            jest.spyOn(prisma.searchHistory, 'findMany').mockResolvedValue([
                 {
                     id: '1',
                     keyword: 'nike',
                     userId: 'user1',
                     createdAt: new Date(),
-                },
+                } as unknown as SearchHistory,
             ]);
 
             const result = await service.getSavedSearch(mockToken);
@@ -65,6 +59,7 @@ describe('PostsService - Search History', () => {
         it('[TC_ADMIN] GV should be able to check other user history', async () => {
             const mockAdmin = { id: 'admin1', token: 'admin_token', status: 'ACTIVE', role: 'GV' };
             jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockAdmin as unknown as User);
+            jest.spyOn(prisma.user, 'findUnique').mockResolvedValue({ id: 'user2' } as any);
             const findManySpy = jest.spyOn(prisma.searchHistory, 'findMany').mockResolvedValue([]);
 
             await service.getSavedSearch('admin_token', '0', '20', 'user2');
