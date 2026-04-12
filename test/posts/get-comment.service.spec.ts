@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PostsService } from '../../src/posts/posts.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { Prisma, Block } from '@prisma/client';
 
 // --- Mock data ---
 const mockActiveUser = {
@@ -266,7 +267,7 @@ describe('PostsService - getComment', () => {
         mockPrisma.block.findFirst.mockResolvedValue(null);
         // commenter-blocked đã block viewer (user-1)
         mockPrisma.block.findMany.mockResolvedValue([
-            { blockerId: 'commenter-blocked', blockedId: 'user-1' },
+            { blockerId: 'commenter-blocked', blockedId: 'user-1' } as unknown as Block,
         ]);
         // DB lọc commenter-blocked ra → còn lại 1 comment
         mockPrisma.comment.findMany.mockResolvedValue([mockComments[0]]);
@@ -281,7 +282,7 @@ describe('PostsService - getComment', () => {
             expect.objectContaining({
                 where: expect.objectContaining({
                     authorId: { notIn: ['commenter-blocked'] },
-                }),
+                } as unknown as Prisma.CommentWhereInput),
             }),
         );
     });
@@ -296,8 +297,8 @@ describe('PostsService - getComment', () => {
         mockPrisma.block.findFirst.mockResolvedValue(null);
         // Tất cả người bình luận đều bị block
         mockPrisma.block.findMany.mockResolvedValue([
-            { blockerId: 'commenter-1', blockedId: 'user-1' },
-            { blockerId: 'commenter-2', blockedId: 'user-1' },
+            { blockerId: 'commenter-1', blockedId: 'user-1' } as unknown as Block,
+            { blockerId: 'commenter-2', blockedId: 'user-1' } as unknown as Block,
         ]);
         // Sau khi lọc → không còn comment nào
         mockPrisma.comment.findMany.mockResolvedValue([]);
@@ -310,7 +311,7 @@ describe('PostsService - getComment', () => {
             expect.objectContaining({
                 where: expect.objectContaining({
                     authorId: { notIn: ['commenter-1', 'commenter-2'] },
-                }),
+                } as unknown as Prisma.CommentWhereInput),
             }),
         );
     });
@@ -421,10 +422,10 @@ describe('PostsService - getComment', () => {
             expect.objectContaining({
                 where: expect.objectContaining({
                     OR: expect.arrayContaining([
-                        { blockerId: 'user-target' },
-                        { blockedId: 'user-target' },
+                        { blockerId: 'user-target' } as unknown as Block,
+                        { blockedId: 'user-target' } as unknown as Block,
                     ]),
-                }),
+                } as unknown as Prisma.BlockWhereInput),
             }),
         );
     });

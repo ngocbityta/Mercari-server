@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PostsService } from '../../src/posts/posts.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { ResponseCode } from '../../src/enums/response-code.enum';
+import { Post, User, Block } from '@prisma/client';
 
 describe('PostsService - searchPosts', () => {
     let service: PostsService;
@@ -51,9 +52,9 @@ describe('PostsService - searchPosts', () => {
             },
         ];
 
-        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as any);
+        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as unknown as User);
         jest.spyOn(prisma.block, 'findMany').mockResolvedValue([]);
-        jest.spyOn(prisma.post, 'findMany').mockResolvedValue(mockPosts as any);
+        jest.spyOn(prisma.post, 'findMany').mockResolvedValue(mockPosts as unknown as Post[]);
 
         const result = await service.searchPosts(mockToken, mockKeyword, '0', '0', '0');
         expect(result.code).toBe(ResponseCode.OK);
@@ -68,7 +69,7 @@ describe('PostsService - searchPosts', () => {
 
     it('[TC3] should return NO_DATA when no results found', async () => {
         const mockUser = { id: 'user1', token: mockToken, status: 'ACTIVE' };
-        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as any);
+        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as unknown as User);
         jest.spyOn(prisma.block, 'findMany').mockResolvedValue([]);
         jest.spyOn(prisma.post, 'findMany').mockResolvedValue([]);
 
@@ -78,7 +79,7 @@ describe('PostsService - searchPosts', () => {
 
     it('[TC4] should return ACCOUNT_LOCKED when requester is banned', async () => {
         const mockUser = { id: 'user1', token: mockToken, status: 'LOCKED' };
-        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as any);
+        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as unknown as User);
 
         const result = await service.searchPosts(mockToken, mockKeyword, '0', '0', '0');
         expect(result.code).toBe(ResponseCode.ACCOUNT_LOCKED);
@@ -86,7 +87,7 @@ describe('PostsService - searchPosts', () => {
 
     it('[TC5] should return INVALID_PARAMETER_VALUE when target user_id not exists', async () => {
         const mockUser = { id: 'user1', token: mockToken, status: 'ACTIVE' };
-        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as any);
+        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as unknown as User);
         jest.spyOn(prisma.block, 'findMany').mockResolvedValue([]);
         jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(null);
 
@@ -108,7 +109,7 @@ describe('PostsService - searchPosts', () => {
 
     it('[TC13] should return INVALID_PARAMETER_VALUE when index or count is invalid', async () => {
         const mockUser = { id: 'user1', token: mockToken, status: 'ACTIVE' };
-        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as any);
+        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as unknown as User);
 
         const result = await service.searchPosts(
             mockToken,
@@ -127,8 +128,8 @@ describe('PostsService - searchPosts', () => {
         const mockUser = { id: 'user1', token: mockToken, status: 'ACTIVE' };
         const mockBlocks = [{ blockerId: 'user1', blockedId: 'blocked_user' }];
 
-        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as any);
-        jest.spyOn(prisma.block, 'findMany').mockResolvedValue(mockBlocks as any);
+        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as unknown as User);
+        jest.spyOn(prisma.block, 'findMany').mockResolvedValue(mockBlocks as unknown as Block[]);
         const findManySpy = jest.spyOn(prisma.post, 'findMany').mockResolvedValue([]);
 
         await service.searchPosts(mockToken, mockKeyword, '0', '0', '0');

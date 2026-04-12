@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PostsService } from '../../src/posts/posts.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { ResponseCode } from '../../src/enums/response-code.enum';
+import { Post, User } from '@prisma/client';
 
 describe('PostsService - getListPosts', () => {
     let service: PostsService;
@@ -25,6 +26,10 @@ describe('PostsService - getListPosts', () => {
                         },
                         block: {
                             findFirst: jest.fn(),
+                            findMany: jest.fn(),
+                        },
+                        enrollment: {
+                            findMany: jest.fn(),
                         },
                     },
                 },
@@ -33,6 +38,10 @@ describe('PostsService - getListPosts', () => {
 
         service = module.get<PostsService>(PostsService);
         prisma = module.get<PrismaService>(PrismaService);
+
+        // Default mock implementation
+        jest.spyOn(prisma.block, 'findMany').mockResolvedValue([]);
+        jest.spyOn(prisma.enrollment, 'findMany').mockResolvedValue([]);
     });
 
     it('should be defined', () => {
@@ -55,8 +64,8 @@ describe('PostsService - getListPosts', () => {
             },
         ];
 
-        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as any);
-        jest.spyOn(prisma.post, 'findMany').mockResolvedValue(mockPosts as any);
+        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as unknown as User);
+        jest.spyOn(prisma.post, 'findMany').mockResolvedValue(mockPosts as unknown as Post[]);
         jest.spyOn(prisma.post, 'findUnique').mockResolvedValue(null);
 
         const result = await service.getListPosts('valid_token');
@@ -75,7 +84,7 @@ describe('PostsService - getListPosts', () => {
     // Test Case 3: Không còn bài viết nào
     it('[TC3] should return NO_DATA when no posts found', async () => {
         const mockUser = { id: 'user1', token: 'valid_token', status: 'ACTIVE' };
-        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as any);
+        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as unknown as User);
         jest.spyOn(prisma.post, 'findMany').mockResolvedValue([]);
 
         const result = await service.getListPosts('valid_token', undefined, undefined, 0);
@@ -85,7 +94,7 @@ describe('PostsService - getListPosts', () => {
     // Test Case 4: Người dùng bị hệ thống chặn (Account Locked)
     it('[TC4] should return ACCOUNT_LOCKED when requester is banned', async () => {
         const mockUser = { id: 'user1', token: 'banned_token', status: 'LOCKED' };
-        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as any);
+        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as unknown as User);
 
         const result = await service.getListPosts('banned_token');
         expect(result.code).toBe(ResponseCode.ACCOUNT_LOCKED);
@@ -107,8 +116,8 @@ describe('PostsService - getListPosts', () => {
             },
         ];
 
-        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as any);
-        jest.spyOn(prisma.post, 'findMany').mockResolvedValue(mockPosts as any);
+        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as unknown as User);
+        jest.spyOn(prisma.post, 'findMany').mockResolvedValue(mockPosts as unknown as Post[]);
 
         const result = await service.getListPosts('token');
         expect(result.data!.posts[0].like).toBe('0');
@@ -129,8 +138,8 @@ describe('PostsService - getListPosts', () => {
             },
         ];
 
-        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as any);
-        jest.spyOn(prisma.post, 'findMany').mockResolvedValue(mockPosts as any);
+        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as unknown as User);
+        jest.spyOn(prisma.post, 'findMany').mockResolvedValue(mockPosts as unknown as Post[]);
 
         const result = await service.getListPosts('token');
         expect(result.code).toBe(ResponseCode.NO_DATA);
@@ -150,8 +159,8 @@ describe('PostsService - getListPosts', () => {
             },
         ];
 
-        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as any);
-        jest.spyOn(prisma.post, 'findMany').mockResolvedValue(mockPosts as any);
+        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as unknown as User);
+        jest.spyOn(prisma.post, 'findMany').mockResolvedValue(mockPosts as unknown as Post[]);
 
         const result = await service.getListPosts('token');
         expect(result.code).toBe(ResponseCode.OK);

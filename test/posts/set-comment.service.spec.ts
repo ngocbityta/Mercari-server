@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PostsService } from '../../src/posts/posts.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { Prisma, Block } from '@prisma/client';
 
 // --- Mock data ---
 const mockActiveUser = {
@@ -155,7 +156,7 @@ describe('PostsService - setComment', () => {
             data: expect.objectContaining({
                 score: '85',
                 detailMistakes: '<table><tr><td>Lỗi tư thế</td></tr></table>',
-            }),
+            } as unknown as Prisma.CommentCreateInput),
         });
     });
 
@@ -286,7 +287,7 @@ describe('PostsService - setComment', () => {
         mockPrisma.comment.create.mockResolvedValue(mockMyComment);
         // user-1 và commenter-blocked có block relationship
         mockPrisma.block.findMany.mockResolvedValue([
-            { blockerId: 'commenter-blocked', blockedId: 'user-1' },
+            { blockerId: 'commenter-blocked', blockedId: 'user-1' } as unknown as Block,
         ]);
         // Sau khi lọc không còn comment nào (comment vừa tạo cũng bị lọc vì authorId = user-1
         // nhưng blockedUserIds chỉ chứa 'commenter-blocked', không chứa 'user-1' → vẫn có)
@@ -309,7 +310,7 @@ describe('PostsService - setComment', () => {
             expect.objectContaining({
                 where: expect.objectContaining({
                     authorId: { notIn: ['commenter-blocked'] },
-                }),
+                } as unknown as Prisma.CommentWhereInput),
             }),
         );
     });
@@ -406,11 +407,11 @@ describe('PostsService - setComment', () => {
             expect.objectContaining({
                 where: expect.objectContaining({
                     authorId: { notIn: ['commenter-x'] },
-                }),
+                } as unknown as Prisma.CommentWhereInput),
             }),
         );
         // Comment của commenter-x không có trong kết quả
-        const ids = result.data!.map((c: any) => c.id);
+        const ids = result.data!.map((c: { id: string }) => c.id);
         expect(ids).not.toContain('comment-x');
     });
 });

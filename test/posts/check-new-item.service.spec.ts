@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PostsService } from '../../src/posts/posts.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { ResponseCode } from '../../src/enums/response-code.enum';
+import { Post } from '@prisma/client';
 
 describe('PostsService - checkNewItem', () => {
     let service: PostsService;
@@ -30,7 +31,7 @@ describe('PostsService - checkNewItem', () => {
     // Test Case 1: Truyền đúng mã last_id, category_id
     it('[TC1] should return new items count when parameters are valid', async () => {
         const mockLastPost = { id: 'last_id', createdAt: new Date(Date.now() - 10000) };
-        jest.spyOn(prisma.post, 'findUnique').mockResolvedValue(mockLastPost as any);
+        jest.spyOn(prisma.post, 'findUnique').mockResolvedValue(mockLastPost as unknown as Post);
         jest.spyOn(prisma.post, 'count').mockResolvedValue(5);
 
         const result = await service.checkNewItem('last_id', '0');

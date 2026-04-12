@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { Prisma } from '@prisma/client';
+import { Prisma, Post, User } from '@prisma/client';
 import { ResponseCode, ResponseMessage } from '../enums/response-code.enum';
 import { IPostQuery, IPostCommand } from './posts.interfaces.ts';
 
@@ -302,7 +302,22 @@ export class PostsService implements IPostQuery, IPostCommand {
         }
 
         // Build the response data
-        const responseData = {
+        const responseData: {
+            id: string;
+            described: string;
+            created: string;
+            modified: string;
+            like: string;
+            comment: string;
+            is_liked: string;
+            video: { url: string; thumb: string }[];
+            author: { id: string; name: string; avatar: string; online: string };
+            exercise_id: string;
+            edited_times: string;
+            is_blocked: string;
+            lecturer?: { id: string; name: string; avatar: string };
+            time_series_poses?: any[];
+        } = {
             id: post.id,
             described: post.content,
             created: post.createdAt.toISOString(),
@@ -336,7 +351,7 @@ export class PostsService implements IPostQuery, IPostCommand {
             });
 
             if (lecturer) {
-                (responseData as any).lecturer = {
+                responseData.lecturer = {
                     id: lecturer.id,
                     name: lecturer.username || 'Giảng viên',
                     avatar: lecturer.avatar || 'default_lecturer_avatar.jpg',
@@ -346,7 +361,7 @@ export class PostsService implements IPostQuery, IPostCommand {
 
         // Add time_series_poses only if viewer is student and owner is teacher
         if (timeSeriesPoses !== undefined) {
-            (responseData as any).time_series_poses = timeSeriesPoses;
+            responseData.time_series_poses = timeSeriesPoses;
         }
 
         // Calculate counts
@@ -417,7 +432,7 @@ export class PostsService implements IPostQuery, IPostCommand {
             // where.categoryId = category_id;
         }
 
-        let lastPost: any = null;
+        let lastPost: Post | null = null;
         if (last_id) {
             lastPost = await this.prisma.post.findUnique({
                 where: { id: last_id },
@@ -437,7 +452,7 @@ export class PostsService implements IPostQuery, IPostCommand {
         const skipTotal = (index || 0) * count;
         const takeTotal = count;
 
-        let finalPosts: any[] = [];
+        let finalPosts: (Post & { owner: User })[] = [];
 
         // 1. Prepare teacher filter
         const teacherWhere: Prisma.PostWhereInput = {
@@ -487,7 +502,7 @@ export class PostsService implements IPostQuery, IPostCommand {
             });
         }
 
-        const posts = finalPosts;
+        const posts: (Post & { owner: User })[] = finalPosts;
 
         if (posts.length === 0 && (index || 0) === 0) {
             return {
@@ -1157,7 +1172,7 @@ export class PostsService implements IPostQuery, IPostCommand {
                     ...(hasComment
                         ? { content: comment }
                         : { score, detailMistakes: detail_mistakes ?? null }),
-                } as any,
+                },
             });
 
             const allBlocks = await this.prisma.block.findMany({
