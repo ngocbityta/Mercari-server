@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PostsService } from '../../src/posts/posts.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { ResponseCode } from '../../src/enums/response-code.enum';
-import { Post, User, Block, Prisma } from '@prisma/client';
+import { Post, User, Block } from '@prisma/client';
 
 describe('PostsService - searchPosts', () => {
     let service: PostsService;
@@ -141,7 +141,7 @@ describe('PostsService - searchPosts', () => {
             expect.objectContaining({
                 where: expect.objectContaining({
                     ownerId: { notIn: ['blocked_user'] },
-                } as unknown as Prisma.PostWhereInput),
+                }),
             }),
         );
     });
