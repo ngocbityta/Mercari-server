@@ -58,10 +58,10 @@ export class CoursesService implements ICourseQuery {
 
             if (is_accept === '1') {
                 await this.prisma.$transaction(async (tx) => {
-                    await (tx as any).enrollment.create({
-                        data: { studentId: user_id, teacherId: requester.id } as any,
+                    await tx.enrollment.create({
+                        data: { studentId: user_id, teacherId: requester.id },
                     });
-                    await (tx as any).enrollmentRequest.delete({ where: { id: request.id } });
+                    await tx.enrollmentRequest.delete({ where: { id: request.id } });
                 });
             } else {
                 await this.prisma.enrollmentRequest.delete({ where: { id: request.id } });
@@ -388,7 +388,7 @@ export class CoursesService implements ICourseQuery {
                 data: {
                     teacherId: course_id,
                     studentId: user_id,
-                } as any,
+                },
             });
 
             return {
