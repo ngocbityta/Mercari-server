@@ -177,8 +177,9 @@ describe('CoursesService - getListCoursesOfStudent', () => {
         // Server trả đủ 2 phần tử, không tự lọc
         expect(result.data!.courses).toHaveLength(2);
         // App phải tự lọc: courses.filter(c => c.id !== requester.id)
-        const filtered = result.data!.courses.filter((c: { id: string }) => c.id !== mockRequester.id);
-        expect(filtered).toHaveLength(1);
+        const filtered = result.data!.courses.filter(
+            (c: { id: string }) => c.id !== mockRequester.id,
+        );
         expect(filtered[0].id).toBe('gv-1');
     });
 

@@ -169,7 +169,9 @@ describe('CoursesService - getListStudents', () => {
 
         expect(result.code).toBe('1000');
         // Server vẫn trả về, không crash — map null → ''
-        const nullEntry = result.data!.students.find((s: { id: string }) => s.id === 'student-null');
+        const nullEntry = result.data!.students.find(
+            (s: { id: string }) => s.id === 'student-null',
+        );
         expect(nullEntry!.name).toBe('');
         // App tự kiểm tra: if (name === '' || !id) → ẩn đi không hiển thị
     });

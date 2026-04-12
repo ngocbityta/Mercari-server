@@ -164,7 +164,9 @@ describe('CoursesService - getRequestedEnrollment', () => {
 
         expect(result.code).toBe('1000');
         // Server map username null → '' thay vì crash
-        const invalidEntry = result.data!.find((d: any) => (d as { request: { id: string } }).request.id === 'student-invalid');
+        const invalidEntry = result.data!.find(
+            (d: any) => (d as { request: { id: string } }).request.id === 'student-invalid',
+        );
         expect(invalidEntry!.request.user_name).toBe('');
         // App phải tự lọc bỏ entry này khi user_name === '' trước khi render
     });
