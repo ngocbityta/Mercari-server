@@ -27,6 +27,9 @@ describe('PostsService - searchPosts', () => {
                             findFirst: jest.fn(),
                             findMany: jest.fn(),
                         },
+                        searchHistory: {
+                            create: jest.fn(),
+                        },
                     },
                 },
             ],

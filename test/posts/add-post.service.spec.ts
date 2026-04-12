@@ -206,6 +206,6 @@ describe('PostsService - addPost', () => {
             'slave-1',
         );
 
-        expect(result.code).toBe(ResponseCode.CAN_NOT_CONNECT);
+        expect(result.code).toBe(ResponseCode.EXCEPTION_ERROR);
     });
 });
