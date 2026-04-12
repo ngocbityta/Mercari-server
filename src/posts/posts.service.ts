@@ -122,151 +122,171 @@ export class PostsService implements IPostQuery, IPostCommand {
         left_video?: string,
         right_video?: string,
     ) {
-        // Validate token - get user
-        const user = await this.prisma.user.findFirst({
-            where: { token },
-        });
+        try {
+            // 1. Validate token - get user
+            const user = await this.prisma.user.findFirst({
+                where: { token },
+            });
 
-        if (!user) {
-            throw new Error('Invalid token');
-        }
+            if (!user) {
+                return {
+                    code: ResponseCode.TOKEN_INVALID,
+                    message: ResponseMessage[ResponseCode.TOKEN_INVALID],
+                };
+            }
 
-        // Check if user is a teacher (GV)
-        if (user.role !== 'GV') {
-            throw new Error('Only teachers can edit posts');
-        }
+            // 2. Check if user account is active
+            if (user.status !== 'ACTIVE') {
+                return {
+                    code: ResponseCode.ACCOUNT_LOCKED,
+                    message: ResponseMessage[ResponseCode.ACCOUNT_LOCKED],
+                };
+            }
 
-        // Check if user account is active
-        if (user.status !== 'ACTIVE') {
-            throw new Error('User account is locked');
-        }
+            // 3. Check if user is a teacher (GV)
+            if (user.role !== 'GV') {
+                return {
+                    code: ResponseCode.NOT_ACCESS,
+                    message: 'Only teachers can edit posts',
+                };
+            }
 
-        // Get the post
-        const post = await this.prisma.post.findUnique({
-            where: { id: postId },
-        });
+            // 4. Get the post
+            const post = await this.prisma.post.findUnique({
+                where: { id: postId },
+            });
 
-        if (!post) {
-            throw new Error('Post not found');
-        }
+            if (!post) {
+                return {
+                    code: ResponseCode.POST_NOT_FOUND,
+                    message: ResponseMessage[ResponseCode.POST_NOT_FOUND],
+                };
+            }
 
-        // Check if the user owns this post
-        if (post.ownerId !== user.id) {
-            throw new Error('You do not own this post');
-        }
+            // 5. Check if the user owns this post
+            if (post.ownerId !== user.id) {
+                return {
+                    code: ResponseCode.NOT_ACCESS,
+                    message: 'You do not own this post',
+                };
+            }
 
-        // Parse video_indices to determine which videos to delete
-        const videosToDelete: string[] = [];
+            // 6. Logic check: Chỉ được gọi nếu chưa có HV nào nộp bài
+            // (A student submission is a Post with exerciseId pointing to this post)
+            const submissionCount = await this.prisma.post.count({
+                where: { exerciseId: postId },
+            });
+            if (submissionCount > 0) {
+                return {
+                    code: ResponseCode.ACTION_DONE_PREVIOUSLY,
+                    message: 'Cannot edit post as students have already submitted',
+                };
+            }
 
-        if (video_indices) {
-            const indices = video_indices.split(',').map((s: string) => s.trim().toLowerCase());
+            // 7. Parse video_indices to determine which videos to delete
+            const videosToDelete: string[] = [];
 
-            for (const index of indices) {
-                if (index === 'l' || index === 'left' || index === 'all' || index === 'lr') {
-                    videosToDelete.push('left');
-                } else if (index === 'r' || index === 'right') {
-                    videosToDelete.push('right');
+            if (video_indices) {
+                const indices = video_indices.split(',').map((s) => s.trim().toLowerCase());
+
+                for (const index of indices) {
+                    if (index === 'l' || index === 'left' || index === 'all' || index === 'lr') {
+                        videosToDelete.push('left');
+                    } else if (index === 'r' || index === 'right') {
+                        videosToDelete.push('right');
+                    }
                 }
             }
-        }
 
-        // Validate video replacement logic
-        const hasLeftVideoToDelete = videosToDelete.includes('left');
-        const hasRightVideoToDelete = videosToDelete.includes('right');
-        const hasLeftVideoToAdd = left_video !== undefined && left_video !== '';
-        const hasRightVideoToAdd = right_video !== undefined && right_video !== '';
+            // 8. Validate video replacement logic (TC 6, 7, 8)
+            const hasLeftVideoToDelete = videosToDelete.includes('left');
+            const hasRightVideoToDelete = videosToDelete.includes('right');
+            const hasLeftVideoToAdd = left_video !== undefined && left_video !== '';
+            const hasRightVideoToAdd = right_video !== undefined && right_video !== '';
 
-        // If deleting left video, must have replacement
-        if (hasLeftVideoToDelete && !hasLeftVideoToAdd) {
-            throw new Error('Must provide replacement video for deleted left video');
-        }
-
-        // If deleting right video, must have replacement
-        if (hasRightVideoToDelete && !hasRightVideoToAdd) {
-            throw new Error('Must provide replacement video for deleted right video');
-        }
-
-        // If adding left video without specifying deletion, it's an update
-        if (hasLeftVideoToAdd && !hasLeftVideoToDelete) {
-            // This is valid - updating left video
-        }
-
-        // If adding right video without specifying deletion, it's an update
-        if (hasRightVideoToAdd && !hasRightVideoToDelete) {
-            // This is valid - updating right video
-        }
-
-        // Check for mismatched video indices and uploads
-        if (
-            (hasLeftVideoToDelete || hasRightVideoToDelete) &&
-            !hasLeftVideoToAdd &&
-            !hasRightVideoToAdd
-        ) {
-            throw new Error('Deleted videos must have replacements');
-        }
-
-        // Build the updated media array
-        const currentMedia = post.media || [];
-        const newMedia: string[] = [];
-
-        // Process current media and apply deletions/additions
-        if (currentMedia.length > 0) {
-            for (let i = 0; i < currentMedia.length; i++) {
-                const mediaItem = currentMedia[i];
-                const isLeftVideo = mediaItem === post.leftVideo;
-                const isRightVideo = mediaItem === post.rightVideo;
-
-                // Skip deleted videos
-                if (isLeftVideo && hasLeftVideoToDelete) {
-                    continue;
-                }
-                if (isRightVideo && hasRightVideoToDelete) {
-                    continue;
-                }
-
-                newMedia.push(mediaItem);
+            // TC 6 & 7: If deleting video, must have replacement
+            if (hasLeftVideoToDelete && !hasLeftVideoToAdd) {
+                return {
+                    code: ResponseCode.INVALID_PARAMETER_VALUE,
+                    message: 'Must provide replacement video for deleted left video',
+                };
             }
-        }
+            if (hasRightVideoToDelete && !hasRightVideoToAdd) {
+                return {
+                    code: ResponseCode.INVALID_PARAMETER_VALUE,
+                    message: 'Must provide replacement video for deleted right video',
+                };
+            }
 
-        // Add new videos
-        if (hasLeftVideoToAdd) {
-            newMedia.push(left_video);
-        }
-        if (hasRightVideoToAdd) {
-            newMedia.push(right_video);
-        }
+            // 9. Build the updated media array
+            const currentMedia = post.media || [];
+            const newMedia: string[] = [];
 
-        // Ensure at least one video exists
-        if (newMedia.length === 0 && (post.leftVideo || post.rightVideo)) {
-            throw new Error('Post must have at least one video');
+            if (currentMedia.length > 0) {
+                for (let i = 0; i < currentMedia.length; i++) {
+                    const mediaItem = currentMedia[i];
+                    const isLeftVideo = mediaItem === post.leftVideo;
+                    const isRightVideo = mediaItem === post.rightVideo;
+
+                    if (isLeftVideo && hasLeftVideoToDelete) {
+                        continue;
+                    }
+                    if (isRightVideo && hasRightVideoToDelete) {
+                        continue;
+                    }
+
+                    newMedia.push(mediaItem);
+                }
+            }
+
+            if (hasLeftVideoToAdd) {
+                newMedia.push(left_video);
+            }
+            if (hasRightVideoToAdd) {
+                newMedia.push(right_video);
+            }
+
+            // Ensure at least one video exists
+            if (newMedia.length === 0 && (post.leftVideo || post.rightVideo)) {
+                return {
+                    code: ResponseCode.INVALID_PARAMETER_VALUE,
+                    message: 'Post must have at least one video',
+                };
+            }
+
+            // 10. Update the post
+            const updatedPost = await this.prisma.post.update({
+                where: { id: postId },
+                data: {
+                    content: described !== undefined ? described : post.content,
+                    media: newMedia,
+                    leftVideo: hasLeftVideoToAdd
+                        ? left_video
+                        : hasLeftVideoToDelete
+                          ? null
+                          : post.leftVideo,
+                    rightVideo: hasRightVideoToAdd
+                        ? right_video
+                        : hasRightVideoToDelete
+                          ? null
+                          : post.rightVideo,
+                },
+            });
+
+            return {
+                code: ResponseCode.OK,
+                message: ResponseMessage[ResponseCode.OK],
+                data: {
+                    id: updatedPost.id,
+                },
+            };
+        } catch (error) {
+            console.error('Error in editPost:', error);
+            return {
+                code: ResponseCode.EXCEPTION_ERROR,
+                message: ResponseMessage[ResponseCode.EXCEPTION_ERROR],
+            };
         }
-
-        // Update the post
-        const updatedPost = await this.prisma.post.update({
-            where: { id: postId },
-            data: {
-                content: described !== undefined ? described : post.content,
-                media: newMedia,
-                leftVideo: hasLeftVideoToAdd
-                    ? left_video
-                    : hasLeftVideoToDelete
-                      ? null
-                      : post.leftVideo,
-                rightVideo: hasRightVideoToAdd
-                    ? right_video
-                    : hasRightVideoToDelete
-                      ? null
-                      : post.rightVideo,
-            },
-            include: {
-                owner: true,
-            },
-        });
-
-        return {
-            id: updatedPost.id,
-            url: '', // Placeholder for future use
-        };
     }
 
     async deletePost(postId: string) {
@@ -399,7 +419,7 @@ export class PostsService implements IPostQuery, IPostCommand {
                 responseData.author = author;
                 responseData.exercise_id = post.exerciseId || '';
                 responseData.edited_times = '0';
-                
+
                 if (lecturer) {
                     responseData.lecturer = lecturer;
                 }
@@ -418,11 +438,11 @@ export class PostsService implements IPostQuery, IPostCommand {
                                             pose_name: 'nose',
                                             pose_coord: ['0.0', '0.0', '0.0'], // x, y, z as strings
                                             confident: '0.0',
-                                        }
-                                    ]
-                                }
-                            ]
-                        }
+                                        },
+                                    ],
+                                },
+                            ],
+                        },
                     ];
                 }
             } else {
@@ -887,8 +907,6 @@ export class PostsService implements IPostQuery, IPostCommand {
             data: { posts: mappedPosts },
         };
     }
-
-
 
     async getComment(
         token: string,

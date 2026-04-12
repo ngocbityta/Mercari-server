@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PostsService } from '../../src/posts/posts.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
-import { Prisma, Block } from '@prisma/client';
+import { Block } from '@prisma/client';
 
 // --- Mock data ---
 const mockActiveUser = {
@@ -156,7 +156,7 @@ describe('PostsService - setComment', () => {
             data: expect.objectContaining({
                 score: '85',
                 detailMistakes: '<table><tr><td>Lỗi tư thế</td></tr></table>',
-            } as unknown as Prisma.CommentCreateInput),
+            }),
         });
     });
 
@@ -310,7 +310,7 @@ describe('PostsService - setComment', () => {
             expect.objectContaining({
                 where: expect.objectContaining({
                     authorId: { notIn: ['commenter-blocked'] },
-                } as unknown as Prisma.CommentWhereInput),
+                }),
             }),
         );
     });
@@ -407,7 +407,7 @@ describe('PostsService - setComment', () => {
             expect.objectContaining({
                 where: expect.objectContaining({
                     authorId: { notIn: ['commenter-x'] },
-                } as unknown as Prisma.CommentWhereInput),
+                }),
             }),
         );
         // Comment của commenter-x không có trong kết quả

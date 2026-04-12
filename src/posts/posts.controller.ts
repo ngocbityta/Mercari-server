@@ -110,7 +110,12 @@ export class PostsController {
 
     @Post('get_saved_search')
     async getSavedSearch(@Body() body: GetSavedSearchDto) {
-        return this.searchHistoryService.getSavedSearch(body.token, body.index, body.count, body.user_id);
+        return this.searchHistoryService.getSavedSearch(
+            body.token,
+            body.index,
+            body.count,
+            body.user_id,
+        );
     }
 
     @Post('del_saved_search')
