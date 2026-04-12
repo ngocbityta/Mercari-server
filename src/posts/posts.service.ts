@@ -10,91 +10,108 @@ export class PostsService implements IPostQuery, IPostCommand {
 
     async addPost(
         token: string,
-        left_video?: string,
-        right_video?: string,
+        left_video: string,
+        right_video: string,
+        described: string,
+        device_slave: string,
         course_id?: string,
         exercise_id?: string,
-        described?: string,
-        device_slave?: string,
         device_master?: string,
     ) {
-        // Validate token - get user from token
-        const user = await this.prisma.user.findFirst({
-            where: { token },
-        });
-
-        if (!user) {
-            throw new Error('Invalid token');
-        }
-
-        // Validate device_master is provided
-        if (!device_master) {
-            throw new Error('device_master is required');
-        }
-
-        // Validate that if exercise_id is provided, course_id must also be provided (student posting)
-        if (exercise_id && !course_id) {
-            throw new Error('course_id is required when exercise_id is provided');
-        }
-
-        // Validate that if course_id is provided, it must be the same as the user's ID (teacher posting)
-        if (course_id && user.id !== course_id) {
-            throw new Error('course_id must match user ID for teacher posting');
-        }
-
-        // [REQ]: GV không làm bài tập của GV khác
-        if (exercise_id) {
-            if (user.role === 'GV') {
-                throw new Error('Giảng viên không được làm bài tập');
-            }
-
-            const exercisePost = await this.prisma.post.findUnique({
-                where: { id: exercise_id },
+        try {
+            // Validate token - get user from token
+            const user = await this.prisma.user.findFirst({
+                where: { token },
             });
 
-            if (!exercisePost) {
-                throw new Error('Exercise post not found');
+            if (!user) {
+                return {
+                    code: ResponseCode.TOKEN_INVALID,
+                    message: ResponseMessage[ResponseCode.TOKEN_INVALID],
+                };
             }
 
-            // Check if the exercise post is owned by a teacher (course owner)
-            const exerciseOwner = await this.prisma.user.findUnique({
-                where: { id: exercisePost.ownerId },
+            // Check if user account is active
+            if (user.status !== 'ACTIVE') {
+                return {
+                    code: ResponseCode.ACCOUNT_LOCKED,
+                    message: ResponseMessage[ResponseCode.ACCOUNT_LOCKED],
+                };
+            }
+
+            // Logic for Student (HV) vs Teacher (GV)
+            if (user.role === 'HV') {
+                // If student is posting, exercise_id and course_id are mandatory (NN: X)
+                if (!exercise_id || !course_id) {
+                    return {
+                        code: ResponseCode.MISSING_PARAMETER,
+                        message: 'exercise_id and course_id are required for students',
+                    };
+                }
+
+                // Check if the exercise post exists
+                const exercisePost = await this.prisma.post.findUnique({
+                    where: { id: exercise_id },
+                    include: { owner: true },
+                });
+
+                if (!exercisePost) {
+                    return {
+                        code: ResponseCode.POST_NOT_FOUND,
+                        message: 'Exercise post not found',
+                    };
+                }
+
+                // Requirement states: exercise owner must be a teacher
+                if (exercisePost.owner.role !== 'GV') {
+                    return {
+                        code: ResponseCode.INVALID_PARAMETER_VALUE,
+                        message: 'Students can only submit assignments to teacher posts',
+                    };
+                }
+
+                // Requirement states: course_id must match teacher's ID (the owner of the exercise post)
+                if (course_id !== exercisePost.ownerId) {
+                    return {
+                        code: ResponseCode.INVALID_PARAMETER_VALUE,
+                        message: 'course_id must match the owner of the exercise post',
+                    };
+                }
+            }
+
+            // Create media array with video files
+            const media: string[] = [left_video, right_video];
+
+            // Create the post
+            const post = await this.prisma.post.create({
+                data: {
+                    ownerId: user.id,
+                    content: described || '',
+                    media,
+                    hashtags: [],
+                    courseId: course_id || null,
+                    exerciseId: exercise_id || null,
+                    deviceMaster: device_master || null,
+                    deviceSlave: device_slave || null,
+                    leftVideo: left_video,
+                    rightVideo: right_video,
+                },
             });
 
-            if (!exerciseOwner) {
-                throw new Error('Exercise post owner not found');
-            }
+            return {
+                code: ResponseCode.OK,
+                message: ResponseMessage[ResponseCode.OK],
+                data: {
+                    id: post.id,
+                },
+            };
+        } catch (error) {
+            console.error('Error in addPost:', error);
+            return {
+                code: ResponseCode.EXCEPTION_ERROR,
+                message: ResponseMessage[ResponseCode.EXCEPTION_ERROR],
+            };
         }
-
-        // Create media array with video files
-        const media: string[] = [];
-        if (left_video) {
-            media.push(left_video);
-        }
-        if (right_video) {
-            media.push(right_video);
-        }
-
-        // Create the post
-        const post = await this.prisma.post.create({
-            data: {
-                ownerId: user.id,
-                content: described || '',
-                media,
-                hashtags: [],
-                courseId: course_id || null,
-                exerciseId: exercise_id || null,
-                deviceMaster: device_master,
-                deviceSlave: device_slave || null,
-                leftVideo: left_video || null,
-                rightVideo: right_video || null,
-            },
-            include: {
-                owner: true,
-            },
-        });
-
-        return post;
     }
 
     async editPost(
@@ -259,118 +276,181 @@ export class PostsService implements IPostQuery, IPostCommand {
         return { message: 'Post deleted successfully' };
     }
 
-    async getPost(token: string, postId: string, _user_id?: string) {
-        // Validate token - get viewer user
-        const viewer = await this.prisma.user.findFirst({
-            where: { token },
-        });
+    async getPost(token: string, postId: string, user_id?: string) {
+        try {
+            // Validate token - get viewer user (requester)
+            const requester = await this.prisma.user.findFirst({
+                where: { token },
+            });
 
-        if (!viewer) {
-            throw new Error('Invalid token');
-        }
+            if (!requester) {
+                return {
+                    code: ResponseCode.TOKEN_INVALID,
+                    message: ResponseMessage[ResponseCode.TOKEN_INVALID],
+                };
+            }
 
-        // Get the post
-        const post = await this.prisma.post.findUnique({
-            where: { id: postId },
-            include: {
-                owner: true,
-            },
-        });
+            if (requester.status === 'LOCKED') {
+                return {
+                    code: ResponseCode.ACCOUNT_LOCKED,
+                    message: ResponseMessage[ResponseCode.ACCOUNT_LOCKED],
+                };
+            }
 
-        if (!post) {
-            throw new Error('Post not found');
-        }
+            // Determine effective viewer (for impersonation)
+            let viewer = requester;
+            if (user_id) {
+                if (requester.role !== 'GV') {
+                    return {
+                        code: ResponseCode.NOT_ACCESS,
+                        message: ResponseMessage[ResponseCode.NOT_ACCESS],
+                    };
+                }
+                const targetUser = await this.prisma.user.findUnique({
+                    where: { id: user_id },
+                });
+                if (!targetUser) {
+                    return {
+                        code: ResponseCode.INVALID_PARAMETER_VALUE,
+                        message: ResponseMessage[ResponseCode.INVALID_PARAMETER_VALUE],
+                    };
+                }
+                viewer = targetUser;
+            }
 
-        // Check if the post owner has blocked the viewer
-        const isBlocked = await this.prisma.block.findFirst({
-            where: {
-                blockerId: post.ownerId,
-                blockedId: viewer.id,
-            },
-        });
+            // Get the post
+            const post = await this.prisma.post.findUnique({
+                where: { id: postId },
+                include: {
+                    owner: true,
+                },
+            });
 
-        // Check if viewer is student and post owner is teacher for time_series_poses
-        const isViewerStudent = viewer.role === 'HV';
-        const isOwnerTeacher = post.owner.role === 'GV';
-        let timeSeriesPoses: any[] | undefined;
+            if (!post) {
+                return {
+                    code: ResponseCode.POST_NOT_FOUND,
+                    message: ResponseMessage[ResponseCode.POST_NOT_FOUND],
+                };
+            }
 
-        // Only include time_series_poses if viewer is student and owner is teacher
-        if (isViewerStudent && isOwnerTeacher) {
-            // This would be populated from a separate table if it exists
-            // For now, return empty array
-            timeSeriesPoses = [];
-        }
+            // Check if post is locked (violation) -> Return 9992 as per Test Case 3
+            if (post.isLocked) {
+                return {
+                    code: ResponseCode.POST_NOT_FOUND,
+                    message: ResponseMessage[ResponseCode.POST_NOT_FOUND],
+                };
+            }
 
-        // Build the response data
-        const responseData: {
-            id: string;
-            described: string;
-            created: string;
-            modified: string;
-            like: string;
-            comment: string;
-            is_liked: string;
-            video: { url: string; thumb: string }[];
-            author: { id: string; name: string; avatar: string; online: string };
-            exercise_id: string;
-            edited_times: string;
-            is_blocked: string;
-            lecturer?: { id: string; name: string; avatar: string };
-            time_series_poses?: any[];
-        } = {
-            id: post.id,
-            described: post.content,
-            created: post.createdAt.toISOString(),
-            modified: post.updatedAt.toISOString(),
-            like: '0', // Will be calculated from likeIds array
-            comment: '0', // Will be calculated from commentIds array
-            is_liked: '0', // Will be set based on viewer's like status
-            video: post.media.map((url, index) => ({
-                url: url,
-                thumb: `thumbnail_${index}.jpg`, // Placeholder for thumbnail
-            })),
-            author: {
+            // Check if the post owner has blocked the viewer
+            const isBlockedRelation = await this.prisma.block.findFirst({
+                where: {
+                    blockerId: post.ownerId,
+                    blockedId: viewer.id,
+                },
+            });
+
+            const is_blocked = isBlockedRelation ? '1' : '0';
+
+            // Calculate counts
+            const commentCount = await this.prisma.comment.count({ where: { postId: post.id } });
+            const likeCount = post.likeIds?.length || 0;
+            const isLiked = (post.likeIds || []).includes(viewer.id);
+
+            // Lecturer and Author
+            const author = {
                 id: post.owner.id,
                 name: post.owner.username || 'Người dùng',
                 avatar: post.owner.avatar || 'default_avatar.jpg',
                 online: post.owner.online ? '1' : '0',
-            },
-            exercise_id: post.exerciseId || '',
-            edited_times: '0', // Placeholder for edit count
-            is_blocked: isBlocked ? '1' : '0',
-        };
+            };
 
-        // Add lecturer info if exercise_id exists and author != lecturer
-        if (post.exerciseId && post.ownerId !== post.courseId && post.courseId) {
-            // Get the course owner (teacher) as lecturer
-            const lecturer = await this.prisma.user.findFirst({
-                where: {
-                    id: post.courseId,
-                    role: 'GV',
-                },
-            });
-
-            if (lecturer) {
-                responseData.lecturer = {
-                    id: lecturer.id,
-                    name: lecturer.username || 'Giảng viên',
-                    avatar: lecturer.avatar || 'default_lecturer_avatar.jpg',
-                };
+            let lecturer;
+            // Add lecturer info if exercise_id exists and author != lecturer
+            if (post.exerciseId && post.ownerId !== post.courseId && post.courseId) {
+                const lecturerUser = await this.prisma.user.findFirst({
+                    where: { id: post.courseId },
+                });
+                if (lecturerUser) {
+                    lecturer = {
+                        id: lecturerUser.id,
+                        name: lecturerUser.username || 'Giảng viên',
+                        avatar: lecturerUser.avatar || 'default_lecturer_avatar.jpg',
+                    };
+                }
             }
+
+            // [Test Case 4]: If blocked, return empty fields except id and is_blocked
+            const responseData: any = {
+                id: post.id,
+                is_blocked,
+            };
+
+            if (is_blocked === '0') {
+                responseData.described = post.content || '';
+                responseData.created = post.createdAt.toISOString();
+                responseData.modified = post.updatedAt.toISOString();
+                responseData.like = likeCount.toString();
+                responseData.comment = commentCount.toString();
+                responseData.is_liked = isLiked ? '1' : '0';
+                responseData.video = post.media.map((url, index) => ({
+                    url: url,
+                    thumb: `thumbnail_${index}.jpg`,
+                }));
+                responseData.author = author;
+                responseData.exercise_id = post.exerciseId || '';
+                responseData.edited_times = '0';
+                
+                if (lecturer) {
+                    responseData.lecturer = lecturer;
+                }
+
+                // Time series poses logic (if student viewing a teacher's post)
+                if (viewer.role === 'HV' && post.owner.role === 'GV') {
+                    // Structure matches get_post(3) doc with string coordinates
+                    responseData.time_series_poses = [
+                        {
+                            frame: [
+                                {
+                                    frame_id: '0',
+                                    created: Date.now().toString(),
+                                    poses: [
+                                        {
+                                            pose_name: 'nose',
+                                            pose_coord: ['0.0', '0.0', '0.0'], // x, y, z as strings
+                                            confident: '0.0',
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ];
+                }
+            } else {
+                // Blocked: return empty structures for required fields
+                responseData.described = '';
+                responseData.created = '';
+                responseData.modified = '';
+                responseData.like = '0';
+                responseData.comment = '0';
+                responseData.is_liked = '0';
+                responseData.video = [];
+                responseData.author = { id: '', name: '', avatar: '' };
+                responseData.exercise_id = '';
+                responseData.edited_times = '0';
+            }
+
+            return {
+                code: ResponseCode.OK,
+                message: ResponseMessage[ResponseCode.OK],
+                data: responseData,
+            };
+        } catch (error) {
+            console.error('Error in getPost:', error);
+            return {
+                code: ResponseCode.EXCEPTION_ERROR,
+                message: ResponseMessage[ResponseCode.EXCEPTION_ERROR],
+            };
         }
-
-        // Add time_series_poses only if viewer is student and owner is teacher
-        if (timeSeriesPoses !== undefined) {
-            responseData.time_series_poses = timeSeriesPoses;
-        }
-
-        // Calculate counts
-        const commentCount = await this.prisma.comment.count({ where: { postId: post.id } });
-        responseData.like = (post.likeIds?.length || 0).toString();
-        responseData.comment = commentCount.toString();
-        responseData.is_liked = (post.likeIds || []).includes(viewer.id) ? '1' : '0';
-
-        return responseData;
     }
 
     async getListPosts(
@@ -808,166 +888,7 @@ export class PostsService implements IPostQuery, IPostCommand {
         };
     }
 
-    async getSavedSearch(token: string, index?: string, count?: string, user_id?: string) {
-        if (!token) {
-            return {
-                code: ResponseCode.TOKEN_INVALID,
-                message: ResponseMessage[ResponseCode.TOKEN_INVALID],
-            };
-        }
 
-        const requester = await this.prisma.user.findFirst({ where: { token } });
-        if (!requester) {
-            return {
-                code: ResponseCode.TOKEN_INVALID,
-                message: ResponseMessage[ResponseCode.TOKEN_INVALID],
-            };
-        }
-
-        if (requester.status === 'LOCKED') {
-            return {
-                code: ResponseCode.ACCOUNT_LOCKED,
-                message: ResponseMessage[ResponseCode.ACCOUNT_LOCKED],
-            };
-        }
-
-        let targetUserId = requester.id;
-        if (user_id) {
-            // Admin only check
-            if (requester.role !== 'GV') {
-                return {
-                    code: ResponseCode.NOT_ACCESS,
-                    message: ResponseMessage[ResponseCode.NOT_ACCESS],
-                };
-            }
-            targetUserId = user_id;
-        }
-
-        const idx = index ? parseInt(index) : 0;
-        const cnt = count ? parseInt(count) : 20;
-
-        try {
-            const histories = await this.prisma.searchHistory.findMany({
-                where: { userId: targetUserId },
-                orderBy: { createdAt: 'desc' },
-                skip: idx * cnt,
-                take: cnt,
-            });
-
-            if (histories.length === 0 && idx === 0) {
-                return {
-                    code: ResponseCode.NO_DATA,
-                    message: ResponseMessage[ResponseCode.NO_DATA],
-                    data: [],
-                };
-            }
-
-            const data = histories.map((h) => ({
-                id: h.id,
-                keyword: h.keyword,
-                user_id: h.userId,
-                duration_min: h.durationMin || '0',
-                duration_max: h.durationMax || '0',
-                created: h.createdAt.toISOString(),
-            }));
-
-            return {
-                code: ResponseCode.OK,
-                message: ResponseMessage[ResponseCode.OK],
-                data,
-            };
-        } catch {
-            return {
-                code: ResponseCode.CAN_NOT_CONNECT,
-                message: ResponseMessage[ResponseCode.CAN_NOT_CONNECT],
-            };
-        }
-    }
-
-    async delSavedSearch(token: string, search_id?: string, all?: string) {
-        if (!token) {
-            return {
-                code: ResponseCode.TOKEN_INVALID,
-                message: ResponseMessage[ResponseCode.TOKEN_INVALID],
-            };
-        }
-
-        const requester = await this.prisma.user.findFirst({ where: { token } });
-        if (!requester) {
-            return {
-                code: ResponseCode.TOKEN_INVALID,
-                message: ResponseMessage[ResponseCode.TOKEN_INVALID],
-            };
-        }
-
-        if (requester.status === 'LOCKED') {
-            return {
-                code: ResponseCode.ACCOUNT_LOCKED,
-                message: ResponseMessage[ResponseCode.ACCOUNT_LOCKED],
-            };
-        }
-
-        try {
-            if (all === '1') {
-                // Check if history exists
-                const count = await this.prisma.searchHistory.count({
-                    where: { userId: requester.id },
-                });
-
-                if (count === 0) {
-                    return {
-                        code: ResponseCode.NO_DATA,
-                        message: ResponseMessage[ResponseCode.NO_DATA],
-                    };
-                }
-
-                // Delete all history for this user
-                await this.prisma.searchHistory.deleteMany({
-                    where: { userId: requester.id },
-                });
-            } else {
-                if (!search_id) {
-                    return {
-                        code: ResponseCode.INVALID_PARAMETER_VALUE,
-                        message: ResponseMessage[ResponseCode.INVALID_PARAMETER_VALUE],
-                    };
-                }
-
-                // Verify ownership and existence
-                const history = await this.prisma.searchHistory.findUnique({
-                    where: { id: search_id },
-                });
-
-                if (!history) {
-                    return {
-                        code: ResponseCode.INVALID_PARAMETER_VALUE,
-                        message: ResponseMessage[ResponseCode.INVALID_PARAMETER_VALUE],
-                    };
-                }
-
-                if (history.userId !== requester.id) {
-                    return {
-                        code: ResponseCode.NOT_ACCESS,
-                        message: ResponseMessage[ResponseCode.NOT_ACCESS],
-                    };
-                }
-
-                await this.prisma.searchHistory.delete({
-                    where: { id: search_id },
-                });
-            }
-
-            return {
-                code: ResponseCode.OK,
-                message: ResponseMessage[ResponseCode.OK],
-            };
-        } catch {
-            return {
-                code: ResponseCode.CAN_NOT_CONNECT,
-                message: ResponseMessage[ResponseCode.CAN_NOT_CONNECT],
-            };
-        }
-    }
 
     async getComment(
         token: string,

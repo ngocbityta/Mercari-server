@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CoursesService } from '../../src/courses/courses.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 
 const mockPrisma = {
     user: {
@@ -50,7 +51,7 @@ describe('CoursesService - setRequestCourse', () => {
             data: expect.objectContaining({
                 teacherId: teacher.id,
                 studentId: student.id,
-            }),
+            } as unknown as Prisma.EnrollmentRequestCreateInput),
         });
     });
 

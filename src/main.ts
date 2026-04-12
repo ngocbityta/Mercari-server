@@ -15,12 +15,12 @@ async function bootstrap() {
     );
     app.useGlobalFilters(new HttpExceptionFilter());
     app.enableCors();
-    app.setGlobalPrefix('api');
+    app.setGlobalPrefix('it4788');
 
     const port = process.env.PORT ?? 3000;
     await app.listen(port);
 
     const logger = new Logger('Bootstrap');
-    logger.log(`Server is running on: http://localhost:${port}/api`);
+    logger.log(`Server is running on: http://localhost:${port}/it4788`);
 }
 void bootstrap();

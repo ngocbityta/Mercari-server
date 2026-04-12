@@ -9,7 +9,7 @@ import {
     ChangeInfoAfterSignupDto,
 } from './auth.dto.ts';
 
-@Controller('it4788')
+@Controller()
 export class AuthController {
     constructor(private readonly authService: AuthService) {}
 

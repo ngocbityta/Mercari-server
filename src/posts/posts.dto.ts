@@ -6,13 +6,13 @@ export class AddPostDto {
     @IsNotEmpty()
     token: string;
 
-    @IsOptional()
     @IsString()
-    left_video?: string;
+    @IsNotEmpty()
+    left_video: string;
 
-    @IsOptional()
     @IsString()
-    right_video?: string;
+    @IsNotEmpty()
+    right_video: string;
 
     @IsOptional()
     @IsString()
@@ -22,17 +22,17 @@ export class AddPostDto {
     @IsString()
     exercise_id?: string;
 
-    @IsOptional()
     @IsString()
-    described?: string;
+    @IsNotEmpty()
+    described: string;
 
     @IsString()
     @IsNotEmpty()
     device_slave: string;
 
+    @IsOptional()
     @IsString()
-    @IsNotEmpty()
-    device_master: string;
+    device_master?: string;
 }
 
 export class GetPostDto {
