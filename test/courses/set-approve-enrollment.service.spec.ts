@@ -40,7 +40,7 @@ describe('CoursesService - setApproveEnrollment', () => {
         service = module.get<CoursesService>(CoursesService);
         jest.clearAllMocks();
 
-        mockPrisma.$transaction.mockImplementation((cb: any) => cb(mockTx));
+        mockPrisma.$transaction.mockImplementation((cb: (tx: any) => any) => cb(mockTx));
         mockTx.enrollment.create.mockResolvedValue({});
         mockTx.enrollmentRequest.delete.mockResolvedValue({});
     });

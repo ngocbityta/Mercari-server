@@ -48,7 +48,12 @@ describe('PostsService - Search History', () => {
         it('[TC1] should return search history for current user', async () => {
             jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as any);
             jest.spyOn((prisma as any).searchHistory, 'findMany').mockResolvedValue([
-                { id: '1', keyword: 'nike', userId: 'user1', createdAt: new Date() },
+                {
+                    id: '1',
+                    keyword: 'nike',
+                    userId: 'user1',
+                    createdAt: new Date(),
+                },
             ]);
 
             const result = await service.getSavedSearch(mockToken);
