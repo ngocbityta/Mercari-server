@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Delete, Body, Param, Query } from '@nestjs/common';
+import { Controller, Post, Get, Delete, Body, Param } from '@nestjs/common';
 import { PostsService } from './posts.service';
 import {
     AddPostDto,
@@ -106,21 +106,12 @@ export class PostsController {
 
     @Post('get_saved_search')
     async getSavedSearch(@Body() body: GetSavedSearchDto) {
-        return this.postsService.getSavedSearch(
-            body.token,
-            body.index,
-            body.count,
-            body.user_id,
-        );
+        return this.postsService.getSavedSearch(body.token, body.index, body.count, body.user_id);
     }
 
     @Post('del_saved_search')
     async delSavedSearch(@Body() body: DelSavedSearchDto) {
-        return this.postsService.delSavedSearch(
-            body.token,
-            body.search_id,
-            body.all,
-        );
+        return this.postsService.delSavedSearch(body.token, body.search_id, body.all);
     }
 
     @Post('get_comment')

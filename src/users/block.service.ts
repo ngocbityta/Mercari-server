@@ -78,7 +78,9 @@ export class BlockService {
         if (userId && userId !== currentUser.id) {
             // Check if admin (GV)
             if (currentUser.role !== 'GV') {
-                throw new BadRequestException('Bạn không có quyền xem danh sách chặn của người khác');
+                throw new BadRequestException(
+                    'Bạn không có quyền xem danh sách chặn của người khác',
+                );
             }
             targetUserId = userId;
         }

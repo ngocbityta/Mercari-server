@@ -31,7 +31,7 @@ describe('PostsService - Search History', () => {
                         },
                         post: {
                             findMany: jest.fn(),
-                        }
+                        },
                     },
                 },
             ],
@@ -48,7 +48,7 @@ describe('PostsService - Search History', () => {
         it('[TC1] should return search history for current user', async () => {
             jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as any);
             jest.spyOn((prisma as any).searchHistory, 'findMany').mockResolvedValue([
-                { id: '1', keyword: 'nike', userId: 'user1', createdAt: new Date() }
+                { id: '1', keyword: 'nike', userId: 'user1', createdAt: new Date() },
             ]);
 
             const result = await service.getSavedSearch(mockToken);
@@ -59,12 +59,16 @@ describe('PostsService - Search History', () => {
         it('[TC_ADMIN] GV should be able to check other user history', async () => {
             const mockAdmin = { id: 'admin1', token: 'admin_token', status: 'ACTIVE', role: 'GV' };
             jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockAdmin as any);
-            const findManySpy = jest.spyOn((prisma as any).searchHistory, 'findMany').mockResolvedValue([]);
+            const findManySpy = jest
+                .spyOn((prisma as any).searchHistory, 'findMany')
+                .mockResolvedValue([]);
 
             await service.getSavedSearch('admin_token', '0', '20', 'user2');
-            expect(findManySpy).toHaveBeenCalledWith(expect.objectContaining({
-                where: { userId: 'user2' }
-            }));
+            expect(findManySpy).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: { userId: 'user2' },
+                }),
+            );
         });
     });
 
@@ -72,7 +76,9 @@ describe('PostsService - Search History', () => {
         it('[TC_DEL_ALL] should delete all history when all="1" and history exists', async () => {
             jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as any);
             jest.spyOn((prisma as any).searchHistory, 'count').mockResolvedValue(5);
-            const deleteManySpy = jest.spyOn((prisma as any).searchHistory, 'deleteMany').mockResolvedValue({ count: 5 });
+            const deleteManySpy = jest
+                .spyOn((prisma as any).searchHistory, 'deleteMany')
+                .mockResolvedValue({ count: 5 });
 
             const result = await service.delSavedSearch(mockToken, undefined, '1');
             expect(result.code).toBe(ResponseCode.OK);
@@ -89,8 +95,13 @@ describe('PostsService - Search History', () => {
 
         it('[TC_DEL_SINGLE] should delete single entry and verify ownership', async () => {
             jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as any);
-            jest.spyOn((prisma as any).searchHistory, 'findUnique').mockResolvedValue({ id: 's1', userId: 'user1' });
-            const deleteSpy = jest.spyOn((prisma as any).searchHistory, 'delete').mockResolvedValue({});
+            jest.spyOn((prisma as any).searchHistory, 'findUnique').mockResolvedValue({
+                id: 's1',
+                userId: 'user1',
+            });
+            const deleteSpy = jest
+                .spyOn((prisma as any).searchHistory, 'delete')
+                .mockResolvedValue({});
 
             const result = await service.delSavedSearch(mockToken, 's1', '0');
             expect(result.code).toBe(ResponseCode.OK);
@@ -107,7 +118,10 @@ describe('PostsService - Search History', () => {
 
         it('[TC_DEL_FAIL] should fail if deleting other user history', async () => {
             jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as any);
-            jest.spyOn((prisma as any).searchHistory, 'findUnique').mockResolvedValue({ id: 's1', userId: 'other_user' });
+            jest.spyOn((prisma as any).searchHistory, 'findUnique').mockResolvedValue({
+                id: 's1',
+                userId: 'other_user',
+            });
 
             const result = await service.delSavedSearch(mockToken, 's1', '0');
             expect(result.code).toBe(ResponseCode.NOT_ACCESS);

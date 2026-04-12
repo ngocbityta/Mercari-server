@@ -17,6 +17,7 @@ const mockUser: User = {
     description: null,
     role: UserRole.HV,
     token: null,
+    height: null,
     status: UserStatus.ACTIVE,
     online: false,
     createdAt: new Date('2026-01-01'),
