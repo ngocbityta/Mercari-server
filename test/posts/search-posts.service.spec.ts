@@ -90,7 +90,14 @@ describe('PostsService - searchPosts', () => {
         jest.spyOn(prisma.block, 'findMany').mockResolvedValue([]);
         jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(null);
 
-        const result = await service.searchPosts(mockToken, mockKeyword, '0', '0', '0', 'non_existent_user');
+        const result = await service.searchPosts(
+            mockToken,
+            mockKeyword,
+            '0',
+            '0',
+            '0',
+            'non_existent_user',
+        );
         expect(result.code).toBe(ResponseCode.INVALID_PARAMETER_VALUE);
     });
 
@@ -103,24 +110,35 @@ describe('PostsService - searchPosts', () => {
         const mockUser = { id: 'user1', token: mockToken, status: 'ACTIVE' };
         jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as any);
 
-        const result = await service.searchPosts(mockToken, mockKeyword, '0', '0', '0', undefined, -1, 10);
+        const result = await service.searchPosts(
+            mockToken,
+            mockKeyword,
+            '0',
+            '0',
+            '0',
+            undefined,
+            -1,
+            10,
+        );
         expect(result.code).toBe(ResponseCode.INVALID_PARAMETER_VALUE);
     });
 
     it('[TC_BLOCK] should filter out posts from blocked users', async () => {
         const mockUser = { id: 'user1', token: mockToken, status: 'ACTIVE' };
         const mockBlocks = [{ blockerId: 'user1', blockedId: 'blocked_user' }];
-        
+
         jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as any);
         jest.spyOn(prisma.block, 'findMany').mockResolvedValue(mockBlocks as any);
         const findManySpy = jest.spyOn(prisma.post, 'findMany').mockResolvedValue([]);
 
         await service.searchPosts(mockToken, mockKeyword, '0', '0', '0');
-        
-        expect(findManySpy).toHaveBeenCalledWith(expect.objectContaining({
-            where: expect.objectContaining({
-                ownerId: { notIn: ['blocked_user'] }
-            })
-        }));
+
+        expect(findManySpy).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    ownerId: { notIn: ['blocked_user'] },
+                }),
+            }),
+        );
     });
 });

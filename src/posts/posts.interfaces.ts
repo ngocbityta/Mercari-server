@@ -9,7 +9,16 @@ export interface IPostQuery {
         user_id?: string,
     ): Promise<any>;
     checkNewItem(lastId?: string, category_id?: string): Promise<any>;
-    searchPosts(token?: string, keyword?: string, category_id?: string, duration_min?: string, duration_max?: string, user_id?: string, index?: number, count?: number): Promise<any>;
+    searchPosts(
+        token?: string,
+        keyword?: string,
+        category_id?: string,
+        duration_min?: string,
+        duration_max?: string,
+        user_id?: string,
+        index?: number,
+        count?: number,
+    ): Promise<any>;
     getSavedSearch(token: string, index?: string, count?: string, user_id?: string): Promise<any>;
     getComment(
         token: string,

@@ -428,7 +428,7 @@ export class PostsService implements IPostQuery, IPostCommand {
         }
 
         // [REQ]: Ưu tiên các bài viết của khóa học đã đăng ký
-        const enrollments = await (this.prisma as any).enrollment.findMany({
+        const enrollments = await this.prisma.enrollment.findMany({
             where: { studentId: viewer.id },
             select: { teacherId: true },
         });
@@ -661,7 +661,7 @@ export class PostsService implements IPostQuery, IPostCommand {
         // Save to SearchHistory (unless it's a hashtag)
         if (keyword && !keyword.startsWith('#')) {
             try {
-                await (this.prisma as any).searchHistory.create({
+                await this.prisma.searchHistory.create({
                     data: {
                         userId: requester.id,
                         keyword: keyword,
@@ -726,54 +726,58 @@ export class PostsService implements IPostQuery, IPostCommand {
             };
         }
 
-        const mappedPosts = (await Promise.all(
-            posts.map(async (post) => {
-                if (!post.owner || !post.owner.id) return null;
+        const mappedPosts = (
+            await Promise.all(
+                posts.map(async (post) => {
+                    if (!post.owner || !post.owner.id) {
+                        return null;
+                    }
 
-                const content = post.content || '';
-                const media = post.media || [];
+                    const content = post.content || '';
+                    const media = post.media || [];
 
-                const isLiked = (post.likeIds || []).includes(requester.id);
-                
-                const blockRelationship = await this.prisma.block.findFirst({
-                    where: {
-                        OR: [
-                            { blockerId: post.ownerId, blockedId: requester.id },
-                            { blockerId: requester.id, blockedId: post.ownerId },
-                        ],
-                    },
-                });
-                const isBlocked = !!blockRelationship;
+                    const isLiked = (post.likeIds || []).includes(requester.id);
 
-                const canEdit = post.ownerId === requester.id && !post.isLocked;
-                const canComment = !post.isLocked;
+                    const blockRelationship = await this.prisma.block.findFirst({
+                        where: {
+                            OR: [
+                                { blockerId: post.ownerId, blockedId: requester.id },
+                                { blockerId: requester.id, blockedId: post.ownerId },
+                            ],
+                        },
+                    });
+                    const isBlocked = !!blockRelationship;
 
-                return {
-                    id: post.id,
-                    described: content,
-                    video: media.map((url, idx) => ({
-                        url,
-                        thumb: `thumbnail_${idx}.jpg`,
-                    })),
-                    created: post.createdAt.toISOString(),
-                    like: (post.likeIds?.length || 0).toString(),
-                    comment: (post.commentIds?.length || 0).toString(),
-                    is_liked: isLiked ? '1' : '0',
-                    is_blocked: isBlocked ? '1' : '0',
-                    can_comment: canComment ? '1' : '0',
-                    can_edit: canEdit ? '1' : '0',
-                    banned: post.owner.status === 'LOCKED' ? '1' : '0',
-                    author: {
-                        id: post.owner.id,
-                        name: post.owner.username || '',
-                        avatar: post.owner.avatar || '',
-                        role: post.owner.role,
-                    },
-                    exercise_id: post.exerciseId || '',
-                    time_series_poses: post.owner.role === 'GV' ? [] : undefined,
-                };
-            }),
-        )).filter(post => post !== null && (post.described !== '' || post.video.length > 0));
+                    const canEdit = post.ownerId === requester.id && !post.isLocked;
+                    const canComment = !post.isLocked;
+
+                    return {
+                        id: post.id,
+                        described: content,
+                        video: media.map((url, idx) => ({
+                            url,
+                            thumb: `thumbnail_${idx}.jpg`,
+                        })),
+                        created: post.createdAt.toISOString(),
+                        like: (post.likeIds?.length || 0).toString(),
+                        comment: (post.commentIds?.length || 0).toString(),
+                        is_liked: isLiked ? '1' : '0',
+                        is_blocked: isBlocked ? '1' : '0',
+                        can_comment: canComment ? '1' : '0',
+                        can_edit: canEdit ? '1' : '0',
+                        banned: post.owner.status === 'LOCKED' ? '1' : '0',
+                        author: {
+                            id: post.owner.id,
+                            name: post.owner.username || '',
+                            avatar: post.owner.avatar || '',
+                            role: post.owner.role,
+                        },
+                        exercise_id: post.exerciseId || '',
+                        time_series_poses: post.owner.role === 'GV' ? [] : undefined,
+                    };
+                }),
+            )
+        ).filter((post) => post !== null && (post.described !== '' || post.video.length > 0));
 
         if (mappedPosts.length === 0 && posts.length > 0 && index === 0) {
             return {
@@ -828,7 +832,7 @@ export class PostsService implements IPostQuery, IPostCommand {
         const cnt = count ? parseInt(count) : 20;
 
         try {
-            const histories = await (this.prisma as any).searchHistory.findMany({
+            const histories = await this.prisma.searchHistory.findMany({
                 where: { userId: targetUserId },
                 orderBy: { createdAt: 'desc' },
                 skip: idx * cnt,
@@ -843,7 +847,7 @@ export class PostsService implements IPostQuery, IPostCommand {
                 };
             }
 
-            const data = histories.map(h => ({
+            const data = histories.map((h) => ({
                 id: h.id,
                 keyword: h.keyword,
                 user_id: h.userId,
@@ -891,7 +895,7 @@ export class PostsService implements IPostQuery, IPostCommand {
         try {
             if (all === '1') {
                 // Check if history exists
-                const count = await (this.prisma as any).searchHistory.count({
+                const count = await this.prisma.searchHistory.count({
                     where: { userId: requester.id },
                 });
 
@@ -903,7 +907,7 @@ export class PostsService implements IPostQuery, IPostCommand {
                 }
 
                 // Delete all history for this user
-                await (this.prisma as any).searchHistory.deleteMany({
+                await this.prisma.searchHistory.deleteMany({
                     where: { userId: requester.id },
                 });
             } else {
@@ -915,7 +919,7 @@ export class PostsService implements IPostQuery, IPostCommand {
                 }
 
                 // Verify ownership and existence
-                const history = await (this.prisma as any).searchHistory.findUnique({
+                const history = await this.prisma.searchHistory.findUnique({
                     where: { id: search_id },
                 });
 
@@ -933,7 +937,7 @@ export class PostsService implements IPostQuery, IPostCommand {
                     };
                 }
 
-                await (this.prisma as any).searchHistory.delete({
+                await this.prisma.searchHistory.delete({
                     where: { id: search_id },
                 });
             }
