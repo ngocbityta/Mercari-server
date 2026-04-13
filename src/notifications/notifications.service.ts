@@ -28,17 +28,34 @@ export class NotificationsService implements INotificationQuery, INotificationCo
         const lastUpdate = new Date().toISOString();
 
         return {
-            data: notifications.map((n) => ({
-                type: n.type ?? '',
-                object_id: n.objectId ?? '0',
-                title: n.title ?? '',
-                notificationId: n.id,
-                created: n.createdAt.toISOString(),
-                avatar: n.avatar ?? '',
-                group: n.groupType,
-                read: n.isRead ? '1' : '0',
-            })),
-            badge: String(badge),
+            data: notifications
+                .filter((n) => {
+                    // Requirement 6: Ignore notifications without title
+                    if (!n.title || n.title.trim() === '') {
+                        return false;
+                    }
+
+                    // Requirement 7: Remove notifications with errors in notification_id, created
+                    // Note: In Prisma, id and createdAt are required, but we check just in case.
+                    if (!n.id || !n.createdAt) {
+                        return false;
+                    }
+
+                    return true;
+                })
+                .map((n) => ({
+                    // Requirement 8: Default values for type, avatar, group, read, object_id
+                    type: n.type ?? 'home',
+                    object_id: n.objectId ?? '0',
+                    title: n.title,
+                    notificationId: n.id,
+                    created: n.createdAt.toISOString(),
+                    avatar: n.avatar ?? 'app_icon',
+                    group: n.groupType ?? 0,
+                    read: n.isRead ? '1' : '0',
+                })),
+            // Requirement 9: Ensure badge is at least 0
+            badge: String(badge >= 0 ? badge : 0),
             last_update: lastUpdate,
         };
     }
@@ -62,7 +79,7 @@ export class NotificationsService implements INotificationQuery, INotificationCo
         });
 
         return {
-            badge: String(badge),
+            badge: String(badge >= 0 ? badge : 0),
             last_update: new Date().toISOString(),
         };
     }

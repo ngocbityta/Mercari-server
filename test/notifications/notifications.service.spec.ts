@@ -122,12 +122,11 @@ describe('NotificationsService', () => {
             expect(result.badge).toBe('5');
         });
 
-        it('should handle notifications with null fields gracefully', async () => {
+        it('should handle notifications with null optional fields by applying defaults', async () => {
             const nullFieldNotif: Notification = {
                 ...mockNotification,
                 type: null,
                 objectId: null,
-                title: null,
                 avatar: null,
             };
             prisma.notification.findMany.mockResolvedValue([nullFieldNotif]);
@@ -135,10 +134,23 @@ describe('NotificationsService', () => {
 
             const result = await service.getNotifications(mockUser, 0, 10);
 
-            expect(result.data[0].type).toBe('');
+            expect(result.data).toHaveLength(1);
+            expect(result.data[0].type).toBe('home');
             expect(result.data[0].object_id).toBe('0');
-            expect(result.data[0].title).toBe('');
-            expect(result.data[0].avatar).toBe('');
+            expect(result.data[0].avatar).toBe('app_icon');
+        });
+
+        it('should filter out notifications without a title', async () => {
+            const missingTitleNotif: Notification = {
+                ...mockNotification,
+                title: null,
+            };
+            prisma.notification.findMany.mockResolvedValue([missingTitleNotif]);
+            prisma.notification.count.mockResolvedValue(1);
+
+            const result = await service.getNotifications(mockUser, 0, 10);
+
+            expect(result.data).toHaveLength(0);
         });
 
         it('should return read status as string 0 or 1', async () => {
