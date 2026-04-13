@@ -1,8 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { PostsService } from '../../src/posts/posts.service';
-import { PrismaService } from '../../src/prisma/prisma.service';
-import { ResponseCode } from '../../src/enums/response-code.enum';
+import { PostsService } from '../../src/posts/posts.service.ts';
+import { PrismaService } from '../../src/prisma/prisma.service.ts';
+import { ResponseCode } from '../../src/enums/response-code.enum.ts';
 import { UserRole, UserStatus } from '@prisma/client';
+import { ApiException } from '../../src/common/exceptions/api.exception.ts';
 
 describe('PostsService - addPost', () => {
     let service: PostsService;
@@ -42,6 +43,7 @@ describe('PostsService - addPost', () => {
         post: {
             findUnique: jest.fn(),
             create: jest.fn(),
+            count: jest.fn(),
         },
     };
 
@@ -72,8 +74,7 @@ describe('PostsService - addPost', () => {
             'slave-1',
         );
 
-        expect(result.code).toBe(ResponseCode.OK);
-        expect(result.data?.id).toBe('new-post-id');
+        expect(result.id).toBe('new-post-id');
         expect(mockPrisma.post.create).toHaveBeenCalled();
     });
 
@@ -92,120 +93,137 @@ describe('PostsService - addPost', () => {
             'exercise-id', // exercise_id
         );
 
-        expect(result.code).toBe(ResponseCode.OK);
-        expect(result.data?.id).toBe('new-post-id');
+        expect(result.id).toBe('new-post-id');
     });
 
-    it('[HV-TC2] Học viên thiếu exercise_id/course_id trả về 1002', async () => {
+    it('[HV-TC2] Học viên thiếu exercise_id/course_id trả về MISSING_PARAMETER', async () => {
         mockPrisma.user.findFirst.mockResolvedValue(mockStudent);
 
-        const result = await service.addPost(
-            'student-token',
-            'v-left.mp4',
-            'v-right.mp4',
-            'content',
-            'slave-1',
-            undefined, // missing course_id
-            undefined, // missing exercise_id
-        );
+        const call = () =>
+            service.addPost(
+                'student-token',
+                'v-left.mp4',
+                'v-right.mp4',
+                'content',
+                'slave-1',
+                undefined,
+                undefined,
+            );
 
-        expect(result.code).toBe(ResponseCode.MISSING_PARAMETER);
+        await expect(call()).rejects.toThrow(ApiException);
+        try {
+            await call();
+        } catch (e) {
+            expect((e as ApiException).code).toBe(ResponseCode.MISSING_PARAMETER);
+        }
     });
 
-    it('[TC2] Token không hợp lệ trả về 9998', async () => {
+    it('[TC2] Token không hợp lệ trả về TOKEN_INVALID', async () => {
         mockPrisma.user.findFirst.mockResolvedValue(null);
 
-        const result = await service.addPost(
-            'invalid-token',
-            'v-left.mp4',
-            'v-right.mp4',
-            'content',
-            'slave-1',
-        );
+        const call = () =>
+            service.addPost('invalid-token', 'v-left.mp4', 'v-right.mp4', 'content', 'slave-1');
 
-        expect(result.code).toBe(ResponseCode.TOKEN_INVALID);
+        await expect(call()).rejects.toThrow(ApiException);
+        try {
+            await call();
+        } catch (e) {
+            expect((e as ApiException).code).toBe(ResponseCode.TOKEN_INVALID);
+        }
     });
 
-    it('[TC4] Tài khoản bị khóa trả về 9991', async () => {
+    it('[TC4] Tài khoản bị khóa trả về ACCOUNT_LOCKED', async () => {
         mockPrisma.user.findFirst.mockResolvedValue({ ...mockTeacher, status: UserStatus.LOCKED });
 
-        const result = await service.addPost(
-            'teacher-token',
-            'v-left.mp4',
-            'v-right.mp4',
-            'content',
-            'slave-1',
-        );
+        const call = () =>
+            service.addPost('teacher-token', 'v-left.mp4', 'v-right.mp4', 'content', 'slave-1');
 
-        expect(result.code).toBe(ResponseCode.ACCOUNT_LOCKED);
+        await expect(call()).rejects.toThrow(ApiException);
+        try {
+            await call();
+        } catch (e) {
+            expect((e as ApiException).code).toBe(ResponseCode.ACCOUNT_LOCKED);
+        }
     });
 
-    it('[HV-TC3] Nộp bài vào bài tập không tồn tại trả về 9992', async () => {
+    it('[HV-TC3] Nộp bài vào bài tập không tồn tại trả về POST_NOT_FOUND', async () => {
         mockPrisma.user.findFirst.mockResolvedValue(mockStudent);
         mockPrisma.post.findUnique.mockResolvedValue(null);
 
-        const result = await service.addPost(
-            'student-token',
-            'v-left.mp4',
-            'v-right.mp4',
-            'content',
-            'slave-1',
-            'teacher-id',
-            'non-existent-id',
-        );
+        const call = () =>
+            service.addPost(
+                'student-token',
+                'v-left.mp4',
+                'v-right.mp4',
+                'content',
+                'slave-1',
+                'teacher-id',
+                'non-existent-id',
+            );
 
-        expect(result.code).toBe(ResponseCode.POST_NOT_FOUND);
+        await expect(call()).rejects.toThrow(ApiException);
+        try {
+            await call();
+        } catch (e) {
+            expect((e as ApiException).code).toBe(ResponseCode.POST_NOT_FOUND);
+        }
     });
 
-    it('[HV-TC4] Nộp bài vào bài của học viên khác (không phải GV) trả về 1004', async () => {
+    it('[HV-TC4] Nộp bài vào bài của học viên khác trả về INVALID_PARAMETER_VALUE', async () => {
         mockPrisma.user.findFirst.mockResolvedValue(mockStudent);
         mockPrisma.post.findUnique.mockResolvedValue({
             ...mockExercisePost,
-            owner: { role: UserRole.HV }, // Owner is not a GV
+            owner: { role: UserRole.HV },
         });
 
-        const result = await service.addPost(
-            'student-token',
-            'v-left.mp4',
-            'v-right.mp4',
-            'content',
-            'slave-1',
-            'other-student-id',
-            'exercise-id',
-        );
+        const call = () =>
+            service.addPost(
+                'student-token',
+                'v-left.mp4',
+                'v-right.mp4',
+                'content',
+                'slave-1',
+                'other-student-id',
+                'exercise-id',
+            );
 
-        expect(result.code).toBe(ResponseCode.INVALID_PARAMETER_VALUE);
+        await expect(call()).rejects.toThrow(ApiException);
+        try {
+            await call();
+        } catch (e) {
+            expect((e as ApiException).code).toBe(ResponseCode.INVALID_PARAMETER_VALUE);
+        }
     });
 
-    it('[HV-TC5] course_id không khớp với chủ bài tập trả về 1004', async () => {
+    it('[HV-TC5] course_id không khớp với chủ bài tập trả về INVALID_PARAMETER_VALUE', async () => {
         mockPrisma.user.findFirst.mockResolvedValue(mockStudent);
         mockPrisma.post.findUnique.mockResolvedValue(mockExercisePost);
 
-        const result = await service.addPost(
-            'student-token',
-            'v-left.mp4',
-            'v-right.mp4',
-            'content',
-            'slave-1',
-            'wrong-teacher-id', // wrong course_id
-            'exercise-id',
-        );
+        const call = () =>
+            service.addPost(
+                'student-token',
+                'v-left.mp4',
+                'v-right.mp4',
+                'content',
+                'slave-1',
+                'wrong-teacher-id',
+                'exercise-id',
+            );
 
-        expect(result.code).toBe(ResponseCode.INVALID_PARAMETER_VALUE);
+        await expect(call()).rejects.toThrow(ApiException);
+        try {
+            await call();
+        } catch (e) {
+            expect((e as ApiException).code).toBe(ResponseCode.INVALID_PARAMETER_VALUE);
+        }
     });
 
-    it('[TC5/6] Lỗi CSDL hoặc ngoại lệ trả về 1001', async () => {
+    it('[TC5/6] Lỗi CSDL hoặc ngoại lệ trả về Error', async () => {
         mockPrisma.user.findFirst.mockResolvedValue(mockTeacher);
-        mockPrisma.post.create.mockRejectedValue(new Error('DB connection failed'));
+        mockPrisma.post.create.mockRejectedValue(new Error('DB failure'));
 
-        const result = await service.addPost(
-            'teacher-token',
-            'v-left.mp4',
-            'v-right.mp4',
-            'content',
-            'slave-1',
-        );
-
-        expect(result.code).toBe(ResponseCode.EXCEPTION_ERROR);
+        await expect(
+            service.addPost('teacher-token', 'v-left.mp4', 'v-right.mp4', 'content', 'slave-1'),
+        ).rejects.toThrow('DB failure');
     });
 });

@@ -1,7 +1,9 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.ts';
 import { User } from '@prisma/client';
 import { IPushSettingsQuery, IPushSettingsCommand } from './settings.interfaces.ts';
+import { ApiException } from '../common/exceptions/api.exception.ts';
+import { ResponseCode } from '../enums/response-code.enum.ts';
 
 const SETTING_FIELDS = [
     'likeComment',
@@ -51,14 +53,20 @@ export class SettingsService implements IPushSettingsQuery, IPushSettingsCommand
         // Check that at least one setting field is present
         const hasAnyField = SETTING_FIELDS.some((field) => data[field] !== undefined);
         if (!hasAnyField) {
-            throw new BadRequestException('At least one setting parameter is required');
+            throw new ApiException(
+                ResponseCode.INVALID_PARAMETER_VALUE,
+                'At least one setting parameter is required',
+            );
         }
 
         // Validate all provided values are '0' or '1'
         for (const field of SETTING_FIELDS) {
             const value = data[field];
             if (value !== undefined && value !== '0' && value !== '1') {
-                throw new BadRequestException(`Invalid value for ${field}: must be "0" or "1"`);
+                throw new ApiException(
+                    ResponseCode.INVALID_PARAMETER_VALUE,
+                    `Invalid value for ${field}: must be "0" or "1"`,
+                );
             }
         }
 
@@ -90,7 +98,10 @@ export class SettingsService implements IPushSettingsQuery, IPushSettingsCommand
         }
 
         if (allSame && Object.keys(updateData).length > 0) {
-            throw new BadRequestException('All settings are already set to the requested values');
+            throw new ApiException(
+                ResponseCode.ACTION_DONE_PREVIOUSLY,
+                'All settings are already set to the requested values',
+            );
         }
 
         // Update only the provided fields

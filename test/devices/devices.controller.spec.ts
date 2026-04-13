@@ -6,6 +6,7 @@ import { ResponseCode } from '../../src/enums/response-code.enum.ts';
 import { UserStatus, Prisma } from '@prisma/client';
 import { TokenGuard } from '../../src/common/guards/token.guard.ts';
 import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import { ApiException } from '../../src/common/exceptions/api.exception.ts';
 
 describe('DevicesController (Integration)', () => {
     let controller: DevicesController;
@@ -43,6 +44,7 @@ describe('DevicesController (Integration)', () => {
 
         controller = module.get<DevicesController>(DevicesController);
         devicesService = module.get<DevicesService>(DevicesService);
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         guard = new TokenGuard(mockPrisma as any);
         jest.clearAllMocks();
     });
@@ -55,13 +57,14 @@ describe('DevicesController (Integration)', () => {
                 devToken: 'dev-token-123',
             });
 
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
             const result = await controller.setDevtoken(dto, mockUser as any);
 
             expect(result.code).toBe(ResponseCode.OK);
             expect(result.data).toEqual({ devtype: '1', devToken: 'dev-token-123' });
         });
 
-        it('TC3: should return 1001 for database related errors', async () => {
+        it('TC3: should throw Prisma error and let it bubble up', async () => {
             const dto = { token: 'valid-token', devtype: 1, devtoken: 'dev-token-123' };
             const dbError = new Prisma.PrismaClientKnownRequestError('DB Error', {
                 code: 'P2002',
@@ -69,30 +72,41 @@ describe('DevicesController (Integration)', () => {
             });
             jest.spyOn(devicesService, 'setDevtoken').mockRejectedValue(dbError);
 
-            const result = await controller.setDevtoken(dto, mockUser as any);
-
-            expect(result.code).toBe(ResponseCode.CAN_NOT_CONNECT);
-            expect(result.message).toBe('Can not connect to DB');
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+            await expect(controller.setDevtoken(dto, mockUser as any)).rejects.toThrow(
+                Prisma.PrismaClientKnownRequestError,
+            );
         });
 
-        it('TC5: should return 1004 for invalid devtype', async () => {
+        it('TC5: should throw ApiException (1004) for invalid devtype', async () => {
             const dto = {
                 token: 'valid-token',
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                 devtype: 'invalid' as any,
                 devtoken: 'dev-token-123',
             };
 
-            const result = await controller.setDevtoken(dto, mockUser as any);
-
-            expect(result.code).toBe(ResponseCode.INVALID_PARAMETER_VALUE);
+            try {
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+                await controller.setDevtoken(dto, mockUser as any);
+                fail('Should have thrown ApiException');
+            } catch (e) {
+                expect(e).toBeInstanceOf(ApiException);
+                expect((e as ApiException).code).toBe(ResponseCode.INVALID_PARAMETER_VALUE);
+            }
         });
 
-        it('TC6: should return 1004 for missing or empty devtoken', async () => {
+        it('TC6: should throw ApiException (1004) for missing or empty devtoken', async () => {
             const dto = { token: 'valid-token', devtype: 1, devtoken: '' };
 
-            const result = await controller.setDevtoken(dto, mockUser as any);
-
-            expect(result.code).toBe(ResponseCode.INVALID_PARAMETER_VALUE);
+            try {
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+                await controller.setDevtoken(dto, mockUser as any);
+                fail('Should have thrown ApiException');
+            } catch (e) {
+                expect(e).toBeInstanceOf(ApiException);
+                expect((e as ApiException).code).toBe(ResponseCode.INVALID_PARAMETER_VALUE);
+            }
         });
     });
 
@@ -111,6 +125,7 @@ describe('DevicesController (Integration)', () => {
                 fail('Should have thrown UnauthorizedException');
             } catch (e) {
                 expect(e).toBeInstanceOf(UnauthorizedException);
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
                 expect(e.getResponse().code).toBe('9998');
             }
         });
@@ -130,6 +145,7 @@ describe('DevicesController (Integration)', () => {
                 fail('Should have thrown UnauthorizedException');
             } catch (e) {
                 expect(e).toBeInstanceOf(UnauthorizedException);
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
                 expect(e.getResponse().code).toBe('9998');
             }
         });

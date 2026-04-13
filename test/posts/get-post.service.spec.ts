@@ -1,14 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { PostsService } from '../../src/posts/posts.service';
-import { PrismaService } from '../../src/prisma/prisma.service';
-import { ResponseCode } from '../../src/enums/response-code.enum';
+import { PostsService } from '../../src/posts/posts.service.ts';
+import { PrismaService } from '../../src/prisma/prisma.service.ts';
+import { ResponseCode } from '../../src/enums/response-code.enum.ts';
 import { User, Post, Block } from '@prisma/client';
-
-interface PostResponse {
-    code: string;
-    message: string;
-    data?: any;
-}
+import { ApiException } from '../../src/common/exceptions/api.exception.ts';
 
 describe('PostsService - getPost', () => {
     let service: PostsService;
@@ -83,31 +78,38 @@ describe('PostsService - getPost', () => {
         jest.spyOn(prisma.block, 'findFirst').mockResolvedValue(null);
         jest.spyOn(prisma.comment, 'count').mockResolvedValue(0);
 
-        const result = (await service.getPost(mockToken, 'post1')) as PostResponse;
+        const result = await service.getPost(mockToken, 'post1');
 
-        expect(result.code).toBe(ResponseCode.OK);
-        expect(result.data.id).toBe('post1');
-        expect(result.data.author.name).toBe('Teacher 1');
+        expect(result.id).toBe('post1');
+        expect(result.author.name).toBe('Teacher 1');
     });
 
-    it('[TC2] should return 9998 if token is invalid', async () => {
+    it('[TC2] should throw ApiException (TOKEN_INVALID) if token is invalid', async () => {
         jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(null);
 
-        const result = await service.getPost('invalid', 'post1');
-
-        expect(result.code).toBe(ResponseCode.TOKEN_INVALID);
+        const call = () => service.getPost('invalid', 'post1');
+        await expect(call()).rejects.toThrow(ApiException);
+        try {
+            await call();
+        } catch (e) {
+            expect((e as ApiException).code).toBe(ResponseCode.TOKEN_INVALID);
+        }
     });
 
-    it('[TC3] should return 9992 if post is locked', async () => {
+    it('[TC3] should throw ApiException (POST_NOT_FOUND) if post is locked', async () => {
         jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as unknown as User);
         jest.spyOn(prisma.post, 'findUnique').mockResolvedValue({
             ...mockPost,
             isLocked: true,
         } as unknown as Post);
 
-        const result = (await service.getPost(mockToken, 'post1')) as PostResponse;
-
-        expect(result.code).toBe(ResponseCode.POST_NOT_FOUND);
+        const call = () => service.getPost(mockToken, 'post1');
+        await expect(call()).rejects.toThrow(ApiException);
+        try {
+            await call();
+        } catch (e) {
+            expect((e as ApiException).code).toBe(ResponseCode.POST_NOT_FOUND);
+        }
     });
 
     it('[TC4] should return is_blocked: 1 and empty fields if blocked', async () => {
@@ -115,12 +117,11 @@ describe('PostsService - getPost', () => {
         jest.spyOn(prisma.post, 'findUnique').mockResolvedValue(mockPost as unknown as Post);
         jest.spyOn(prisma.block, 'findFirst').mockResolvedValue({ id: 'b1' } as unknown as Block);
 
-        const result = (await service.getPost(mockToken, 'post1')) as PostResponse;
+        const result = await service.getPost(mockToken, 'post1');
 
-        expect(result.code).toBe(ResponseCode.OK);
-        expect(result.data.is_blocked).toBe('1');
-        expect(result.data.described).toBe('');
-        expect(result.data.video).toEqual([]);
+        expect(result.is_blocked).toBe('1');
+        expect(result.described).toBe('');
+        expect(result.video).toEqual([]);
     });
 
     it('[TC9] should use defaults if author name or avatar is missing', async () => {
@@ -134,32 +135,33 @@ describe('PostsService - getPost', () => {
         );
         jest.spyOn(prisma.block, 'findFirst').mockResolvedValue(null);
 
-        const result = (await service.getPost(mockToken, 'post1')) as PostResponse;
+        const result = await service.getPost(mockToken, 'post1');
 
-        expect(result.data.author.name).toBe('Người dùng');
-        expect(result.data.author.avatar).toBe('default_avatar.jpg');
+        expect(result.author.name).toBe('Người dùng');
+        expect(result.author.avatar).toBe('default_avatar.jpg');
     });
 
-    it('[TC10] should return 9992 if post ID is wrong', async () => {
+    it('[TC10] should throw ApiException (POST_NOT_FOUND) if post ID is wrong', async () => {
         jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as unknown as User);
         jest.spyOn(prisma.post, 'findUnique').mockResolvedValue(null);
 
-        const result = await service.getPost(mockToken, 'wrong_id');
-
-        expect(result.code).toBe(ResponseCode.POST_NOT_FOUND);
+        const call = () => service.getPost(mockToken, 'wrong_id');
+        await expect(call()).rejects.toThrow(ApiException);
+        try {
+            await call();
+        } catch (e) {
+            expect((e as ApiException).code).toBe(ResponseCode.POST_NOT_FOUND);
+        }
     });
 
     it('[GV-Admin] GV should be able to impersonate user view', async () => {
-        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockTeacher as unknown as User); // Requester is GV
-        jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(mockUser as unknown as User); // Target user
+        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockTeacher as unknown as User);
+        jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(mockUser as unknown as User);
         jest.spyOn(prisma.post, 'findUnique').mockResolvedValue(mockPost as unknown as Post);
         jest.spyOn(prisma.block, 'findFirst').mockResolvedValue(null);
 
-        const result = (await service.getPost('teacher_token', 'post1', 'user1')) as PostResponse;
+        const result = await service.getPost('teacher_token', 'post1', 'user1');
 
-        expect(result.code).toBe(ResponseCode.OK);
-        // Should return time_series_poses since effective viewer is HV (mockUser)
-        // and post owner is GV (mockTeacher)
-        expect(result.data.time_series_poses).toBeDefined();
+        expect(result.time_series_poses).toBeDefined();
     });
 });

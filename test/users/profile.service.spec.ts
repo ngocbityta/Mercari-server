@@ -1,9 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { ProfileService } from '../../src/users/profile.service.ts';
 import { PrismaService } from '../../src/prisma/prisma.service.ts';
 import { UserRole, UserStatus } from '../../src/enums/users.enum.ts';
 import { User } from '@prisma/client';
+import { ApiException } from '../../src/common/exceptions/api.exception.ts';
+import { ResponseCode } from '../../src/enums/response-code.enum.ts';
 
 const mockUser: User = {
     id: 'user-a',
@@ -91,32 +92,44 @@ describe('ProfileService', () => {
             expect(result.username).toBe('otheruser');
         });
 
-        it('TC5: should throw NotFoundException when target user does not exist', async () => {
+        it('TC5: should throw ApiException (NO_DATA) when target user does not exist', async () => {
             prisma.user.findUnique.mockResolvedValue(null);
 
-            await expect(service.getUserInfo(mockUser, 'nonexistent-id')).rejects.toThrow(
-                NotFoundException,
-            );
+            const call = () => service.getUserInfo(mockUser, 'nonexistent-id');
+            await expect(call()).rejects.toThrow(ApiException);
+            try {
+                await call();
+            } catch (e) {
+                expect((e as ApiException).code).toBe(ResponseCode.NO_DATA);
+            }
         });
 
-        it('TC5b: should throw NotFoundException when target user is locked', async () => {
+        it('TC5b: should throw ApiException (NO_DATA) when target user is locked', async () => {
             prisma.user.findUnique.mockResolvedValue(mockLockedUser);
 
-            await expect(service.getUserInfo(mockUser, mockLockedUser.id)).rejects.toThrow(
-                NotFoundException,
-            );
+            const call = () => service.getUserInfo(mockUser, mockLockedUser.id);
+            await expect(call()).rejects.toThrow(ApiException);
+            try {
+                await call();
+            } catch (e) {
+                expect((e as ApiException).code).toBe(ResponseCode.NO_DATA);
+            }
         });
 
-        it('should throw NotFoundException when target user has blocked current user', async () => {
+        it('should throw ApiException (NO_DATA) when target user has blocked current user', async () => {
             prisma.user.findUnique.mockResolvedValue(mockOtherUser);
             prisma.block.findUnique.mockResolvedValue({
                 blockerId: mockOtherUser.id,
                 blockedId: mockUser.id,
             });
 
-            await expect(service.getUserInfo(mockUser, mockOtherUser.id)).rejects.toThrow(
-                NotFoundException,
-            );
+            const call = () => service.getUserInfo(mockUser, mockOtherUser.id);
+            await expect(call()).rejects.toThrow(ApiException);
+            try {
+                await call();
+            } catch (e) {
+                expect((e as ApiException).code).toBe(ResponseCode.NO_DATA);
+            }
         });
 
         it('should return default empty strings for null fields', async () => {
@@ -154,34 +167,50 @@ describe('ProfileService', () => {
         it('TC5a: should throw error when username is empty', async () => {
             prisma.user.findUnique.mockResolvedValue(mockUser);
 
-            await expect(service.setUserInfo(mockUser, { username: '' })).rejects.toThrow(
-                BadRequestException,
-            );
+            const call = () => service.setUserInfo(mockUser, { username: '' });
+            await expect(call()).rejects.toThrow(ApiException);
+            try {
+                await call();
+            } catch (e) {
+                expect((e as ApiException).code).toBe(ResponseCode.INVALID_PARAMETER_VALUE);
+            }
         });
 
         it('TC5b: should throw error when username contains numbers', async () => {
             prisma.user.findUnique.mockResolvedValue(mockUser);
 
-            await expect(service.setUserInfo(mockUser, { username: 'test123' })).rejects.toThrow(
-                BadRequestException,
-            );
+            const call = () => service.setUserInfo(mockUser, { username: 'test123' });
+            await expect(call()).rejects.toThrow(ApiException);
+            try {
+                await call();
+            } catch (e) {
+                expect((e as ApiException).code).toBe(ResponseCode.INVALID_PARAMETER_VALUE);
+            }
         });
 
         it('TC5c: should throw error when username contains special characters', async () => {
             prisma.user.findUnique.mockResolvedValue(mockUser);
 
-            await expect(service.setUserInfo(mockUser, { username: 'test@user' })).rejects.toThrow(
-                BadRequestException,
-            );
+            const call = () => service.setUserInfo(mockUser, { username: 'test@user' });
+            await expect(call()).rejects.toThrow(ApiException);
+            try {
+                await call();
+            } catch (e) {
+                expect((e as ApiException).code).toBe(ResponseCode.INVALID_PARAMETER_VALUE);
+            }
         });
 
         it('TC5d: should throw error when username is too long', async () => {
             prisma.user.findUnique.mockResolvedValue(mockUser);
             const longName = 'a'.repeat(51);
 
-            await expect(service.setUserInfo(mockUser, { username: longName })).rejects.toThrow(
-                BadRequestException,
-            );
+            const call = () => service.setUserInfo(mockUser, { username: longName });
+            await expect(call()).rejects.toThrow(ApiException);
+            try {
+                await call();
+            } catch (e) {
+                expect((e as ApiException).code).toBe(ResponseCode.INVALID_PARAMETER_VALUE);
+            }
         });
 
         it('TC6: should trim and normalize username', async () => {
@@ -202,17 +231,25 @@ describe('ProfileService', () => {
         it('TC8: should throw error for banned username', async () => {
             prisma.user.findUnique.mockResolvedValue(mockUser);
 
-            await expect(service.setUserInfo(mockUser, { username: 'hitier' })).rejects.toThrow(
-                BadRequestException,
-            );
+            const call = () => service.setUserInfo(mockUser, { username: 'hitier' });
+            await expect(call()).rejects.toThrow(ApiException);
+            try {
+                await call();
+            } catch (e) {
+                expect((e as ApiException).code).toBe(ResponseCode.INVALID_PARAMETER_VALUE);
+            }
         });
 
         it('TC8b: should throw error for banned username (case insensitive)', async () => {
             prisma.user.findUnique.mockResolvedValue(mockUser);
 
-            await expect(service.setUserInfo(mockUser, { username: 'Admin' })).rejects.toThrow(
-                BadRequestException,
-            );
+            const call = () => service.setUserInfo(mockUser, { username: 'Admin' });
+            await expect(call()).rejects.toThrow(ApiException);
+            try {
+                await call();
+            } catch (e) {
+                expect((e as ApiException).code).toBe(ResponseCode.INVALID_PARAMETER_VALUE);
+            }
         });
 
         it('should update avatar and cover image', async () => {
@@ -248,9 +285,13 @@ describe('ProfileService', () => {
         it('should throw error if user not found', async () => {
             prisma.user.findUnique.mockResolvedValue(null);
 
-            await expect(service.setUserInfo(mockUser, { username: 'newname' })).rejects.toThrow(
-                NotFoundException,
-            );
+            const call = () => service.setUserInfo(mockUser, { username: 'newname' });
+            await expect(call()).rejects.toThrow(ApiException);
+            try {
+                await call();
+            } catch (e) {
+                expect((e as ApiException).code).toBe(ResponseCode.NO_DATA);
+            }
         });
 
         it('TC5e: should accept username with underscores', async () => {

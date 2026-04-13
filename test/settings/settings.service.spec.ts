@@ -1,9 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException } from '@nestjs/common';
 import { SettingsService } from '../../src/settings/settings.service.ts';
 import { PrismaService } from '../../src/prisma/prisma.service.ts';
 import { UserRole, UserStatus } from '../../src/enums/users.enum.ts';
 import { User, PushSetting } from '@prisma/client';
+import { ApiException } from '../../src/common/exceptions/api.exception.ts';
+import { ResponseCode } from '../../src/enums/response-code.enum.ts';
 
 const mockUser: User = {
     id: 'user-id-123',
@@ -117,19 +118,23 @@ describe('SettingsService', () => {
         });
 
         it('TC5: should throw error if input contains invalid values (not 0 or 1)', async () => {
-            await expect(
-                service.setPushSettings(mockUser, {
-                    likeComment: '2',
-                }),
-            ).rejects.toThrow(BadRequestException);
+            const call = () => service.setPushSettings(mockUser, { likeComment: '2' });
+            await expect(call()).rejects.toThrow(ApiException);
+            try {
+                await call();
+            } catch (e) {
+                expect((e as ApiException).code).toBe(ResponseCode.INVALID_PARAMETER_VALUE);
+            }
         });
 
         it('TC5b: should throw error if input contains non-numeric values', async () => {
-            await expect(
-                service.setPushSettings(mockUser, {
-                    likeComment: 'abc',
-                }),
-            ).rejects.toThrow(BadRequestException);
+            const call = () => service.setPushSettings(mockUser, { likeComment: 'abc' });
+            await expect(call()).rejects.toThrow(ApiException);
+            try {
+                await call();
+            } catch (e) {
+                expect((e as ApiException).code).toBe(ResponseCode.INVALID_PARAMETER_VALUE);
+            }
         });
 
         it('TC6: should keep existing values for fields not provided', async () => {
@@ -149,20 +154,29 @@ describe('SettingsService', () => {
         });
 
         it('TC7: should throw error when no setting parameters are provided', async () => {
-            await expect(service.setPushSettings(mockUser, {})).rejects.toThrow(
-                BadRequestException,
-            );
+            const call = () => service.setPushSettings(mockUser, {});
+            await expect(call()).rejects.toThrow(ApiException);
+            try {
+                await call();
+            } catch (e) {
+                expect((e as ApiException).code).toBe(ResponseCode.INVALID_PARAMETER_VALUE);
+            }
         });
 
         it('TC8: should throw error if all values are same as current', async () => {
             prisma.pushSetting.findUnique.mockResolvedValue(defaultPushSetting);
 
-            await expect(
+            const call = () =>
                 service.setPushSettings(mockUser, {
                     likeComment: '1',
                     fromFriends: '1',
-                }),
-            ).rejects.toThrow(BadRequestException);
+                });
+            await expect(call()).rejects.toThrow(ApiException);
+            try {
+                await call();
+            } catch (e) {
+                expect((e as ApiException).code).toBe(ResponseCode.ACTION_DONE_PREVIOUSLY);
+            }
         });
 
         it('should create default settings before updating if none exist', async () => {

@@ -1,10 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConflictException, NotFoundException } from '@nestjs/common';
 import { UsersService } from '../../src/users/users.service.ts';
 import { PrismaService } from '../../src/prisma/prisma.service.ts';
 import { CreateUserDto, UpdateUserDto } from '../../src/users/users.dto.ts';
 import { UserRole, UserStatus } from '../../src/enums/users.enum.ts';
 import { User } from '@prisma/client';
+import { ApiException } from '../../src/common/exceptions/api.exception.ts';
+import { ResponseCode } from '../../src/enums/response-code.enum.ts';
 
 // Mock user data
 const mockUser: User = {
@@ -98,10 +99,16 @@ describe('UsersService', () => {
             expect(result).toEqual(mockUser);
         });
 
-        it('should throw ConflictException if phonenumber already exists', async () => {
+        it('should throw ApiException if phonenumber already exists', async () => {
             prisma.user.findUnique.mockResolvedValue(mockUser);
 
-            await expect(service.create(createUserDto)).rejects.toThrow(ConflictException);
+            const call = () => service.create(createUserDto);
+            await expect(call()).rejects.toThrow(ApiException);
+            try {
+                await call();
+            } catch (e) {
+                expect((e as ApiException).code).toBe(ResponseCode.USER_EXISTED);
+            }
             expect(prisma.user.create).not.toHaveBeenCalled();
         });
     });
@@ -129,10 +136,16 @@ describe('UsersService', () => {
             expect(result).toEqual(mockUser);
         });
 
-        it('should throw NotFoundException if user not found', async () => {
+        it('should throw ApiException if user not found', async () => {
             prisma.user.findUnique.mockResolvedValue(null);
 
-            await expect(service.findOne('nonexistent-id')).rejects.toThrow(NotFoundException);
+            const call = () => service.findOne('nonexistent-id');
+            await expect(call()).rejects.toThrow(ApiException);
+            try {
+                await call();
+            } catch (e) {
+                expect((e as ApiException).code).toBe(ResponseCode.NO_DATA);
+            }
         });
     });
 

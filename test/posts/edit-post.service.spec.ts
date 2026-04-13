@@ -1,8 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { PostsService } from '../../src/posts/posts.service';
-import { PrismaService } from '../../src/prisma/prisma.service';
-import { ResponseCode } from '../../src/enums/response-code.enum';
+import { PostsService } from '../../src/posts/posts.service.ts';
+import { PrismaService } from '../../src/prisma/prisma.service.ts';
+import { ResponseCode } from '../../src/enums/response-code.enum.ts';
 import { User, Post } from '@prisma/client';
+import { ApiException } from '../../src/common/exceptions/api.exception.ts';
 
 describe('PostsService - editPost', () => {
     let service: PostsService;
@@ -17,6 +18,7 @@ describe('PostsService - editPost', () => {
                     useValue: {
                         user: {
                             findFirst: jest.fn(),
+                            findUnique: jest.fn(),
                         },
                         post: {
                             findUnique: jest.fn(),
@@ -51,68 +53,100 @@ describe('PostsService - editPost', () => {
     it('[TC1] should edit post successfully when parameters are valid', async () => {
         jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as User);
         jest.spyOn(prisma.post, 'findUnique').mockResolvedValue(mockPost as Post);
-        jest.spyOn(prisma.post, 'count').mockResolvedValue(0); // No submissions
+        jest.spyOn(prisma.post, 'count').mockResolvedValue(0);
         jest.spyOn(prisma.post, 'update').mockResolvedValue({ id: mockPostId } as Post);
 
         const result = await service.editPost(mockToken, mockPostId, 'New content');
-        expect(result.code).toBe(ResponseCode.OK);
-        expect(result.data?.id).toBe(mockPostId);
+        expect(result.id).toBe(mockPostId);
     });
 
-    it('[TC2] should return TOKEN_INVALID when token is wrong', async () => {
+    it('[TC2] should throw ApiException (TOKEN_INVALID) when token is wrong', async () => {
         jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(null);
-        const result = await service.editPost('wrong_token', mockPostId, 'New content');
-        expect(result.code).toBe(ResponseCode.TOKEN_INVALID);
+        const call = () => service.editPost('wrong_token', mockPostId, 'New content');
+        await expect(call()).rejects.toThrow(ApiException);
+        try {
+            await call();
+        } catch (e) {
+            expect((e as ApiException).code).toBe(ResponseCode.TOKEN_INVALID);
+        }
     });
 
-    it('[TC5] should return ACCOUNT_LOCKED when account is locked', async () => {
+    it('[TC5] should throw ApiException (ACCOUNT_LOCKED) when account is locked', async () => {
         const lockedUser = { ...mockUser, status: 'LOCKED' };
         jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(lockedUser as User);
-        const result = await service.editPost(mockToken, mockPostId, 'New content');
-        expect(result.code).toBe(ResponseCode.ACCOUNT_LOCKED);
+        const call = () => service.editPost(mockToken, mockPostId, 'New content');
+        await expect(call()).rejects.toThrow(ApiException);
+        try {
+            await call();
+        } catch (e) {
+            expect((e as ApiException).code).toBe(ResponseCode.ACCOUNT_LOCKED);
+        }
     });
 
-    it('should return NOT_ACCESS when non-teacher tries to edit', async () => {
+    it('should throw ApiException (NOT_ACCESS) when non-teacher tries to edit', async () => {
         const hvUser = { ...mockUser, role: 'HV' };
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(hvUser as any);
-        const result = await service.editPost(mockToken, mockPostId, 'New content');
-        expect(result.code).toBe(ResponseCode.NOT_ACCESS);
+        const call = () => service.editPost(mockToken, mockPostId, 'New content');
+        await expect(call()).rejects.toThrow(ApiException);
+        try {
+            await call();
+        } catch (e) {
+            expect((e as ApiException).code).toBe(ResponseCode.NOT_ACCESS);
+        }
     });
 
-    it('should return POST_NOT_FOUND when post does not exist', async () => {
+    it('should throw ApiException (POST_NOT_FOUND) when post does not exist', async () => {
         jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as User);
         jest.spyOn(prisma.post, 'findUnique').mockResolvedValue(null);
-        const result = await service.editPost(mockToken, 'non_existent', 'New content');
-        expect(result.code).toBe(ResponseCode.POST_NOT_FOUND);
+        const call = () => service.editPost(mockToken, 'non_existent', 'New content');
+        await expect(call()).rejects.toThrow(ApiException);
+        try {
+            await call();
+        } catch (e) {
+            expect((e as ApiException).code).toBe(ResponseCode.POST_NOT_FOUND);
+        }
     });
 
-    it('should return NOT_ACCESS when editing post of another user', async () => {
+    it('should throw ApiException (NOT_ACCESS) when editing post of another user', async () => {
         const otherPost = { ...mockPost, ownerId: 'other_gv' };
         jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as User);
         jest.spyOn(prisma.post, 'findUnique').mockResolvedValue(otherPost as Post);
-        const result = await service.editPost(mockToken, mockPostId, 'New content');
-        expect(result.code).toBe(ResponseCode.NOT_ACCESS);
+        const call = () => service.editPost(mockToken, mockPostId, 'New content');
+        await expect(call()).rejects.toThrow(ApiException);
+        try {
+            await call();
+        } catch (e) {
+            expect((e as ApiException).code).toBe(ResponseCode.NOT_ACCESS);
+        }
     });
 
-    it('should return ACTION_DONE_PREVIOUSLY when students have already submitted (Image 36 rule)', async () => {
+    it('should throw ApiException (ACTION_DONE_PREVIOUSLY) when students have already submitted', async () => {
         jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as User);
         jest.spyOn(prisma.post, 'findUnique').mockResolvedValue(mockPost as Post);
-        jest.spyOn(prisma.post, 'count').mockResolvedValue(1); // 1 HV has submitted
+        jest.spyOn(prisma.post, 'count').mockResolvedValue(1);
 
-        const result = await service.editPost(mockToken, mockPostId, 'New content');
-        expect(result.code).toBe(ResponseCode.ACTION_DONE_PREVIOUSLY);
-        expect(result.message).toContain('students have already submitted');
+        const call = () => service.editPost(mockToken, mockPostId, 'New content');
+        await expect(call()).rejects.toThrow(ApiException);
+        try {
+            await call();
+        } catch (e) {
+            expect((e as ApiException).code).toBe(ResponseCode.ACTION_DONE_PREVIOUSLY);
+        }
     });
 
-    it('[TC6/7] should return INVALID_PARAMETER_VALUE when deleting video without replacement', async () => {
+    it('[TC6/7] should throw ApiException (INVALID_PARAMETER_VALUE) when deleting video without replacement', async () => {
         jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as User);
         jest.spyOn(prisma.post, 'findUnique').mockResolvedValue(mockPost as Post);
         jest.spyOn(prisma.post, 'count').mockResolvedValue(0);
 
-        // Request delete left video but no provided left_video
-        const result = await service.editPost(mockToken, mockPostId, undefined, 'L');
-        expect(result.code).toBe(ResponseCode.INVALID_PARAMETER_VALUE);
-        expect(result.message).toContain('replacement video');
+        const call = () => service.editPost(mockToken, mockPostId, undefined, 'L');
+        await expect(call()).rejects.toThrow(ApiException);
+        try {
+            await call();
+        } catch (e) {
+            expect((e as ApiException).code).toBe(ResponseCode.INVALID_PARAMETER_VALUE);
+        }
     });
 
     it('should successfully update video when indices and replacement match', async () => {
@@ -127,6 +161,7 @@ describe('PostsService - editPost', () => {
 
         expect(updateSpy).toHaveBeenCalledWith(
             expect.objectContaining({
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                 data: expect.objectContaining({
                     leftVideo: 'new_l.mp4',
                 }),

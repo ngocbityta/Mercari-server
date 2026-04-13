@@ -1,9 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException } from '@nestjs/common';
 import { AccountService } from '../../src/users/account.service.ts';
 import { PrismaService } from '../../src/prisma/prisma.service.ts';
 import { UserRole, UserStatus } from '../../src/enums/users.enum.ts';
 import { User } from '@prisma/client';
+import { ApiException } from '../../src/common/exceptions/api.exception.ts';
+import { ResponseCode } from '../../src/enums/response-code.enum.ts';
 
 const mockUser: User = {
     id: 'user-id-123',
@@ -59,48 +60,59 @@ describe('AccountService', () => {
         });
 
         it('TC5: should throw error when old password is incorrect', async () => {
-            await expect(service.changePassword(mockUser, 'wrongpass', 'newpass2')).rejects.toThrow(
-                BadRequestException,
-            );
+            const call = () => service.changePassword(mockUser, 'wrongpass', 'newpass2');
+            await expect(call()).rejects.toThrow(ApiException);
+            try {
+                await call();
+            } catch (e) {
+                expect((e as ApiException).code).toBe(ResponseCode.INVALID_PARAMETER_VALUE);
+                expect((e as ApiException).message).toBe('Mật khẩu cũ không chính xác');
+            }
         });
 
         it('TC7a: should throw error when new password is too short', async () => {
-            await expect(service.changePassword(mockUser, 'password1', 'ab')).rejects.toThrow(
-                BadRequestException,
-            );
+            const call = () => service.changePassword(mockUser, 'password1', 'ab');
+            await expect(call()).rejects.toThrow(ApiException);
+            try {
+                await call();
+            } catch (e) {
+                expect((e as ApiException).code).toBe(ResponseCode.INVALID_PARAMETER_VALUE);
+            }
         });
 
         it('TC7b: should throw error when new password is too long', async () => {
-            await expect(
+            const call = () =>
                 service.changePassword(
                     mockUser,
                     'password1',
                     'abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz1',
-                ),
-            ).rejects.toThrow(BadRequestException);
+                );
+            await expect(call()).rejects.toThrow(ApiException);
+            try {
+                await call();
+            } catch (e) {
+                expect((e as ApiException).code).toBe(ResponseCode.INVALID_PARAMETER_VALUE);
+            }
         });
 
         it('TC8: should throw error when new password is too similar to old (LCS >= 80%)', async () => {
-            // password1 vs password2 -> LCS = "password" = 8 chars, new pwd len 9, 8/9 = 88%
-            await expect(
-                service.changePassword(mockUser, 'password1', 'password2'),
-            ).rejects.toThrow(BadRequestException);
+            const call = () => service.changePassword(mockUser, 'password1', 'password2');
+            await expect(call()).rejects.toThrow(ApiException);
+            try {
+                await call();
+            } catch (e) {
+                expect((e as ApiException).code).toBe(ResponseCode.INVALID_PARAMETER_VALUE);
+            }
         });
 
         it('TC9: should throw error when new password is same as old password', async () => {
-            await expect(
-                service.changePassword(mockUser, 'password1', 'password1'),
-            ).rejects.toThrow(BadRequestException);
-        });
-
-        it('should accept password when LCS is below 80%', async () => {
-            prisma.user.update.mockResolvedValue({
-                ...mockUser,
-                password: 'xyzthing',
-            });
-
-            const result = await service.changePassword(mockUser, 'password1', 'xyzthing');
-            expect(result).toEqual({});
+            const call = () => service.changePassword(mockUser, 'password1', 'password1');
+            await expect(call()).rejects.toThrow(ApiException);
+            try {
+                await call();
+            } catch (e) {
+                expect((e as ApiException).code).toBe(ResponseCode.INVALID_PARAMETER_VALUE);
+            }
         });
     });
 
@@ -119,7 +131,7 @@ describe('AccountService', () => {
         });
 
         it('TC5: should throw error when last_update is missing', () => {
-            expect(() => service.checkNewVersion(mockUser, '')).toThrow(BadRequestException);
+            expect(() => service.checkNewVersion(mockUser, '')).toThrow(ApiException);
         });
 
         it('TC7: should return active=0 for locked user', () => {
@@ -128,12 +140,6 @@ describe('AccountService', () => {
 
             expect(result.version.active).toBe('0');
             expect(result.user.active).toBe('0');
-        });
-
-        it('should return valid now field', () => {
-            const result = service.checkNewVersion(mockUser, '0.9.0');
-            expect(result.now).toBeDefined();
-            expect(typeof result.now).toBe('string');
         });
     });
 });

@@ -1,6 +1,8 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.ts';
 import { User, UserStatus } from '@prisma/client';
+import { ApiException } from '../common/exceptions/api.exception.ts';
+import { ResponseCode } from '../enums/response-code.enum.ts';
 
 @Injectable()
 export class AccountService {
@@ -8,16 +10,25 @@ export class AccountService {
 
     async changePassword(user: User, password: string, newPassword: string) {
         if (password === newPassword) {
-            throw new BadRequestException('Mật khẩu mới không được trùng với mật khẩu cũ');
+            throw new ApiException(
+                ResponseCode.INVALID_PARAMETER_VALUE,
+                'Mật khẩu mới không được trùng với mật khẩu cũ',
+            );
         }
 
         const isMatch = user.password === password;
         if (!isMatch) {
-            throw new BadRequestException('Mật khẩu cũ không chính xác');
+            throw new ApiException(
+                ResponseCode.INVALID_PARAMETER_VALUE,
+                'Mật khẩu cũ không chính xác',
+            );
         }
 
         if (newPassword.length < 6 || newPassword.length > 50) {
-            throw new BadRequestException('Mật khẩu mới phải từ 6 đến 50 ký tự');
+            throw new ApiException(
+                ResponseCode.INVALID_PARAMETER_VALUE,
+                'Mật khẩu mới phải từ 6 đến 50 ký tự',
+            );
         }
 
         const getLongestCommonSubstring = (s1: string, s2: string): number => {
@@ -41,7 +52,10 @@ export class AccountService {
 
         const lcsLength = getLongestCommonSubstring(password, newPassword);
         if (lcsLength / newPassword.length >= 0.8) {
-            throw new BadRequestException('Mật khẩu mới quá giống mật khẩu cũ');
+            throw new ApiException(
+                ResponseCode.INVALID_PARAMETER_VALUE,
+                'Mật khẩu mới quá giống mật khẩu cũ',
+            );
         }
 
         await this.prisma.user.update({
@@ -54,7 +68,10 @@ export class AccountService {
 
     checkNewVersion(user: User, lastUpdate: string) {
         if (!lastUpdate || typeof lastUpdate !== 'string') {
-            throw new BadRequestException('Parameter last_update is required');
+            throw new ApiException(
+                ResponseCode.INVALID_PARAMETER_VALUE,
+                'Parameter last_update is required',
+            );
         }
 
         return {

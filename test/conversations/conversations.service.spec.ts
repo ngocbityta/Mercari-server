@@ -1,10 +1,11 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { ConversationsService } from '../../src/conversations/conversations.service.ts';
 import { PrismaService } from '../../src/prisma/prisma.service.ts';
 import { UserRole, UserStatus } from '../../src/enums/users.enum.ts';
 import { EventsGateway } from '../../src/events/events.gateway.ts';
 import { User, Conversation, Message } from '@prisma/client';
+import { ApiException } from '../../src/common/exceptions/api.exception.ts';
+import { ResponseCode } from '../../src/enums/response-code.enum.ts';
+import { Test, TestingModule } from '@nestjs/testing';
 
 const mockUser: User = {
     id: 'user-a',
@@ -102,12 +103,13 @@ const mockPrisma = {
     },
 };
 
+/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment */
+
 describe('ConversationsService', () => {
     let service: ConversationsService;
-    let prisma: typeof mockPrisma;
+    let prisma: any;
 
     beforeEach(async () => {
-        jest.clearAllMocks();
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 ConversationsService,
@@ -118,6 +120,10 @@ describe('ConversationsService', () => {
 
         service = module.get<ConversationsService>(ConversationsService);
         prisma = module.get(PrismaService);
+    });
+
+    it('should be defined', () => {
+        expect(service).toBeDefined();
     });
 
     describe('getListConversation', () => {
@@ -199,12 +205,16 @@ describe('ConversationsService', () => {
             expect(result.conversation.id).toBe('conv-1');
         });
 
-        it('TC5: should throw NotFoundException when conversation not found', async () => {
+        it('TC5: should throw ApiException when conversation not found', async () => {
             prisma.conversation.findUnique.mockResolvedValue(null);
 
-            await expect(
-                service.getConversation(mockUser, 0, 10, undefined, 'nonexistent'),
-            ).rejects.toThrow(NotFoundException);
+            const call = () => service.getConversation(mockUser, 0, 10, undefined, 'nonexistent');
+            await expect(call()).rejects.toThrow(ApiException);
+            try {
+                await call();
+            } catch (e) {
+                expect((e as ApiException).code).toBe(ResponseCode.NO_DATA);
+            }
         });
 
         it('should indicate blocked status when block exists', async () => {
@@ -224,9 +234,13 @@ describe('ConversationsService', () => {
             const deletedConv = { ...mockConversation, isDeleted: true };
             prisma.conversation.findUnique.mockResolvedValue(deletedConv);
 
-            await expect(
-                service.getConversation(mockUser, 0, 10, undefined, 'conv-1'),
-            ).rejects.toThrow(NotFoundException);
+            const call = () => service.getConversation(mockUser, 0, 10, undefined, 'conv-1');
+            await expect(call()).rejects.toThrow(ApiException);
+            try {
+                await call();
+            } catch (e) {
+                expect((e as ApiException).code).toBe(ResponseCode.NO_DATA);
+            }
         });
     });
 
@@ -248,12 +262,16 @@ describe('ConversationsService', () => {
             expect(result).toEqual({});
         });
 
-        it('should throw NotFoundException when conversation not found', async () => {
+        it('should throw ApiException when conversation not found', async () => {
             prisma.conversation.findFirst.mockResolvedValue(null);
 
-            await expect(
-                service.setReadMessage(mockUser, undefined, 'nonexistent'),
-            ).rejects.toThrow(NotFoundException);
+            const call = () => service.setReadMessage(mockUser, undefined, 'nonexistent');
+            await expect(call()).rejects.toThrow(ApiException);
+            try {
+                await call();
+            } catch (e) {
+                expect((e as ApiException).code).toBe(ResponseCode.NO_DATA);
+            }
         });
 
         it('should work with partner_id instead of conversation_id', async () => {
@@ -284,20 +302,28 @@ describe('ConversationsService', () => {
             expect(result).toEqual({});
         });
 
-        it('should throw NotFoundException when message does not exist', async () => {
+        it('should throw ApiException when message does not exist', async () => {
             prisma.message.findUnique.mockResolvedValue(null);
 
-            await expect(service.deleteMessage(mockUser, 'nonexistent')).rejects.toThrow(
-                NotFoundException,
-            );
+            const call = () => service.deleteMessage(mockUser, 'nonexistent');
+            await expect(call()).rejects.toThrow(ApiException);
+            try {
+                await call();
+            } catch (e) {
+                expect((e as ApiException).code).toBe(ResponseCode.NO_DATA);
+            }
         });
 
         it('should throw error when trying to delete message from another user', async () => {
             prisma.message.findUnique.mockResolvedValue(mockMessage); // sent by user-b
 
-            await expect(service.deleteMessage(mockUser, 'msg-1')).rejects.toThrow(
-                BadRequestException,
-            );
+            const call = () => service.deleteMessage(mockUser, 'msg-1');
+            await expect(call()).rejects.toThrow(ApiException);
+            try {
+                await call();
+            } catch (e) {
+                expect((e as ApiException).code).toBe(ResponseCode.NOT_ACCESS);
+            }
         });
     });
 
@@ -333,9 +359,13 @@ describe('ConversationsService', () => {
         it('TC6: should throw error when conversation does not exist', async () => {
             prisma.conversation.findFirst.mockResolvedValue(null);
 
-            await expect(
-                service.deleteConversation(mockUser, undefined, 'nonexistent'),
-            ).rejects.toThrow(NotFoundException);
+            const call = () => service.deleteConversation(mockUser, undefined, 'nonexistent');
+            await expect(call()).rejects.toThrow(ApiException);
+            try {
+                await call();
+            } catch (e) {
+                expect((e as ApiException).code).toBe(ResponseCode.NO_DATA);
+            }
         });
     });
 
@@ -386,35 +416,51 @@ describe('ConversationsService', () => {
                 blockedId: 'user-b',
             });
 
-            await expect(
-                service.setSendMessage(mockUser, 'Hi!', 'user-b', undefined),
-            ).rejects.toThrow(BadRequestException);
+            const call = () => service.setSendMessage(mockUser, 'Hi!', 'user-b', undefined);
+            await expect(call()).rejects.toThrow(ApiException);
+            try {
+                await call();
+            } catch (e) {
+                expect((e as ApiException).code).toBe(ResponseCode.NOT_ACCESS);
+            }
         });
 
         it('TC5: should throw error when partner does not exist', async () => {
             prisma.conversation.findFirst.mockResolvedValue(null);
             prisma.user.findUnique.mockResolvedValue(null);
 
-            await expect(
-                service.setSendMessage(mockUser, 'Hi!', 'nonexistent', undefined),
-            ).rejects.toThrow(NotFoundException);
+            const call = () => service.setSendMessage(mockUser, 'Hi!', 'nonexistent', undefined);
+            await expect(call()).rejects.toThrow(ApiException);
+            try {
+                await call();
+            } catch (e) {
+                expect((e as ApiException).code).toBe(ResponseCode.NO_DATA);
+            }
         });
 
         it('should throw error when partner is locked', async () => {
             prisma.conversation.findFirst.mockResolvedValue(null);
             prisma.user.findUnique.mockResolvedValue(mockLockedPartner);
 
-            await expect(
-                service.setSendMessage(mockUser, 'Hi!', 'user-locked', undefined),
-            ).rejects.toThrow(NotFoundException);
+            const call = () => service.setSendMessage(mockUser, 'Hi!', 'user-locked', undefined);
+            await expect(call()).rejects.toThrow(ApiException);
+            try {
+                await call();
+            } catch (e) {
+                expect((e as ApiException).code).toBe(ResponseCode.NO_DATA);
+            }
         });
 
         it('should throw error when no conversation found and no partner_id', async () => {
             prisma.conversation.findFirst.mockResolvedValue(null);
 
-            await expect(
-                service.setSendMessage(mockUser, 'Hi!', undefined, 'nonexistent'),
-            ).rejects.toThrow(NotFoundException);
+            const call = () => service.setSendMessage(mockUser, 'Hi!', undefined, 'nonexistent');
+            await expect(call()).rejects.toThrow(ApiException);
+            try {
+                await call();
+            } catch (e) {
+                expect((e as ApiException).code).toBe(ResponseCode.NO_DATA);
+            }
         });
     });
 });

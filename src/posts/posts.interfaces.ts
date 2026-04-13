@@ -1,3 +1,28 @@
+export interface Author {
+    id: string;
+    name: string;
+    avatar: string;
+    online?: string;
+    role?: string;
+}
+
+export interface PostResponse {
+    id: string;
+    is_blocked: string;
+    described?: string;
+    created?: string;
+    modified?: string;
+    like?: string;
+    comment?: string;
+    is_liked?: string;
+    video?: { url: string; thumb: string }[];
+    author?: Author;
+    exercise_id?: string;
+    edited_times?: string;
+    lecturer?: { id: string; name: string; avatar: string };
+    time_series_poses?: any[];
+}
+
 export interface IPostQuery {
     getPost(token: string, postId: string, user_id?: string): Promise<any>;
     getListPosts(

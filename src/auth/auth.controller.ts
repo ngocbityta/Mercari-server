@@ -8,6 +8,7 @@ import {
     CheckVerifyCodeDto,
     ChangeInfoAfterSignupDto,
 } from './auth.dto.ts';
+import { ApiResponse } from '../common/dto/api-response.dto.ts';
 
 @Controller()
 export class AuthController {
@@ -15,37 +16,43 @@ export class AuthController {
 
     @Post('signup')
     @HttpCode(HttpStatus.OK)
-    signup(@Body() dto: SignupDto) {
-        return this.authService.signup(dto);
+    async signup(@Body() dto: SignupDto) {
+        const result = await this.authService.signup(dto);
+        return ApiResponse.success(result);
     }
 
     @Post('login')
     @HttpCode(HttpStatus.OK)
-    login(@Body() dto: LoginDto) {
-        return this.authService.login(dto);
+    async login(@Body() dto: LoginDto) {
+        const result = await this.authService.login(dto);
+        return ApiResponse.success(result);
     }
 
     @Post('logout')
     @HttpCode(HttpStatus.OK)
-    logout(@Body() dto: LogoutDto) {
-        return this.authService.logout(dto.token);
+    async logout(@Body() dto: LogoutDto) {
+        const result = await this.authService.logout(dto.token);
+        return ApiResponse.success(result);
     }
 
     @Post('get_verify_code')
     @HttpCode(HttpStatus.OK)
-    getVerifyCode(@Body() dto: GetVerifyCodeDto) {
-        return this.authService.getVerifyCode(dto.phonenumber);
+    async getVerifyCode(@Body() dto: GetVerifyCodeDto) {
+        const result = await this.authService.getVerifyCode(dto.phonenumber);
+        return ApiResponse.success(result);
     }
 
     @Post('check_verify_code')
     @HttpCode(HttpStatus.OK)
-    checkVerifyCode(@Body() dto: CheckVerifyCodeDto) {
-        return this.authService.checkVerifyCode(dto);
+    async checkVerifyCode(@Body() dto: CheckVerifyCodeDto) {
+        const result = await this.authService.checkVerifyCode(dto);
+        return ApiResponse.success(result);
     }
 
     @Post('change_info_after_signup')
     @HttpCode(HttpStatus.OK)
-    changeInfoAfterSignup(@Body() dto: ChangeInfoAfterSignupDto) {
-        return this.authService.changeInfoAfterSignup(dto);
+    async changeInfoAfterSignup(@Body() dto: ChangeInfoAfterSignupDto) {
+        const result = await this.authService.changeInfoAfterSignup(dto);
+        return ApiResponse.success(result);
     }
 }

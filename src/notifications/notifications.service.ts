@@ -1,8 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.ts';
 import { User } from '@prisma/client';
 import { EventsGateway } from '../events/events.gateway.ts';
 import { INotificationQuery, INotificationCommand } from './notifications.interfaces.ts';
+import { ApiException } from '../common/exceptions/api.exception.ts';
+import { ResponseCode } from '../enums/response-code.enum.ts';
 
 @Injectable()
 export class NotificationsService implements INotificationQuery, INotificationCommand {
@@ -47,7 +49,7 @@ export class NotificationsService implements INotificationQuery, INotificationCo
         });
 
         if (!notification || notification.userId !== user.id) {
-            throw new NotFoundException('Notification not found');
+            throw new ApiException(ResponseCode.NO_DATA, 'Notification not found');
         }
 
         await this.prisma.notification.update({

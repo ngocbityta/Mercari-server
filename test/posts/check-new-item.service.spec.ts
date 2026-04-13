@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { PostsService } from '../../src/posts/posts.service';
-import { PrismaService } from '../../src/prisma/prisma.service';
-import { ResponseCode } from '../../src/enums/response-code.enum';
+import { PostsService } from '../../src/posts/posts.service.ts';
+import { PrismaService } from '../../src/prisma/prisma.service.ts';
 import { Post } from '@prisma/client';
 
 describe('PostsService - checkNewItem', () => {
@@ -35,15 +34,13 @@ describe('PostsService - checkNewItem', () => {
         jest.spyOn(prisma.post, 'count').mockResolvedValue(5);
 
         const result = await service.checkNewItem('last_id', '0');
-        expect(result.code).toBe(ResponseCode.OK);
-        expect(result.data!.new_items).toBe('5');
+        expect(result.new_items).toBe('5');
     });
 
     // Test Case 2: Không truyền last_id (NN=O)
     it('[TC2] should return 0 new items when last_id is not provided', async () => {
         const result = await service.checkNewItem(undefined, '0');
-        expect(result.code).toBe(ResponseCode.OK);
-        expect(result.data!.new_items).toBe('0');
+        expect(result.new_items).toBe('0');
     });
 
     // Test Case 3: Giá trị trả về không hợp lệ (Mock logic trả về số lượng bài mới)
@@ -51,15 +48,13 @@ describe('PostsService - checkNewItem', () => {
         jest.spyOn(prisma.post, 'findUnique').mockResolvedValue(null);
 
         const result = await service.checkNewItem('non_existent_id', '0');
-        expect(result.code).toBe(ResponseCode.OK);
-        expect(result.data!.new_items).toBe('0');
+        expect(result.new_items).toBe('0');
     });
 
     // Test Case 6: Server bị lỗi không lấy được giá trị
-    it('[TC6] should return CAN_NOT_CONNECT when database query fails', async () => {
+    it('[TC6] should throw error when database query fails', async () => {
         jest.spyOn(prisma.post, 'findUnique').mockRejectedValue(new Error('DB Error'));
 
-        const result = await service.checkNewItem('last_id', '0');
-        expect(result.code).toBe(ResponseCode.CAN_NOT_CONNECT);
+        await expect(service.checkNewItem('last_id', '0')).rejects.toThrow('DB Error');
     });
 });

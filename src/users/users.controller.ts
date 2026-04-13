@@ -7,8 +7,6 @@ import {
     Param,
     Delete,
     ParseUUIDPipe,
-    BadRequestException,
-    NotFoundException,
     HttpCode,
     HttpStatus,
     UseGuards,
@@ -32,6 +30,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator.ts';
 import type { User } from '@prisma/client';
 import { ApiResponse } from '../common/dto/api-response.dto.ts';
 import { ResponseCode } from '../enums/response-code.enum.ts';
+import { ApiException } from '../common/exceptions/api.exception.ts';
 
 @Controller('users')
 export class UsersController {
@@ -39,29 +38,34 @@ export class UsersController {
 
     @Post()
     @HttpCode(HttpStatus.CREATED)
-    create(@Body() createUserDto: CreateUserDto) {
-        return this.usersService.create(createUserDto);
+    async create(@Body() createUserDto: CreateUserDto) {
+        const result = await this.usersService.create(createUserDto);
+        return ApiResponse.success(result);
     }
 
     @Get()
-    findAll() {
-        return this.usersService.findAll();
+    async findAll() {
+        const result = await this.usersService.findAll();
+        return ApiResponse.success(result);
     }
 
     @Get(':id')
-    findOne(@Param('id', ParseUUIDPipe) id: string) {
-        return this.usersService.findOne(id);
+    async findOne(@Param('id', ParseUUIDPipe) id: string) {
+        const result = await this.usersService.findOne(id);
+        return ApiResponse.success(result);
     }
 
     @Patch(':id')
-    update(@Param('id', ParseUUIDPipe) id: string, @Body() updateUserDto: UpdateUserDto) {
-        return this.usersService.update(id, updateUserDto);
+    async update(@Param('id', ParseUUIDPipe) id: string, @Body() updateUserDto: UpdateUserDto) {
+        const result = await this.usersService.update(id, updateUserDto);
+        return ApiResponse.success(result);
     }
 
     @Delete(':id')
-    @HttpCode(HttpStatus.NO_CONTENT)
-    remove(@Param('id', ParseUUIDPipe) id: string) {
-        return this.usersService.remove(id);
+    @HttpCode(HttpStatus.OK)
+    async remove(@Param('id', ParseUUIDPipe) id: string) {
+        await this.usersService.remove(id);
+        return ApiResponse.success({});
     }
 }
 
@@ -77,54 +81,33 @@ export class UserInfoController {
     @HttpCode(HttpStatus.OK)
     @UseGuards(TokenGuard)
     async getUserInfo(@Body() dto: GetUserInfoDto, @CurrentUser() user: User) {
-        try {
-            const result = await this.profileService.getUserInfo(user, dto.userId);
-            return ApiResponse.success(result);
-        } catch (error) {
-            if (error instanceof Error && error.message === 'User not found') {
-                return ApiResponse.error(ResponseCode.NO_DATA, 'User not found');
-            }
-            return ApiResponse.error(ResponseCode.EXCEPTION_ERROR, 'Exception error');
-        }
+        const result = await this.profileService.getUserInfo(user, dto.userId);
+        return ApiResponse.success(result);
     }
 
     @Post('set_user_info')
     @HttpCode(HttpStatus.OK)
     @UseGuards(TokenGuard)
     async setUserInfo(@Body() dto: SetUserInfoDto, @CurrentUser() user: User) {
-        try {
-            const result = await this.profileService.setUserInfo(user, {
-                username: dto.username,
-                avatar: dto.avatar,
-                coverImage: dto.coverImage,
-                description: dto.description,
-            });
-            return ApiResponse.success(result);
-        } catch (error) {
-            if (error instanceof Error) {
-                return ApiResponse.error(ResponseCode.INVALID_PARAMETER_VALUE, error.message);
-            }
-            return ApiResponse.error(ResponseCode.EXCEPTION_ERROR, 'Exception error');
-        }
+        const result = await this.profileService.setUserInfo(user, {
+            username: dto.username,
+            avatar: dto.avatar,
+            coverImage: dto.coverImage,
+            description: dto.description,
+        });
+        return ApiResponse.success(result);
     }
 
     @Post('change_password')
     @HttpCode(HttpStatus.OK)
     @UseGuards(TokenGuard)
     async changePassword(@Body() dto: ChangePasswordDto, @CurrentUser() user: User) {
-        try {
-            const result = await this.accountService.changePassword(
-                user,
-                dto.password,
-                dto.newPassword,
-            );
-            return ApiResponse.success(result);
-        } catch (error) {
-            if (error instanceof Error) {
-                return ApiResponse.error(ResponseCode.INVALID_PARAMETER_VALUE, error.message);
-            }
-            return ApiResponse.error(ResponseCode.EXCEPTION_ERROR, 'Exception error');
-        }
+        const result = await this.accountService.changePassword(
+            user,
+            dto.password,
+            dto.newPassword,
+        );
+        return ApiResponse.success(result);
     }
 
     @Post('set_block')
@@ -132,53 +115,31 @@ export class UserInfoController {
     @UseGuards(TokenGuard)
     async setBlock(@Body() dto: SetBlockDto, @CurrentUser() user: User) {
         if (user.status === 'LOCKED') {
-            return ApiResponse.error(ResponseCode.ACCOUNT_LOCKED, 'User account is locked');
+            throw new ApiException(ResponseCode.ACCOUNT_LOCKED, 'User account is locked');
         }
 
-        try {
-            const result = await this.blockService.setBlock(user, dto.userId, dto.type);
-            return ApiResponse.success(result);
-        } catch (error) {
-            if (error instanceof BadRequestException || error instanceof NotFoundException) {
-                return ApiResponse.error(ResponseCode.INVALID_PARAMETER_VALUE, error.message);
-            }
-            // For DB connection errors or other exceptions
-            return ApiResponse.error(ResponseCode.CAN_NOT_CONNECT, 'Không thể kết nối Internet');
-        }
+        const result = await this.blockService.setBlock(user, dto.userId, dto.type);
+        return ApiResponse.success(result);
     }
 
     @Post('check_new_version')
     @HttpCode(HttpStatus.OK)
     @UseGuards(TokenGuard)
     checkNewVersion(@Body() dto: CheckNewVersionDto, @CurrentUser() user: User) {
-        try {
-            const result = this.accountService.checkNewVersion(user, dto.lastUpdate);
-            return ApiResponse.success(result);
-        } catch (error) {
-            if (error instanceof Error) {
-                return ApiResponse.error(ResponseCode.INVALID_PARAMETER_VALUE, error.message);
-            }
-            return ApiResponse.error(ResponseCode.EXCEPTION_ERROR, 'Exception error');
-        }
+        const result = this.accountService.checkNewVersion(user, dto.lastUpdate);
+        return ApiResponse.success(result);
     }
 
     @Post('get_list_blocks')
     @HttpCode(HttpStatus.OK)
     @UseGuards(TokenGuard)
     async getListBlocks(@Body() dto: GetListBlocksDto, @CurrentUser() user: User) {
-        try {
-            const result = await this.blockService.getListBlocks(
-                user,
-                dto.index,
-                dto.count,
-                dto.user_id,
-            );
-            return ApiResponse.success(result);
-        } catch (error) {
-            if (error instanceof Error) {
-                return ApiResponse.error(ResponseCode.INVALID_PARAMETER_VALUE, error.message);
-            }
-            return ApiResponse.error(ResponseCode.EXCEPTION_ERROR, 'Exception error');
-        }
+        const result = await this.blockService.getListBlocks(
+            user,
+            dto.index,
+            dto.count,
+            dto.user_id,
+        );
+        return ApiResponse.success(result);
     }
 }

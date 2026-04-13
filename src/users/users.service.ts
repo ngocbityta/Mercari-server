@@ -1,8 +1,10 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.ts';
 import { CreateUserDto, UpdateUserDto } from './users.dto.ts';
 import { User } from '@prisma/client';
 import { IUserQuery, IUserCommand } from './users.interfaces.ts';
+import { ApiException } from '../common/exceptions/api.exception.ts';
+import { ResponseCode } from '../enums/response-code.enum.ts';
 
 @Injectable()
 export class UsersService implements IUserQuery, IUserCommand {
@@ -14,7 +16,7 @@ export class UsersService implements IUserQuery, IUserCommand {
         });
 
         if (existingUser) {
-            throw new ConflictException('Số điện thoại đã được đăng ký');
+            throw new ApiException(ResponseCode.USER_EXISTED, 'Số điện thoại đã được đăng ký');
         }
 
         return this.prisma.user.create({
@@ -68,7 +70,7 @@ export class UsersService implements IUserQuery, IUserCommand {
         });
 
         if (!user) {
-            throw new NotFoundException(`Không tìm thấy người dùng với id: ${id}`);
+            throw new ApiException(ResponseCode.NO_DATA, `Không tìm thấy người dùng với id: ${id}`);
         }
 
         return user;
@@ -83,7 +85,7 @@ export class UsersService implements IUserQuery, IUserCommand {
             });
 
             if (existingUser) {
-                throw new ConflictException('Số điện thoại đã được đăng ký');
+                throw new ApiException(ResponseCode.USER_EXISTED, 'Số điện thoại đã được đăng ký');
             }
         }
 

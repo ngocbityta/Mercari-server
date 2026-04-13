@@ -1,6 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.ts';
 import { User, UserStatus } from '@prisma/client';
+import { ApiException } from '../common/exceptions/api.exception.ts';
+import { ResponseCode } from '../enums/response-code.enum.ts';
 
 @Injectable()
 export class ProfileService {
@@ -16,7 +18,7 @@ export class ProfileService {
         });
 
         if (!targetUser || targetUser.status === UserStatus.LOCKED) {
-            throw new NotFoundException('User not found');
+            throw new ApiException(ResponseCode.NO_DATA, 'User not found');
         }
 
         const isBlocked = await this.prisma.block.findUnique({
@@ -29,7 +31,7 @@ export class ProfileService {
         });
 
         if (isBlocked) {
-            throw new NotFoundException('User not found');
+            throw new ApiException(ResponseCode.NO_DATA, 'User not found');
         }
 
         return this.formatUserInfo(targetUser);
@@ -44,7 +46,7 @@ export class ProfileService {
         });
 
         if (!user) {
-            throw new NotFoundException('User not found');
+            throw new ApiException(ResponseCode.NO_DATA, 'User not found');
         }
 
         const updateData: {
@@ -58,19 +60,29 @@ export class ProfileService {
         if (data.username !== undefined) {
             const normalizedUsername = data.username.trim();
             if (normalizedUsername.length === 0) {
-                throw new BadRequestException('Username cannot be empty');
+                throw new ApiException(
+                    ResponseCode.INVALID_PARAMETER_VALUE,
+                    'Username cannot be empty',
+                );
             }
             const usernameRegex = /^[a-zA-Z_][a-zA-Z_]*$/;
             if (!usernameRegex.test(normalizedUsername)) {
-                throw new BadRequestException(
+                throw new ApiException(
+                    ResponseCode.INVALID_PARAMETER_VALUE,
                     'Username can only contain letters and underscores, must start with a letter or underscore',
                 );
             }
             if (normalizedUsername.length > 50) {
-                throw new BadRequestException('Username is too long');
+                throw new ApiException(
+                    ResponseCode.INVALID_PARAMETER_VALUE,
+                    'Username is too long',
+                );
             }
             if (BANNED_USERNAMES.includes(normalizedUsername.toLowerCase())) {
-                throw new BadRequestException('This username is not allowed');
+                throw new ApiException(
+                    ResponseCode.INVALID_PARAMETER_VALUE,
+                    'This username is not allowed',
+                );
             }
             updateData.username = normalizedUsername;
         }

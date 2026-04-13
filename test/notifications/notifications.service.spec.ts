@@ -1,10 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
 import { NotificationsService } from '../../src/notifications/notifications.service.ts';
 import { PrismaService } from '../../src/prisma/prisma.service.ts';
 import { EventsGateway } from '../../src/events/events.gateway.ts';
 import { UserRole, UserStatus } from '../../src/enums/users.enum.ts';
 import { User, Notification } from '@prisma/client';
+import { ApiException } from '../../src/common/exceptions/api.exception.ts';
+import { ResponseCode } from '../../src/enums/response-code.enum.ts';
 
 const mockUser: User = {
     id: 'user-id-123',
@@ -184,21 +185,29 @@ describe('NotificationsService', () => {
             expect(result.badge).toBe('0');
         });
 
-        it('should throw NotFoundException when notification does not exist', async () => {
+        it('should throw ApiException (NO_DATA) when notification does not exist', async () => {
             prisma.notification.findUnique.mockResolvedValue(null);
 
-            await expect(service.setReadNotification(mockUser, 'nonexistent')).rejects.toThrow(
-                NotFoundException,
-            );
+            const call = () => service.setReadNotification(mockUser, 'nonexistent');
+            await expect(call()).rejects.toThrow(ApiException);
+            try {
+                await call();
+            } catch (e) {
+                expect((e as ApiException).code).toBe(ResponseCode.NO_DATA);
+            }
         });
 
-        it('should throw NotFoundException when notification belongs to another user', async () => {
+        it('should throw ApiException (NO_DATA) when notification belongs to another user', async () => {
             const otherUserNotif = { ...mockNotification, userId: 'other-user' };
             prisma.notification.findUnique.mockResolvedValue(otherUserNotif);
 
-            await expect(service.setReadNotification(mockUser, 'notif-1')).rejects.toThrow(
-                NotFoundException,
-            );
+            const call = () => service.setReadNotification(mockUser, 'notif-1');
+            await expect(call()).rejects.toThrow(ApiException);
+            try {
+                await call();
+            } catch (e) {
+                expect((e as ApiException).code).toBe(ResponseCode.NO_DATA);
+            }
         });
 
         it('should return remaining unread badge count', async () => {

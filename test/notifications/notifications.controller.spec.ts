@@ -2,10 +2,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotificationsController } from '../../src/notifications/notifications.controller.ts';
 import { NotificationsService } from '../../src/notifications/notifications.service.ts';
 import { ResponseCode } from '../../src/enums/response-code.enum.ts';
-import { NotFoundException } from '@nestjs/common';
 import { TokenGuard } from '../../src/common/guards/token.guard.ts';
 import { PrismaService } from '../../src/prisma/prisma.service.ts';
 import { User, UserRole, UserStatus } from '@prisma/client';
+import { ApiException } from '../../src/common/exceptions/api.exception.ts';
 
 const mockUser: User = {
     id: 'user-1',
@@ -40,7 +40,7 @@ describe('NotificationsController', () => {
                     },
                 },
                 {
-                    provide: PrismaService, // TokenGuard needs this
+                    provide: PrismaService,
                     useValue: {},
                 },
             ],
@@ -53,31 +53,51 @@ describe('NotificationsController', () => {
         service = module.get(NotificationsService);
     });
 
-    describe('setReadNotification', () => {
-        it('should return 9994 when service throws Notification not found', async () => {
-            service.setReadNotification.mockRejectedValue(
-                new NotFoundException('Notification not found'),
-            );
+    describe('getNotification', () => {
+        it('should return wrapped list of notifications', async () => {
+            const mockData = { data: [], badge: '0', last_update: '' };
+            service.getNotifications.mockResolvedValue(mockData);
 
-            const result = await controller.setReadNotification(
-                { token: 'tok', notificationId: '123' },
-                mockUser,
-            );
+            const result = await controller.getNotification({ index: '0', count: '10' }, mockUser);
 
-            expect(result.code).toBe(ResponseCode.NO_DATA);
-            expect(result.code).toBe('9994');
+            expect(result).toEqual({
+                code: '1000',
+                message: 'OK',
+                data: mockData,
+            });
         });
 
-        it('should return 9999 for generic errors', async () => {
-            service.setReadNotification.mockRejectedValue(new Error('Internal error'));
+        it('should throw ApiException for invalid parameters', async () => {
+            await expect(
+                controller.getNotification({ index: '-1', count: '10' }, mockUser),
+            ).rejects.toThrow(ApiException);
+        });
+    });
+
+    describe('setReadNotification', () => {
+        it('should mark as read and return wrapped result', async () => {
+            const mockResult = { badge: '0', last_update: '' };
+            service.setReadNotification.mockResolvedValue(mockResult);
 
             const result = await controller.setReadNotification(
-                { token: 'tok', notificationId: '123' },
+                { token: 'tok', notificationId: 'notif-1' },
                 mockUser,
             );
 
-            expect(result.code).toBe(ResponseCode.EXCEPTION_ERROR);
-            expect(result.code).toBe('9999');
+            expect(result).toEqual({
+                code: '1000',
+                message: 'OK',
+                data: mockResult,
+            });
+        });
+
+        it('should bubble up ApiException from service', async () => {
+            const apiException = new ApiException(ResponseCode.NO_DATA, 'Not found');
+            service.setReadNotification.mockRejectedValue(apiException);
+
+            await expect(
+                controller.setReadNotification({ token: 'tok', notificationId: '123' }, mockUser),
+            ).rejects.toThrow(ApiException);
         });
     });
 });

@@ -1,6 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.ts';
 import { User, UserStatus } from '@prisma/client';
+import { ApiException } from '../common/exceptions/api.exception.ts';
+import { ResponseCode } from '../enums/response-code.enum.ts';
 
 @Injectable()
 export class BlockService {
@@ -8,20 +10,32 @@ export class BlockService {
 
     async setBlock(currentUser: User, targetUserId: string, type: string) {
         if (currentUser.id === targetUserId) {
-            throw new BadRequestException('Bạn không thể chặn chính mình');
+            throw new ApiException(
+                ResponseCode.INVALID_PARAMETER_VALUE,
+                'Bạn không thể chặn chính mình',
+            );
         }
 
         const targetUser = await this.prisma.user.findUnique({ where: { id: targetUserId } });
         if (!targetUser) {
-            throw new NotFoundException('Người dùng không tồn tại');
+            throw new ApiException(
+                ResponseCode.INVALID_PARAMETER_VALUE,
+                'Người dùng không tồn tại',
+            );
         }
 
         if (targetUser.status === UserStatus.LOCKED) {
-            throw new BadRequestException('Người dùng này đã bị khóa');
+            throw new ApiException(
+                ResponseCode.INVALID_PARAMETER_VALUE,
+                'Người dùng này đã bị khóa',
+            );
         }
 
         if (type !== '0' && type !== '1') {
-            throw new BadRequestException('Loại hành động không hợp lệ');
+            throw new ApiException(
+                ResponseCode.INVALID_PARAMETER_VALUE,
+                'Loại hành động không hợp lệ',
+            );
         }
 
         const existingBlock = await this.prisma.block.findUnique({
@@ -35,7 +49,10 @@ export class BlockService {
 
         if (type === '0') {
             if (existingBlock) {
-                throw new BadRequestException('Bạn đã chặn người này rồi');
+                throw new ApiException(
+                    ResponseCode.INVALID_PARAMETER_VALUE,
+                    'Bạn đã chặn người này rồi',
+                );
             }
             await this.prisma.block.create({
                 data: {
@@ -45,7 +62,10 @@ export class BlockService {
             });
         } else {
             if (!existingBlock) {
-                throw new BadRequestException('Bạn chưa từng chặn người này');
+                throw new ApiException(
+                    ResponseCode.INVALID_PARAMETER_VALUE,
+                    'Bạn chưa từng chặn người này',
+                );
             }
             await this.prisma.block.delete({
                 where: {
@@ -78,7 +98,8 @@ export class BlockService {
         if (userId && userId !== currentUser.id) {
             // Check if admin (GV)
             if (currentUser.role !== 'GV') {
-                throw new BadRequestException(
+                throw new ApiException(
+                    ResponseCode.INVALID_PARAMETER_VALUE,
                     'Bạn không có quyền xem danh sách chặn của người khác',
                 );
             }

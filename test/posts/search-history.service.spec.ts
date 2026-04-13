@@ -1,8 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { SearchHistoryService } from '../../src/posts/search-history.service';
-import { PrismaService } from '../../src/prisma/prisma.service';
-import { ResponseCode } from '../../src/enums/response-code.enum';
+import { SearchHistoryService } from '../../src/posts/search-history.service.ts';
+import { PrismaService } from '../../src/prisma/prisma.service.ts';
+import { ResponseCode } from '../../src/enums/response-code.enum.ts';
 import { User, SearchHistory } from '@prisma/client';
+import { ApiException } from '../../src/common/exceptions/api.exception.ts';
 
 describe('SearchHistoryService', () => {
     let service: SearchHistoryService;
@@ -52,8 +53,8 @@ describe('SearchHistoryService', () => {
             ]);
 
             const result = await service.getSavedSearch(mockToken);
-            expect(result.code).toBe(ResponseCode.OK);
-            expect(result.data?.length).toBeGreaterThan(0);
+            expect(result.length).toBeGreaterThan(0);
+            expect(result[0].keyword).toBe('nike');
         });
 
         it('[TC_ADMIN] GV should be able to check other user history', async () => {
@@ -62,7 +63,11 @@ describe('SearchHistoryService', () => {
             jest.spyOn(prisma.user, 'findUnique').mockResolvedValue({
                 id: 'user2',
             } as unknown as User);
-            const findManySpy = jest.spyOn(prisma.searchHistory, 'findMany').mockResolvedValue([]);
+            const findManySpy = jest
+                .spyOn(prisma.searchHistory, 'findMany')
+                .mockResolvedValue([
+                    { id: '1', keyword: 'nike', userId: 'user2', createdAt: new Date() } as any,
+                ]);
 
             await service.getSavedSearch('admin_token', '0', '20', 'user2');
             expect(findManySpy).toHaveBeenCalledWith(
@@ -70,6 +75,19 @@ describe('SearchHistoryService', () => {
                     where: { userId: 'user2' },
                 }),
             );
+        });
+
+        it('[TC_NO_DATA] should throw NO_DATA if no history', async () => {
+            jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as unknown as User);
+            jest.spyOn(prisma.searchHistory, 'findMany').mockResolvedValue([]);
+
+            const call = () => service.getSavedSearch(mockToken);
+            await expect(call()).rejects.toThrow(ApiException);
+            try {
+                await call();
+            } catch (e) {
+                expect((e as ApiException).code).toBe(ResponseCode.NO_DATA);
+            }
         });
     });
 
@@ -82,16 +100,21 @@ describe('SearchHistoryService', () => {
                 .mockResolvedValue({ count: 5 });
 
             const result = await service.delSavedSearch(mockToken, undefined, '1');
-            expect(result.code).toBe(ResponseCode.OK);
+            expect(result).toEqual({});
             expect(deleteManySpy).toHaveBeenCalledWith({ where: { userId: 'user1' } });
         });
 
-        it('[TC_DEL_NO_DATA] should return NO_DATA when all="1" but no history exists', async () => {
+        it('[TC_DEL_NO_DATA] should throw NO_DATA when all="1" but no history exists', async () => {
             jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as unknown as User);
             jest.spyOn(prisma.searchHistory, 'count').mockResolvedValue(0);
 
-            const result = await service.delSavedSearch(mockToken, undefined, '1');
-            expect(result.code).toBe(ResponseCode.NO_DATA);
+            const call = () => service.delSavedSearch(mockToken, undefined, '1');
+            await expect(call()).rejects.toThrow(ApiException);
+            try {
+                await call();
+            } catch (e) {
+                expect((e as ApiException).code).toBe(ResponseCode.NO_DATA);
+            }
         });
 
         it('[TC_DEL_SINGLE] should delete single entry and verify ownership', async () => {
@@ -105,16 +128,21 @@ describe('SearchHistoryService', () => {
                 .mockResolvedValue({} as unknown as SearchHistory);
 
             const result = await service.delSavedSearch(mockToken, 's1', '0');
-            expect(result.code).toBe(ResponseCode.OK);
+            expect(result).toEqual({});
             expect(deleteSpy).toHaveBeenCalledWith({ where: { id: 's1' } });
         });
 
-        it('[TC_DEL_NOT_FOUND] should return INVALID_PARAMETER_VALUE if search_id not exists', async () => {
+        it('[TC_DEL_NOT_FOUND] should throw INVALID_PARAMETER_VALUE if search_id not exists', async () => {
             jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as unknown as User);
             jest.spyOn(prisma.searchHistory, 'findUnique').mockResolvedValue(null);
 
-            const result = await service.delSavedSearch(mockToken, 'non_existent', '0');
-            expect(result.code).toBe(ResponseCode.INVALID_PARAMETER_VALUE);
+            const call = () => service.delSavedSearch(mockToken, 'non_existent', '0');
+            await expect(call()).rejects.toThrow(ApiException);
+            try {
+                await call();
+            } catch (e) {
+                expect((e as ApiException).code).toBe(ResponseCode.INVALID_PARAMETER_VALUE);
+            }
         });
 
         it('[TC_DEL_FAIL] should fail if deleting other user history', async () => {
@@ -124,8 +152,13 @@ describe('SearchHistoryService', () => {
                 userId: 'other_user',
             } as unknown as SearchHistory);
 
-            const result = await service.delSavedSearch(mockToken, 's1', '0');
-            expect(result.code).toBe(ResponseCode.NOT_ACCESS);
+            const call = () => service.delSavedSearch(mockToken, 's1', '0');
+            await expect(call()).rejects.toThrow(ApiException);
+            try {
+                await call();
+            } catch (e) {
+                expect((e as ApiException).code).toBe(ResponseCode.NOT_ACCESS);
+            }
         });
     });
 });

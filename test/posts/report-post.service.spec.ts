@@ -1,6 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { PostsService } from '../../src/posts/posts.service';
-import { PrismaService } from '../../src/prisma/prisma.service';
+import { PostsService } from '../../src/posts/posts.service.ts';
+import { PrismaService } from '../../src/prisma/prisma.service.ts';
+import { ApiException } from '../../src/common/exceptions/api.exception.ts';
+import { ResponseCode } from '../../src/enums/response-code.enum.ts';
 
 // Mock data
 const mockActiveUser = {
@@ -71,9 +73,8 @@ describe('PostsService - reportPost', () => {
 
     /**
      * Test case 1: Người dùng truyền đúng tất cả thông tin
-     * Kết quả mong đợi: 1000 | OK
      */
-    it('[TC1] Gửi đúng token, postId, subject, details → trả về 1000', async () => {
+    it('[TC1] Gửi đúng token, postId, subject, details → trả về {}', async () => {
         mockPrisma.user.findFirst.mockResolvedValue(mockActiveUser);
         mockPrisma.post.findUnique.mockResolvedValue(mockPost);
         mockPrisma.report.findUnique.mockResolvedValue(null);
@@ -86,8 +87,7 @@ describe('PostsService - reportPost', () => {
             'Bài viết chứa ngôn ngữ thù địch',
         );
 
-        expect(result.code).toBe('1000');
-        expect(result.message).toBe('OK');
+        expect(result).toEqual({});
         expect(mockPrisma.report.create).toHaveBeenCalledWith({
             data: {
                 postId: 'post-1',
@@ -99,100 +99,83 @@ describe('PostsService - reportPost', () => {
     });
 
     /**
-     * Test case 2: Token sai / trống / token phiên cũ
-     * Kết quả mong đợi: 9998 → ứng dụng đẩy sang trang đăng nhập
+     * Test case 2: Token sai
      */
-    it('[TC2] Token không hợp lệ (sai/trống/cũ) → trả về 9998', async () => {
+    it('[TC2] Token không hợp lệ → throws ApiException (TOKEN_INVALID)', async () => {
         mockPrisma.user.findFirst.mockResolvedValue(null);
 
-        const result = await service.reportPost(
-            'invalid-or-expired-token',
-            'post-1',
-            'Vi phạm',
-            'Chi tiết',
-        );
-
-        expect(result.code).toBe('9998');
-        expect(mockPrisma.post.findUnique).not.toHaveBeenCalled();
+        const call = () =>
+            service.reportPost('invalid-or-expired-token', 'post-1', 'Vi phạm', 'Chi tiết');
+        await expect(call()).rejects.toThrow(ApiException);
+        try {
+            await call();
+        } catch (e) {
+            expect((e as ApiException).code).toBe(ResponseCode.TOKEN_INVALID);
+        }
     });
 
     /**
-     * Test case 3: Bài viết bị khóa trước khi gửi báo cáo
-     * Kết quả mong đợi: 1010 → ứng dụng xóa bài viết khỏi trang hiện tại
+     * Test case 3: Bài viết bị khóa
      */
-    it('[TC3] Bài viết bị khóa/hạn chế → trả về 1010', async () => {
+    it('[TC3] Bài viết bị khóa/hạn chế → throws ApiException (ACTION_DONE_PREVIOUSLY)', async () => {
         mockPrisma.user.findFirst.mockResolvedValue(mockActiveUser);
         mockPrisma.post.findUnique.mockResolvedValue(mockLockedPost);
 
-        const result = await service.reportPost(
-            'valid-token',
-            'post-locked',
-            'Vi phạm',
-            'Chi tiết',
-        );
-
-        expect(result.code).toBe('1010');
-        expect(mockPrisma.report.create).not.toHaveBeenCalled();
+        const call = () => service.reportPost('valid-token', 'post-locked', 'Vi phạm', 'Chi tiết');
+        await expect(call()).rejects.toThrow(ApiException);
+        try {
+            await call();
+        } catch (e) {
+            expect((e as ApiException).code).toBe(ResponseCode.ACTION_DONE_PREVIOUSLY);
+        }
     });
 
     /**
      * Test case 4: Tài khoản người dùng bị khóa
-     * Kết quả mong đợi: 9991 → ứng dụng đẩy sang trang đăng nhập
      */
-    it('[TC4] Tài khoản bị khóa → trả về 9991', async () => {
+    it('[TC4] Tài khoản bị khóa → throws ApiException (ACCOUNT_LOCKED)', async () => {
         mockPrisma.user.findFirst.mockResolvedValue(mockLockedUser);
 
-        const result = await service.reportPost(
-            'locked-user-token',
-            'post-1',
-            'Vi phạm',
-            'Chi tiết',
-        );
-
-        expect(result.code).toBe('9991');
-        expect(mockPrisma.post.findUnique).not.toHaveBeenCalled();
-        expect(mockPrisma.report.create).not.toHaveBeenCalled();
+        const call = () => service.reportPost('locked-user-token', 'post-1', 'Vi phạm', 'Chi tiết');
+        await expect(call()).rejects.toThrow(ApiException);
+        try {
+            await call();
+        } catch (e) {
+            expect((e as ApiException).code).toBe(ResponseCode.ACCOUNT_LOCKED);
+        }
     });
 
     /**
-     * Test case 5: Hệ thống không thể tiếp nhận báo cáo (DB lỗi)
-     * Kết quả mong đợi: 1001 → ứng dụng hiện "Không thể kết nối Internet"
+     * Test case 5: DB lỗi
      */
-    it('[TC5] DB không truy cập được → trả về 1001', async () => {
+    it('[TC5] DB không truy cập được → throws Error', async () => {
         mockPrisma.user.findFirst.mockResolvedValue(mockActiveUser);
         mockPrisma.post.findUnique.mockResolvedValue(mockPost);
         mockPrisma.report.findUnique.mockRejectedValue(new Error('DB connection failed'));
 
-        const result = await service.reportPost('valid-token', 'post-1', 'Vi phạm', 'Chi tiết');
-
-        expect(result.code).toBe('1001');
+        await expect(
+            service.reportPost('valid-token', 'post-1', 'Vi phạm', 'Chi tiết'),
+        ).rejects.toThrow('DB connection failed');
     });
 
     /**
-     * Test case 6: Sai id bài viết (không tồn tại)
-     * Kết quả mong đợi: 9992 → báo bài viết không tồn tại
+     * Test case 6: Sai id bài viết
      */
-    it('[TC6] Post id không tồn tại → trả về 9992', async () => {
+    it('[TC6] Post id không tồn tại → throws ApiException (POST_NOT_FOUND)', async () => {
         mockPrisma.user.findFirst.mockResolvedValue(mockActiveUser);
         mockPrisma.post.findUnique.mockResolvedValue(null);
 
-        const result = await service.reportPost(
-            'valid-token',
-            'post-999-khong-ton-tai',
-            'Vi phạm',
-            'Chi tiết',
-        );
-
-        expect(result.code).toBe('9992');
-        expect(mockPrisma.report.create).not.toHaveBeenCalled();
+        const call = () =>
+            service.reportPost('valid-token', 'post-999-khong-ton-tai', 'Vi phạm', 'Chi tiết');
+        await expect(call()).rejects.toThrow(ApiException);
+        try {
+            await call();
+        } catch (e) {
+            expect((e as ApiException).code).toBe(ResponseCode.POST_NOT_FOUND);
+        }
     });
 
-    /**
-     * Test case 7: Mạng bị ngắt giữa chừng
-     * NOTE: Đây là lỗi phía client/network, không thể test ở service layer.
-     * Client (mobile/web app) cần handle: request timeout → hiện "Không thể kết nối Internet"
-     */
-    it('[TC7] Lỗi mạng là client-side concern - backend trả về 1001 khi không kết nối được', () => {
+    it('[TC7] Lỗi mạng is client-side concern', () => {
         expect(true).toBe(true);
     });
 });

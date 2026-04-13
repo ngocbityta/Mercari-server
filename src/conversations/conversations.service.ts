@@ -1,9 +1,11 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.ts';
 import { User, Conversation } from '@prisma/client';
 import { EventsGateway } from '../events/events.gateway.ts';
 import { UserStatus } from '../enums/users.enum.ts';
 import { IConversationQuery, IConversationCommand } from './conversations.interfaces.ts';
+import { ApiException } from '../common/exceptions/api.exception.ts';
+import { ResponseCode } from '../enums/response-code.enum.ts';
 
 @Injectable()
 export class ConversationsService implements IConversationQuery, IConversationCommand {
@@ -112,11 +114,11 @@ export class ConversationsService implements IConversationQuery, IConversationCo
         }
 
         if (!conversation) {
-            throw new NotFoundException('Conversation not found');
+            throw new ApiException(ResponseCode.NO_DATA, 'Conversation not found');
         }
 
         if (conversation.partnerAId !== user.id && conversation.partnerBId !== user.id) {
-            throw new NotFoundException('Conversation not found');
+            throw new ApiException(ResponseCode.NO_DATA, 'Conversation not found');
         }
 
         const partner =
@@ -171,7 +173,7 @@ export class ConversationsService implements IConversationQuery, IConversationCo
         const conversation = await this.findConversation(user, partnerId, conversationId);
 
         if (!conversation) {
-            throw new NotFoundException('Conversation not found');
+            throw new ApiException(ResponseCode.NO_DATA, 'Conversation not found');
         }
 
         await this.prisma.message.updateMany({
@@ -192,11 +194,14 @@ export class ConversationsService implements IConversationQuery, IConversationCo
         });
 
         if (!message) {
-            throw new NotFoundException('Message not found');
+            throw new ApiException(ResponseCode.NO_DATA, 'Message not found');
         }
 
         if (message.senderId !== user.id) {
-            throw new BadRequestException('You can only delete your own messages');
+            throw new ApiException(
+                ResponseCode.NOT_ACCESS,
+                'You can only delete your own messages',
+            );
         }
 
         await this.prisma.message.update({
@@ -211,7 +216,7 @@ export class ConversationsService implements IConversationQuery, IConversationCo
         const conversation = await this.findConversation(user, partnerId, conversationId);
 
         if (!conversation) {
-            throw new NotFoundException('Conversation not found');
+            throw new ApiException(ResponseCode.NO_DATA, 'Conversation not found');
         }
 
         await this.prisma.conversation.update({
@@ -233,7 +238,7 @@ export class ConversationsService implements IConversationQuery, IConversationCo
         if (!conversation && partnerId) {
             const partner = await this.prisma.user.findUnique({ where: { id: partnerId } });
             if (!partner || partner.status === UserStatus.LOCKED) {
-                throw new NotFoundException('Partner not found');
+                throw new ApiException(ResponseCode.NO_DATA, 'Partner not found');
             }
 
             const isBlocked = await this.prisma.block.findFirst({
@@ -245,7 +250,7 @@ export class ConversationsService implements IConversationQuery, IConversationCo
                 },
             });
             if (isBlocked) {
-                throw new BadRequestException('Cannot send message to this user');
+                throw new ApiException(ResponseCode.NOT_ACCESS, 'Cannot send message to this user');
             }
 
             conversation = await this.prisma.conversation.create({
@@ -255,7 +260,7 @@ export class ConversationsService implements IConversationQuery, IConversationCo
                 },
             });
         } else if (!conversation) {
-            throw new NotFoundException('Conversation not found');
+            throw new ApiException(ResponseCode.NO_DATA, 'Conversation not found');
         }
 
         const receiverId =

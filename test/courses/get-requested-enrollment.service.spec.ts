@@ -1,6 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { CoursesService } from '../../src/courses/courses.service';
-import { PrismaService } from '../../src/prisma/prisma.service';
+import { CoursesService } from '../../src/courses/courses.service.ts';
+import { PrismaService } from '../../src/prisma/prisma.service.ts';
+import { ApiException } from '../../src/common/exceptions/api.exception.ts';
+import { ResponseCode } from '../../src/enums/response-code.enum.ts';
 
 // --- Mock data ---
 const mockGVUser = {
@@ -83,18 +85,16 @@ describe('CoursesService - getRequestedEnrollment', () => {
 
     /**
      * TC1: Truyền đúng mã phiên đăng nhập và các tham số.
-     * Kết quả: 1000, data chứa danh sách yêu cầu đúng định dạng + total.
      */
-    it('[TC1] Thành công → 1000, data đúng định dạng, có trường total', async () => {
+    it('[TC1] Thành công → data đúng định dạng, có trường total', async () => {
         mockPrisma.user.findFirst.mockResolvedValue(mockGVUser);
         mockPrisma.enrollmentRequest.findMany.mockResolvedValue([mockRequest1, mockRequest2]);
         mockPrisma.enrollmentRequest.count.mockResolvedValue(2);
 
         const result = await service.getRequestedEnrollment('gv-token', 0, 20);
 
-        expect(result.code).toBe('1000');
         expect(result.data).toHaveLength(2);
-        expect(result.data![0]).toMatchObject({
+        expect(result.data[0]).toMatchObject({
             request: {
                 id: 'student-1',
                 user_name: 'Hoc Vien 1',
@@ -102,57 +102,60 @@ describe('CoursesService - getRequestedEnrollment', () => {
                 created: mockRequest1.createdAt.toISOString(),
             },
         });
-        // TC9 dependency: server phải trả về total
         expect(result.total).toBe(2);
     });
 
     /**
-     * TC2: Mã phiên đăng nhập sai (trống, quá ngắn, hoặc phiên cũ).
-     * Kết quả: 9998 → ứng dụng đẩy người dùng sang trang đăng nhập.
+     * TC2: Token sai
      */
-    it('[TC2] Token sai / phiên cũ → trả về 9998', async () => {
+    it('[TC2] Token sai / phiên cũ → throws ApiException TOKEN_INVALID', async () => {
         mockPrisma.user.findFirst.mockResolvedValue(null);
 
-        const result = await service.getRequestedEnrollment('token-sai', 0, 20);
-
-        expect(result.code).toBe('9998');
-        expect(mockPrisma.enrollmentRequest.findMany).not.toHaveBeenCalled();
+        const call = () => service.getRequestedEnrollment('token-sai', 0, 20);
+        await expect(call()).rejects.toThrow(ApiException);
+        try {
+            await call();
+        } catch (e) {
+            expect((e as ApiException).code).toBe(ResponseCode.TOKEN_INVALID);
+        }
     });
 
     /**
-     * TC3: Đúng token và tham số nhưng không có kết quả nào.
-     * Kết quả: 9994 → hiển thị "Không tìm thấy kết quả nào".
+     * TC3: Không có yêu cầu nào
      */
-    it('[TC3] Không có yêu cầu nào (index=0) → trả về 9994', async () => {
+    it('[TC3] Không có yêu cầu nào (index=0) → throws ApiException NO_DATA', async () => {
         mockPrisma.user.findFirst.mockResolvedValue(mockGVUser);
         mockPrisma.enrollmentRequest.findMany.mockResolvedValue([]);
         mockPrisma.enrollmentRequest.count.mockResolvedValue(0);
 
-        const result = await service.getRequestedEnrollment('gv-token', 0, 20);
-
-        expect(result.code).toBe('9994');
+        const call = () => service.getRequestedEnrollment('gv-token', 0, 20);
+        await expect(call()).rejects.toThrow(ApiException);
+        try {
+            await call();
+        } catch (e) {
+            expect((e as ApiException).code).toBe(ResponseCode.NO_DATA);
+        }
     });
 
     /**
-     * TC4: Tài khoản bị khóa (hệ thống khóa giữa chừng).
-     * Kết quả: 9991 → ứng dụng đẩy người dùng sang trang đăng nhập.
+     * TC4: Tài khoản bị khóa
      */
-    it('[TC4] Tài khoản bị khóa → trả về 9991', async () => {
+    it('[TC4] Tài khoản bị khóa → throws ApiException ACCOUNT_LOCKED', async () => {
         mockPrisma.user.findFirst.mockResolvedValue(mockLockedGV);
 
-        const result = await service.getRequestedEnrollment('locked-token', 0, 20);
-
-        expect(result.code).toBe('9991');
-        expect(mockPrisma.enrollmentRequest.findMany).not.toHaveBeenCalled();
+        const call = () => service.getRequestedEnrollment('locked-token', 0, 20);
+        await expect(call()).rejects.toThrow(ApiException);
+        try {
+            await call();
+        } catch (e) {
+            expect((e as ApiException).code).toBe(ResponseCode.ACCOUNT_LOCKED);
+        }
     });
 
     /**
-     * TC5: Kết quả trả về có username hoặc id không chuẩn (null, rỗng).
-     * NOTE: Đây là client-side concern. Server trả về raw data, ứng dụng lọc trước khi hiển thị.
-     *       Server vẫn map null → '' để không gây crash, nhưng việc ẩn là trách nhiệm của app.
-     * Kết quả mong đợi của server: 1000, username null → '' trong response.
+     * TC5: username=null
      */
-    it('[TC5] Yêu cầu có username=null → server map thành chuỗi rỗng, ứng dụng tự lọc', async () => {
+    it('[TC5] Yêu cầu có username=null → server map thành chuỗi rỗng', async () => {
         mockPrisma.user.findFirst.mockResolvedValue(mockGVUser);
         mockPrisma.enrollmentRequest.findMany.mockResolvedValue([
             mockRequest1,
@@ -162,115 +165,51 @@ describe('CoursesService - getRequestedEnrollment', () => {
 
         const result = await service.getRequestedEnrollment('gv-token', 0, 20);
 
-        expect(result.code).toBe('1000');
-        // Server map username null → '' thay vì crash
-        const invalidEntry = result.data!.find(
+        const invalidEntry = result.data.find(
             (d: any) => (d as { request: { id: string } }).request.id === 'student-invalid',
         );
         expect(invalidEntry!.request.user_name).toBe('');
-        // App phải tự lọc bỏ entry này khi user_name === '' trước khi render
     });
 
     /**
-     * TC6: Kiểm tra thứ tự thời gian (mới nhất trước).
-     * Kết quả: server orderBy createdAt DESC → yêu cầu mới nhất đứng đầu.
-     *          Nếu app nhận sai thứ tự (do cache cũ), app cần tự sắp xếp lại.
+     * TC6: Thứ tự thời gian
      */
     it('[TC6] Kết quả phải theo thứ tự mới nhất trước → server orderBy createdAt DESC', async () => {
         mockPrisma.user.findFirst.mockResolvedValue(mockGVUser);
-        // Server trả về đúng thứ tự: req1 (2024-01-02) trước req2 (2024-01-01)
         mockPrisma.enrollmentRequest.findMany.mockResolvedValue([mockRequest1, mockRequest2]);
         mockPrisma.enrollmentRequest.count.mockResolvedValue(2);
 
         const result = await service.getRequestedEnrollment('gv-token', 0, 20);
 
-        expect(result.code).toBe('1000');
-        // Yêu cầu mới nhất (2024-01-02) đứng đầu
-        expect(result.data![0].request.id).toBe('student-1');
-        expect(result.data![1].request.id).toBe('student-2');
-        // Đảm bảo query có orderBy
+        expect(result.data[0].request.id).toBe('student-1');
+        expect(result.data[1].request.id).toBe('student-2');
         expect(mockPrisma.enrollmentRequest.findMany).toHaveBeenCalledWith(
             expect.objectContaining({ orderBy: { createdAt: 'desc' } }),
         );
     });
 
     /**
-     * TC7: Kết quả trả về có thêm thông tin phụ (ví dụ: số học viên chung với GV).
-     * NOTE: Đây là client-side concern — server không tính "số học viên chung".
-     *       App có thể tự tính sau khi nhận data từ nhiều nguồn và hiển thị thêm.
-     */
-    it('[TC7] Hiển thị thông tin bổ sung là client-side concern', () => {
-        // App tự tính và hiển thị thông tin bổ sung (số học viên chung)
-        // dựa trên data đã nhận — không phụ thuộc vào server cho TC này.
-        expect(true).toBe(true);
-    });
-
-    /**
-     * TC8: Thông tin bổ sung (số học viên chung) trả về không chuẩn.
-     * NOTE: Client-side concern — app ẩn đi các số liệu không hợp lệ
-     *       (âm, NaN, undefined) trước khi render.
-     */
-    it('[TC8] Thông tin bổ sung không chuẩn là client-side concern', () => {
-        // App kiểm tra trước khi hiển thị:
-        // if (typeof commonCount !== 'number' || commonCount < 0) → ẩn đi
-        expect(true).toBe(true);
-    });
-
-    /**
-     * TC9: total từ server > số yêu cầu đã nhận về (vì phân trang).
-     * Kết quả: server trả về total = tổng tất cả yêu cầu.
-     *          Ứng dụng hiển thị total cho người dùng biết còn bao nhiêu.
+     * TC9: total server > data.length
      */
     it('[TC9] total server > data.length (còn trang sau) → app hiển thị total', async () => {
         mockPrisma.user.findFirst.mockResolvedValue(mockGVUser);
-        // Chỉ lấy được 1 record nhưng tổng là 50
         mockPrisma.enrollmentRequest.findMany.mockResolvedValue([mockRequest1]);
         mockPrisma.enrollmentRequest.count.mockResolvedValue(50);
 
         const result = await service.getRequestedEnrollment('gv-token', 0, 1);
 
-        expect(result.code).toBe('1000');
         expect(result.data).toHaveLength(1);
-        // total = 50 > data.length = 1 → app biết còn nhiều trang
         expect(result.total).toBe(50);
-        expect(result.total).toBeGreaterThan(result.data!.length);
     });
 
     /**
-     * TC10: total từ server < tổng số đã nhận qua nhiều lần query.
-     * NOTE: Client-side concern — xảy ra khi có yêu cầu bị xóa giữa các lần query.
-     *       App dùng giá trị lớn hơn (accumulated count) để hiển thị.
-     * Kết quả: server trả về total đúng tại thời điểm query, app tự xử lý.
+     * TC11: Pagination
      */
-    it('[TC10] total server < accumulated client count → server trả đúng, app xử lý', async () => {
-        mockPrisma.user.findFirst.mockResolvedValue(mockGVUser);
-        // Query lần 2: total giảm còn 1 (1 yêu cầu bị xóa giữa chừng)
-        mockPrisma.enrollmentRequest.findMany.mockResolvedValue([mockRequest2]);
-        mockPrisma.enrollmentRequest.count.mockResolvedValue(1);
-
-        const result = await service.getRequestedEnrollment('gv-token', 1, 20);
-
-        expect(result.code).toBe('1000');
-        // Server trả total = 1 (đúng tại thời điểm query)
-        expect(result.total).toBe(1);
-        // App so sánh với accumulated (ví dụ: đã nhận 20 từ lần trước)
-        // và hiển thị max(total_server, accumulated_client) = 20
-        // → Đây là logic của app, không phải server
-    });
-
-    /**
-     * TC11: Pull-down để làm mới, pull-up để tải thêm.
-     * NOTE: Client-side pagination concern.
-     *       - Pull-down: app gọi lại với index=0 → reset danh sách
-     *       - Pull-up: app gọi với index tăng dần → append vào danh sách
-     * Kết quả: server hỗ trợ bằng cách trả đúng skip = index * count.
-     */
-    it('[TC11] Pull-down (index=0) và pull-up (index tăng) → server skip đúng', async () => {
+    it('[TC11] Pagination check skip correctly', async () => {
         mockPrisma.user.findFirst.mockResolvedValue(mockGVUser);
         mockPrisma.enrollmentRequest.findMany.mockResolvedValue([mockRequest2]);
         mockPrisma.enrollmentRequest.count.mockResolvedValue(25);
 
-        // Pull-up: tải trang 2 (index=1, count=20 → skip=20)
         await service.getRequestedEnrollment('gv-token', 1, 20);
 
         expect(mockPrisma.enrollmentRequest.findMany).toHaveBeenCalledWith(
@@ -278,56 +217,45 @@ describe('CoursesService - getRequestedEnrollment', () => {
         );
     });
 
-    /**
-     * TC12: Cache dữ liệu ở tab.
-     * NOTE: Hoàn toàn là client-side concern — app tự cache response vào bộ nhớ/local storage.
-     *       Server không tham gia vào cơ chế cache.
-     *       Khi tab được mở lại, app quyết định có gọi API mới hay dùng cache.
-     */
-    it('[TC12] Cache là client-side concern — server luôn trả dữ liệu mới nhất', () => {
-        // Server không có cơ chế cache — mỗi request trả về snapshot mới nhất của DB.
-        // App tự implement cache (ví dụ: không gọi lại nếu data < 5 phút tuổi).
-        expect(true).toBe(true);
-    });
-
-    // --- Test bổ sung cho các trường hợp kỹ thuật ---
-
-    it('[Bonus] DB lỗi khi findMany → trả về 1001', async () => {
+    it('[Bonus] DB lỗi khi findMany → throws Error', async () => {
         mockPrisma.user.findFirst.mockResolvedValue(mockGVUser);
         mockPrisma.enrollmentRequest.findMany.mockRejectedValue(new Error('DB error'));
 
-        const result = await service.getRequestedEnrollment('gv-token', 0, 20);
-
-        expect(result.code).toBe('1001');
+        await expect(service.getRequestedEnrollment('gv-token', 0, 20)).rejects.toThrow('DB error');
     });
 
-    it('[Bonus] DB lỗi ngay khi tra cứu token (findFirst throw) → trả về 1001', async () => {
+    it('[Bonus] DB lỗi ngay khi tra cứu token → throws Error', async () => {
         mockPrisma.user.findFirst.mockRejectedValue(new Error('Connection timeout'));
 
-        const result = await service.getRequestedEnrollment('gv-token', 0, 20);
-
-        expect(result.code).toBe('1001');
-        expect(mockPrisma.enrollmentRequest.findMany).not.toHaveBeenCalled();
+        await expect(service.getRequestedEnrollment('gv-token', 0, 20)).rejects.toThrow(
+            'Connection timeout',
+        );
     });
 
-    it('[Bonus] index hoặc count sai (NaN, âm) → trả về 1004', async () => {
+    it('[Bonus] index hoặc count sai → throws ApiException INVALID_PARAMETER_VALUE', async () => {
         mockPrisma.user.findFirst.mockResolvedValue(mockGVUser);
 
-        const r1 = await service.getRequestedEnrollment('gv-token', NaN, 20);
-        const r2 = await service.getRequestedEnrollment('gv-token', 0, 0);
-        const r3 = await service.getRequestedEnrollment('gv-token', -1, 20);
-
-        expect(r1.code).toBe('1004');
-        expect(r2.code).toBe('1004');
-        expect(r3.code).toBe('1004');
+        await expect(service.getRequestedEnrollment('gv-token', NaN, 20)).rejects.toThrow(
+            ApiException,
+        );
+        await expect(service.getRequestedEnrollment('gv-token', 0, 0)).rejects.toThrow(
+            ApiException,
+        );
+        await expect(service.getRequestedEnrollment('gv-token', -1, 20)).rejects.toThrow(
+            ApiException,
+        );
     });
 
-    it('[Bonus] HV gọi API → trả về 1009', async () => {
+    it('[Bonus] HV gọi API → throws ApiException NOT_ACCESS', async () => {
         mockPrisma.user.findFirst.mockResolvedValue(mockHVUser);
 
-        const result = await service.getRequestedEnrollment('hv-token', 0, 20);
-
-        expect(result.code).toBe('1009');
+        const call = () => service.getRequestedEnrollment('hv-token', 0, 20);
+        await expect(call()).rejects.toThrow(ApiException);
+        try {
+            await call();
+        } catch (e) {
+            expect((e as ApiException).code).toBe(ResponseCode.NOT_ACCESS);
+        }
     });
 
     it('[Bonus] GV dùng user_id hợp lệ → xem enrollment của GV khác', async () => {
@@ -338,7 +266,7 @@ describe('CoursesService - getRequestedEnrollment', () => {
 
         const result = await service.getRequestedEnrollment('gv-token', 0, 20, 'user-gv-target');
 
-        expect(result.code).toBe('1000');
+        expect(result.data).toHaveLength(1);
         expect(mockPrisma.enrollmentRequest.findMany).toHaveBeenCalledWith(
             expect.objectContaining({
                 where: { teacherId: 'user-gv-target' },
