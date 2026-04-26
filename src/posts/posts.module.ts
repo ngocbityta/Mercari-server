@@ -4,11 +4,12 @@ import { PostsController } from './posts.controller';
 import { SearchHistoryService } from './search-history.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { MediaService } from './media.service';
+import { MediaController } from './media.controller';
 import { ConfigModule } from '@nestjs/config';
 
 @Module({
     imports: [PrismaModule, ConfigModule],
-    controllers: [PostsController],
+    controllers: [PostsController, MediaController],
     providers: [PostsService, SearchHistoryService, MediaService],
     exports: [PostsService, SearchHistoryService, MediaService],
 })

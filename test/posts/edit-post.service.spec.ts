@@ -31,7 +31,11 @@ describe('PostsService - editPost', () => {
                 {
                     provide: MediaService,
                     useValue: {
-                        uploadFile: jest.fn().mockResolvedValue('http://download-url.com/new-video'),
+                        uploadFile: jest
+                            .fn()
+                            .mockResolvedValue('http://download-url.com/new-video'),
+                        getProxiedUrl: jest.fn((url) => url),
+                        getVideoResponse: jest.fn(),
                     },
                 },
             ],
