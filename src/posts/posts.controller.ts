@@ -11,6 +11,7 @@ import {
     UploadedFiles,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import 'multer';
 import { PostsService } from './posts.service.ts';
 import { SearchHistoryService } from './search-history.service.ts';
 import {

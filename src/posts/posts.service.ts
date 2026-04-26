@@ -6,6 +6,7 @@ import { IPostQuery, IPostCommand, PostResponse } from './posts.interfaces.ts';
 import { ApiException } from '../common/exceptions/api.exception.ts';
 
 import { MediaService } from './media.service';
+import 'multer';
 
 @Injectable()
 export class PostsService implements IPostQuery, IPostCommand {
