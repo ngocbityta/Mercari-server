@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PostsService } from '../../src/posts/posts.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { MediaService } from '../../src/posts/media.service';
 import { ResponseCode } from '../../src/enums/response-code.enum';
 import { User, Post, Block } from '@prisma/client';
 
@@ -68,6 +69,10 @@ describe('PostsService - getPost', () => {
                             count: jest.fn(),
                         },
                     },
+                },
+                {
+                    provide: MediaService,
+                    useValue: { uploadFile: jest.fn() },
                 },
             ],
         }).compile();

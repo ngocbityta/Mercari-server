@@ -32,12 +32,12 @@ export interface IPostQuery {
 export interface IPostCommand {
     addPost(
         token: string,
-        left_video?: string,
-        right_video?: string,
-        course_id?: string,
-        exercise_id?: string,
+        left_video?: Express.Multer.File,
+        right_video?: Express.Multer.File,
         described?: string,
         device_slave?: string,
+        course_id?: string,
+        exercise_id?: string,
         device_master?: string,
     ): Promise<any>;
     editPost(
@@ -45,8 +45,8 @@ export interface IPostCommand {
         postId: string,
         described?: string,
         video_indices?: string,
-        left_video?: string,
-        right_video?: string,
+        left_video?: Express.Multer.File,
+        right_video?: Express.Multer.File,
     ): Promise<any>;
     deletePost(postId: string): Promise<any>;
 
@@ -62,3 +62,4 @@ export interface IPostCommand {
         detail_mistakes?: string,
     ): Promise<any>;
 }
+

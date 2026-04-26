@@ -1,8 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PostsService } from '../../src/posts/posts.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { MediaService } from '../../src/posts/media.service';
 import { ResponseCode } from '../../src/enums/response-code.enum';
-import { Post, User } from '@prisma/client';
+import { Post, User, Block } from '@prisma/client';
 
 describe('PostsService - getListPosts', () => {
     let service: PostsService;
@@ -32,6 +33,10 @@ describe('PostsService - getListPosts', () => {
                             findMany: jest.fn(),
                         },
                     },
+                },
+                {
+                    provide: MediaService,
+                    useValue: { uploadFile: jest.fn() },
                 },
             ],
         }).compile();
@@ -166,5 +171,77 @@ describe('PostsService - getListPosts', () => {
         expect(result.code).toBe(ResponseCode.OK);
         expect(result.data!.posts).toHaveLength(1);
         expect(result.data!.posts[0].described).toBe('Partial info');
+    });
+
+    it('should prioritize posts from enrolled teachers', async () => {
+        const mockUser = { id: 'student1', token: 'token', status: 'ACTIVE', role: 'HV' };
+        const teacherPosts = [
+            {
+                id: 't-post1',
+                ownerId: 'teacher1',
+                content: 'T-Content',
+                media: [],
+                createdAt: new Date(),
+                owner: { id: 'teacher1', status: 'ACTIVE' },
+            },
+        ];
+        const otherPosts = [
+            {
+                id: 'o-post1',
+                ownerId: 'other1',
+                content: 'O-Content',
+                media: [],
+                createdAt: new Date(),
+                owner: { id: 'other1', status: 'ACTIVE' },
+            },
+        ];
+
+        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as unknown as User);
+        jest.spyOn(prisma.enrollment, 'findMany').mockResolvedValue([
+            { teacherId: 'teacher1' },
+        ] as any);
+        jest.spyOn(prisma.post, 'count').mockResolvedValue(1); // 1 teacher post
+
+        // First findMany for teachers
+        const findManySpy = jest.spyOn(prisma.post, 'findMany');
+        findManySpy.mockResolvedValueOnce(teacherPosts as unknown as Post[]);
+        // Second findMany for others
+        findManySpy.mockResolvedValueOnce(otherPosts as unknown as Post[]);
+
+        const result = (await service.getListPosts('token', undefined, undefined, 0, 10)) as any;
+
+        expect(result.code).toBe(ResponseCode.OK);
+        expect(result.data.posts[0].id).toBe('t-post1');
+        // If teacherPosts fills the count, it might not even call second findMany if count=1
+        // But here count=10, so both should be there
+        expect(result.data.posts[1].id).toBe('o-post1');
+    });
+
+    it('should filter out posts from blocked users', async () => {
+        const mockUser = { id: 'user1', token: 'token', status: 'ACTIVE' };
+        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as unknown as User);
+        jest.spyOn(prisma.block, 'findMany').mockResolvedValue([
+            { blockerId: 'user1', blockedId: 'blocked1' },
+        ] as unknown as Block[]);
+        const countSpy = jest.spyOn(prisma.post, 'count').mockResolvedValue(0);
+        const findManySpy = jest.spyOn(prisma.post, 'findMany').mockResolvedValue([]);
+
+        await service.getListPosts('token');
+
+        expect(countSpy).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    ownerId: { in: [] }, // No enrollments
+                }),
+            }),
+        );
+        // Logic for othersWhere
+        expect(findManySpy).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    ownerId: { notIn: ['blocked1'] },
+                }),
+            }),
+        );
     });
 });

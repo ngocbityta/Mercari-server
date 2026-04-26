@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PostsService } from '../../src/posts/posts.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { MediaService } from '../../src/posts/media.service';
 import { ResponseCode } from '../../src/enums/response-code.enum';
 import { UserRole, UserStatus } from '@prisma/client';
 
@@ -34,6 +35,20 @@ describe('PostsService - addPost', () => {
         id: 'new-post-id',
     };
 
+    // Helper to create a mock Multer file
+    const mockFile = (name: string): Express.Multer.File => ({
+        fieldname: name,
+        originalname: `${name}.mp4`,
+        encoding: '7bit',
+        mimetype: 'video/mp4',
+        buffer: Buffer.from('fake video content'),
+        size: 18,
+        stream: null as any,
+        destination: '',
+        filename: '',
+        path: '',
+    });
+
     const mockPrisma = {
         user: {
             findFirst: jest.fn(),
@@ -45,6 +60,10 @@ describe('PostsService - addPost', () => {
         },
     };
 
+    const mockMediaService = {
+        uploadFile: jest.fn().mockResolvedValue('http://localhost:8000/v1/videos/vid_xxx/download'),
+    };
+
     beforeEach(async () => {
         const module: TestingModule = await Test.createTestingModule({
             providers: [
@@ -53,11 +72,18 @@ describe('PostsService - addPost', () => {
                     provide: PrismaService,
                     useValue: mockPrisma,
                 },
+                {
+                    provide: MediaService,
+                    useValue: mockMediaService,
+                },
             ],
         }).compile();
 
         service = module.get<PostsService>(PostsService);
         jest.clearAllMocks();
+        mockMediaService.uploadFile.mockResolvedValue(
+            'http://localhost:8000/v1/videos/vid_xxx/download',
+        );
     });
 
     it('[TC1] Giáo viên đăng bài thành công', async () => {
@@ -66,8 +92,8 @@ describe('PostsService - addPost', () => {
 
         const result = await service.addPost(
             'teacher-token',
-            'v-left.mp4',
-            'v-right.mp4',
+            mockFile('left_video'),
+            mockFile('right_video'),
             'test content',
             'slave-1',
         );
@@ -75,6 +101,7 @@ describe('PostsService - addPost', () => {
         expect(result.code).toBe(ResponseCode.OK);
         expect(result.data?.id).toBe('new-post-id');
         expect(mockPrisma.post.create).toHaveBeenCalled();
+        expect(mockMediaService.uploadFile).toHaveBeenCalledTimes(2);
     });
 
     it('[HV-TC1] Học viên nộp bài tập thành công', async () => {
@@ -84,8 +111,8 @@ describe('PostsService - addPost', () => {
 
         const result = await service.addPost(
             'student-token',
-            'v-left.mp4',
-            'v-right.mp4',
+            mockFile('left_video'),
+            mockFile('right_video'),
             'student submission',
             'slave-1',
             'teacher-id', // course_id
@@ -101,8 +128,8 @@ describe('PostsService - addPost', () => {
 
         const result = await service.addPost(
             'student-token',
-            'v-left.mp4',
-            'v-right.mp4',
+            mockFile('left_video'),
+            mockFile('right_video'),
             'content',
             'slave-1',
             undefined, // missing course_id
@@ -117,8 +144,8 @@ describe('PostsService - addPost', () => {
 
         const result = await service.addPost(
             'invalid-token',
-            'v-left.mp4',
-            'v-right.mp4',
+            mockFile('left_video'),
+            mockFile('right_video'),
             'content',
             'slave-1',
         );
@@ -131,8 +158,8 @@ describe('PostsService - addPost', () => {
 
         const result = await service.addPost(
             'teacher-token',
-            'v-left.mp4',
-            'v-right.mp4',
+            mockFile('left_video'),
+            mockFile('right_video'),
             'content',
             'slave-1',
         );
@@ -146,8 +173,8 @@ describe('PostsService - addPost', () => {
 
         const result = await service.addPost(
             'student-token',
-            'v-left.mp4',
-            'v-right.mp4',
+            mockFile('left_video'),
+            mockFile('right_video'),
             'content',
             'slave-1',
             'teacher-id',
@@ -166,8 +193,8 @@ describe('PostsService - addPost', () => {
 
         const result = await service.addPost(
             'student-token',
-            'v-left.mp4',
-            'v-right.mp4',
+            mockFile('left_video'),
+            mockFile('right_video'),
             'content',
             'slave-1',
             'other-student-id',
@@ -183,8 +210,8 @@ describe('PostsService - addPost', () => {
 
         const result = await service.addPost(
             'student-token',
-            'v-left.mp4',
-            'v-right.mp4',
+            mockFile('left_video'),
+            mockFile('right_video'),
             'content',
             'slave-1',
             'wrong-teacher-id', // wrong course_id
@@ -200,8 +227,8 @@ describe('PostsService - addPost', () => {
 
         const result = await service.addPost(
             'teacher-token',
-            'v-left.mp4',
-            'v-right.mp4',
+            mockFile('left_video'),
+            mockFile('right_video'),
             'content',
             'slave-1',
         );

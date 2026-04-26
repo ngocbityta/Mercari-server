@@ -3,17 +3,21 @@ import { PrismaService } from '../prisma/prisma.service';
 import { Prisma, Post, User } from '@prisma/client';
 import { ResponseCode, ResponseMessage } from '../enums/response-code.enum';
 import { IPostQuery, IPostCommand } from './posts.interfaces.ts';
+import { MediaService } from './media.service.ts';
 
 @Injectable()
 export class PostsService implements IPostQuery, IPostCommand {
-    constructor(private prisma: PrismaService) {}
+    constructor(
+        private prisma: PrismaService,
+        private mediaService: MediaService,
+    ) {}
 
     async addPost(
         token: string,
-        left_video: string,
-        right_video: string,
-        described: string,
-        device_slave: string,
+        left_video?: Express.Multer.File,
+        right_video?: Express.Multer.File,
+        described?: string,
+        device_slave?: string,
         course_id?: string,
         exercise_id?: string,
         device_master?: string,
@@ -41,7 +45,7 @@ export class PostsService implements IPostQuery, IPostCommand {
 
             // Logic for Student (HV) vs Teacher (GV)
             if (user.role === 'HV') {
-                // If student is posting, exercise_id and course_id are mandatory (NN: X)
+                // If student is posting, exercise_id and course_id are mandatory
                 if (!exercise_id || !course_id) {
                     return {
                         code: ResponseCode.MISSING_PARAMETER,
@@ -70,7 +74,7 @@ export class PostsService implements IPostQuery, IPostCommand {
                     };
                 }
 
-                // Requirement states: course_id must match teacher's ID (the owner of the exercise post)
+                // Requirement states: course_id must match teacher's ID
                 if (course_id !== exercisePost.ownerId) {
                     return {
                         code: ResponseCode.INVALID_PARAMETER_VALUE,
@@ -79,8 +83,19 @@ export class PostsService implements IPostQuery, IPostCommand {
                 }
             }
 
-            // Create media array with video files
-            const media: string[] = [left_video, right_video];
+            // Upload video files to media server and get URLs
+            const leftVideoUrl = left_video
+                ? await this.mediaService.uploadFile(left_video)
+                : undefined;
+            const rightVideoUrl = right_video
+                ? await this.mediaService.uploadFile(right_video)
+                : undefined;
+
+            // Build media array from uploaded URLs
+            const media: string[] = [
+                ...(leftVideoUrl ? [leftVideoUrl] : []),
+                ...(rightVideoUrl ? [rightVideoUrl] : []),
+            ];
 
             // Create the post
             const post = await this.prisma.post.create({
@@ -93,8 +108,8 @@ export class PostsService implements IPostQuery, IPostCommand {
                     exerciseId: exercise_id || null,
                     deviceMaster: device_master || null,
                     deviceSlave: device_slave || null,
-                    leftVideo: left_video,
-                    rightVideo: right_video,
+                    leftVideo: leftVideoUrl || null,
+                    rightVideo: rightVideoUrl || null,
                 },
             });
 
@@ -119,8 +134,8 @@ export class PostsService implements IPostQuery, IPostCommand {
         postId: string,
         described?: string,
         video_indices?: string,
-        left_video?: string,
-        right_video?: string,
+        left_video?: Express.Multer.File,
+        right_video?: Express.Multer.File,
     ) {
         try {
             // 1. Validate token - get user
@@ -172,7 +187,6 @@ export class PostsService implements IPostQuery, IPostCommand {
             }
 
             // 6. Logic check: Chỉ được gọi nếu chưa có HV nào nộp bài
-            // (A student submission is a Post with exerciseId pointing to this post)
             const submissionCount = await this.prisma.post.count({
                 where: { exerciseId: postId },
             });
@@ -192,19 +206,20 @@ export class PostsService implements IPostQuery, IPostCommand {
                 for (const index of indices) {
                     if (index === 'l' || index === 'left' || index === 'all' || index === 'lr') {
                         videosToDelete.push('left');
-                    } else if (index === 'r' || index === 'right') {
+                    }
+                    if (index === 'r' || index === 'right' || index === 'all' || index === 'lr') {
                         videosToDelete.push('right');
                     }
                 }
             }
 
-            // 8. Validate video replacement logic (TC 6, 7, 8)
+            // 8. Validate video replacement logic
             const hasLeftVideoToDelete = videosToDelete.includes('left');
             const hasRightVideoToDelete = videosToDelete.includes('right');
-            const hasLeftVideoToAdd = left_video !== undefined && left_video !== '';
-            const hasRightVideoToAdd = right_video !== undefined && right_video !== '';
+            const hasLeftVideoToAdd = left_video !== undefined;
+            const hasRightVideoToAdd = right_video !== undefined;
 
-            // TC 6 & 7: If deleting video, must have replacement
+            // If deleting video, must have replacement
             if (hasLeftVideoToDelete && !hasLeftVideoToAdd) {
                 return {
                     code: ResponseCode.INVALID_PARAMETER_VALUE,
@@ -218,7 +233,29 @@ export class PostsService implements IPostQuery, IPostCommand {
                 };
             }
 
-            // 9. Build the updated media array
+            // If uploading replacement, must specify which index to delete
+            if (hasLeftVideoToAdd && !hasLeftVideoToDelete) {
+                return {
+                    code: ResponseCode.INVALID_PARAMETER_VALUE,
+                    message: 'Must specify left video index to delete when uploading replacement',
+                };
+            }
+            if (hasRightVideoToAdd && !hasRightVideoToDelete) {
+                return {
+                    code: ResponseCode.INVALID_PARAMETER_VALUE,
+                    message: 'Must specify right video index to delete when uploading replacement',
+                };
+            }
+
+            // 9. Upload replacement files to media server
+            const newLeftVideoUrl = hasLeftVideoToAdd
+                ? await this.mediaService.uploadFile(left_video!)
+                : undefined;
+            const newRightVideoUrl = hasRightVideoToAdd
+                ? await this.mediaService.uploadFile(right_video!)
+                : undefined;
+
+            // 10. Build the updated media array
             const currentMedia = post.media || [];
             const newMedia: string[] = [];
 
@@ -239,11 +276,11 @@ export class PostsService implements IPostQuery, IPostCommand {
                 }
             }
 
-            if (hasLeftVideoToAdd) {
-                newMedia.push(left_video);
+            if (newLeftVideoUrl) {
+                newMedia.push(newLeftVideoUrl);
             }
-            if (hasRightVideoToAdd) {
-                newMedia.push(right_video);
+            if (newRightVideoUrl) {
+                newMedia.push(newRightVideoUrl);
             }
 
             // Ensure at least one video exists
@@ -254,19 +291,19 @@ export class PostsService implements IPostQuery, IPostCommand {
                 };
             }
 
-            // 10. Update the post
+            // 11. Update the post
             const updatedPost = await this.prisma.post.update({
                 where: { id: postId },
                 data: {
                     content: described !== undefined ? described : post.content,
                     media: newMedia,
-                    leftVideo: hasLeftVideoToAdd
-                        ? left_video
+                    leftVideo: newLeftVideoUrl
+                        ? newLeftVideoUrl
                         : hasLeftVideoToDelete
                           ? null
                           : post.leftVideo,
-                    rightVideo: hasRightVideoToAdd
-                        ? right_video
+                    rightVideo: newRightVideoUrl
+                        ? newRightVideoUrl
                         : hasRightVideoToDelete
                           ? null
                           : post.rightVideo,
@@ -623,57 +660,43 @@ export class PostsService implements IPostQuery, IPostCommand {
             });
         }
 
-        const mappedPosts = (
-            await Promise.all(
-                posts.map(async (post) => {
-                    const content = post.content || '';
-                    const media = post.media || [];
+        const mappedPosts = posts
+            .map((post) => {
+                const content = post.content || '';
+                const media = post.media || [];
 
-                    const isLiked = viewer ? (post.likeIds || []).includes(viewer.id) : false;
+                const isLiked = (post.likeIds || []).includes(viewer.id);
+                const isBlocked = blockedIds.includes(post.ownerId);
 
-                    let isBlocked = false;
-                    if (viewer) {
-                        const blockRelationship = await this.prisma.block.findFirst({
-                            where: {
-                                OR: [
-                                    { blockerId: post.ownerId, blockedId: viewer.id },
-                                    { blockerId: viewer.id, blockedId: post.ownerId },
-                                ],
-                            },
-                        });
-                        isBlocked = !!blockRelationship;
-                    }
+                const canEdit = post.ownerId === viewer.id && !post.isLocked;
+                const canComment = !post.isLocked;
 
-                    const canEdit = viewer ? post.ownerId === viewer.id && !post.isLocked : false;
-                    const canComment = !post.isLocked;
-
-                    return {
-                        id: post.id,
-                        described: content,
-                        video: media.map((url, idx) => ({
-                            url,
-                            thumb: `thumbnail_${idx}.jpg`,
-                        })),
-                        created: post.createdAt.toISOString(),
-                        like: (post.likeIds?.length || 0).toString(),
-                        comment: (post.commentIds?.length || 0).toString(),
-                        is_liked: isLiked ? '1' : '0',
-                        is_blocked: isBlocked ? '1' : '0',
-                        can_comment: canComment ? '1' : '0',
-                        can_edit: canEdit ? '1' : '0',
-                        banned: post.owner.status === 'LOCKED' ? '1' : '0',
-                        author: {
-                            id: post.owner.id,
-                            name: post.owner.username || '',
-                            avatar: post.owner.avatar || '',
-                            role: post.owner.role,
-                        },
-                        exercise_id: post.exerciseId || '',
-                        time_series_poses: post.owner.role === 'GV' ? [] : undefined,
-                    };
-                }),
-            )
-        ).filter((post) => post.described !== '' || post.video.length > 0);
+                return {
+                    id: post.id,
+                    described: content,
+                    video: media.map((url, idx) => ({
+                        url,
+                        thumb: `thumbnail_${idx}.jpg`,
+                    })),
+                    created: post.createdAt.toISOString(),
+                    like: (post.likeIds?.length || 0).toString(),
+                    comment: (post.commentIds?.length || 0).toString(),
+                    is_liked: isLiked ? '1' : '0',
+                    is_blocked: isBlocked ? '1' : '0',
+                    can_comment: canComment ? '1' : '0',
+                    can_edit: canEdit ? '1' : '0',
+                    banned: post.owner.status === 'LOCKED' ? '1' : '0',
+                    author: {
+                        id: post.owner.id,
+                        name: post.owner.username || 'Người dùng',
+                        avatar: post.owner.avatar || 'default_avatar.jpg',
+                        role: post.owner.role,
+                    },
+                    exercise_id: post.exerciseId || '',
+                    time_series_poses: post.owner.role === 'GV' ? [] : undefined,
+                };
+            })
+            .filter((p) => p.described !== '' || p.video.length > 0);
 
         if (mappedPosts.length === 0 && posts.length > 0 && index === 0) {
             return {

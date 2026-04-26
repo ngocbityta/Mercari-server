@@ -1,13 +1,15 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { PostsService } from './posts.service';
 import { PostsController } from './posts.controller';
 import { SearchHistoryService } from './search-history.service';
+import { MediaService } from './media.service';
 import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
-    imports: [PrismaModule],
+    imports: [PrismaModule, ConfigModule],
     controllers: [PostsController],
-    providers: [PostsService, SearchHistoryService],
-    exports: [PostsService, SearchHistoryService],
+    providers: [PostsService, SearchHistoryService, MediaService],
+    exports: [PostsService, SearchHistoryService, MediaService],
 })
 export class PostsModule {}

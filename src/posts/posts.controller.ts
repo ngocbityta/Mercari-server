@@ -1,4 +1,14 @@
-import { Controller, Post, Get, Delete, Body, Param } from '@nestjs/common';
+import {
+    Controller,
+    Post,
+    Get,
+    Delete,
+    Body,
+    Param,
+    UseInterceptors,
+    UploadedFiles,
+} from '@nestjs/common';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { PostsService } from './posts.service';
 import { SearchHistoryService } from './search-history.service';
 import {
@@ -24,21 +34,25 @@ export class PostsController {
     ) {}
 
     @Post('add_post')
-    async addPost(@Body() body: AddPostDto) {
-        const {
-            token,
-            left_video,
-            right_video,
-            course_id,
-            exercise_id,
-            described,
-            device_slave,
-            device_master,
-        } = body;
+    @UseInterceptors(
+        FileFieldsInterceptor([
+            { name: 'left_video', maxCount: 1 },
+            { name: 'right_video', maxCount: 1 },
+        ]),
+    )
+    async addPost(
+        @Body() body: AddPostDto,
+        @UploadedFiles()
+        files: {
+            left_video?: Express.Multer.File[];
+            right_video?: Express.Multer.File[];
+        },
+    ) {
+        const { token, course_id, exercise_id, described, device_slave, device_master } = body;
         return this.postsService.addPost(
             token,
-            left_video,
-            right_video,
+            files?.left_video?.[0],
+            files?.right_video?.[0],
             described,
             device_slave,
             course_id,
@@ -54,15 +68,28 @@ export class PostsController {
     }
 
     @Post('edit_post')
-    async editPost(@Body() body: EditPostDto) {
-        const { token, id, described, video_indices, left_video, right_video } = body;
+    @UseInterceptors(
+        FileFieldsInterceptor([
+            { name: 'left_video', maxCount: 1 },
+            { name: 'right_video', maxCount: 1 },
+        ]),
+    )
+    async editPost(
+        @Body() body: EditPostDto,
+        @UploadedFiles()
+        files: {
+            left_video?: Express.Multer.File[];
+            right_video?: Express.Multer.File[];
+        },
+    ) {
+        const { token, id, described, video_indices } = body;
         return this.postsService.editPost(
             token,
             id,
             described,
             video_indices,
-            left_video,
-            right_video,
+            files?.left_video?.[0],
+            files?.right_video?.[0],
         );
     }
 

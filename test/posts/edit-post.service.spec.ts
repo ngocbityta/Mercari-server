@@ -1,12 +1,37 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PostsService } from '../../src/posts/posts.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { MediaService } from '../../src/posts/media.service';
 import { ResponseCode } from '../../src/enums/response-code.enum';
 import { User, Post } from '@prisma/client';
 
 describe('PostsService - editPost', () => {
     let service: PostsService;
     let prisma: PrismaService;
+
+    // Helper to create a mock Multer file
+    const mockFile = (name: string): Express.Multer.File => ({
+        fieldname: name,
+        originalname: `${name}.mp4`,
+        encoding: '7bit',
+        mimetype: 'video/mp4',
+        buffer: Buffer.from('fake video content'),
+        size: 18,
+        stream: null as any,
+        destination: '',
+        filename: '',
+        path: '',
+    });
+
+    const mockMediaService = {
+        uploadFile: jest
+            .fn()
+            .mockImplementation((file: Express.Multer.File) =>
+                Promise.resolve(
+                    `http://localhost:8000/v1/videos/vid_${file.fieldname}/download`,
+                ),
+            ),
+    };
 
     beforeEach(async () => {
         const module: TestingModule = await Test.createTestingModule({
@@ -25,11 +50,19 @@ describe('PostsService - editPost', () => {
                         },
                     },
                 },
+                {
+                    provide: MediaService,
+                    useValue: mockMediaService,
+                },
             ],
         }).compile();
 
         service = module.get<PostsService>(PostsService);
         prisma = module.get<PrismaService>(PrismaService);
+        jest.clearAllMocks();
+        mockMediaService.uploadFile.mockImplementation((file: Express.Multer.File) =>
+            Promise.resolve(`http://localhost:8000/v1/videos/vid_${file.fieldname}/download`),
+        );
     });
 
     const mockToken = 'valid_token';
@@ -44,8 +77,8 @@ describe('PostsService - editPost', () => {
         id: mockPostId,
         ownerId: 'gv1',
         content: 'Old content',
-        media: ['v1.mp4'],
-        leftVideo: 'v1.mp4',
+        media: ['http://localhost:8000/v1/videos/vid_v1/download'],
+        leftVideo: 'http://localhost:8000/v1/videos/vid_v1/download',
     };
 
     it('[TC1] should edit post successfully when parameters are valid', async () => {
@@ -109,10 +142,58 @@ describe('PostsService - editPost', () => {
         jest.spyOn(prisma.post, 'findUnique').mockResolvedValue(mockPost as Post);
         jest.spyOn(prisma.post, 'count').mockResolvedValue(0);
 
-        // Request delete left video but no provided left_video
+        // Request delete left video but no provided left_video file
         const result = await service.editPost(mockToken, mockPostId, undefined, 'L');
         expect(result.code).toBe(ResponseCode.INVALID_PARAMETER_VALUE);
         expect(result.message).toContain('replacement video');
+    });
+
+    it('should return INVALID_PARAMETER_VALUE when uploading video without specifying index', async () => {
+        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as User);
+        jest.spyOn(prisma.post, 'findUnique').mockResolvedValue(mockPost as Post);
+        jest.spyOn(prisma.post, 'count').mockResolvedValue(0);
+
+        // Upload left_video file but no L in video_indices
+        const result = await service.editPost(
+            mockToken,
+            mockPostId,
+            undefined,
+            undefined,
+            mockFile('left_video'),
+        );
+        expect(result.code).toBe(ResponseCode.INVALID_PARAMETER_VALUE);
+        expect(result.message).toContain('specify left video index');
+    });
+
+    it('should handle "all" or "lr" indices', async () => {
+        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as User);
+        jest.spyOn(prisma.post, 'findUnique').mockResolvedValue({
+            ...mockPost,
+            rightVideo: 'http://localhost:8000/v1/videos/vid_v2/download',
+        } as Post);
+        jest.spyOn(prisma.post, 'count').mockResolvedValue(0);
+        const updateSpy = jest
+            .spyOn(prisma.post, 'update')
+            .mockResolvedValue({ id: mockPostId } as Post);
+
+        const result = await service.editPost(
+            mockToken,
+            mockPostId,
+            undefined,
+            'all',
+            mockFile('left_video'),
+            mockFile('right_video'),
+        );
+
+        expect(result.code).toBe(ResponseCode.OK);
+        expect(updateSpy).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({
+                    leftVideo: 'http://localhost:8000/v1/videos/vid_left_video/download',
+                    rightVideo: 'http://localhost:8000/v1/videos/vid_right_video/download',
+                }),
+            }),
+        );
     });
 
     it('should successfully update video when indices and replacement match', async () => {
@@ -123,14 +204,28 @@ describe('PostsService - editPost', () => {
             .spyOn(prisma.post, 'update')
             .mockResolvedValue({ id: mockPostId } as Post);
 
-        await service.editPost(mockToken, mockPostId, undefined, 'L', 'new_l.mp4');
+        await service.editPost(
+            mockToken,
+            mockPostId,
+            undefined,
+            'L',
+            mockFile('left_video'),
+        );
 
         expect(updateSpy).toHaveBeenCalledWith(
             expect.objectContaining({
                 data: expect.objectContaining({
-                    leftVideo: 'new_l.mp4',
+                    leftVideo: 'http://localhost:8000/v1/videos/vid_left_video/download',
                 }),
             }),
         );
+    });
+
+    it('should return 1001 when DB error occurs', async () => {
+        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as User);
+        jest.spyOn(prisma.post, 'findUnique').mockRejectedValue(new Error('DB error'));
+
+        const result = await service.editPost(mockToken, mockPostId, 'New content');
+        expect(result.code).toBe(ResponseCode.EXCEPTION_ERROR);
     });
 });
