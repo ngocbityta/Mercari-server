@@ -4,6 +4,7 @@ import { PrismaService } from '../../src/prisma/prisma.service.ts';
 import { ResponseCode } from '../../src/enums/response-code.enum.ts';
 import { UserRole, UserStatus } from '@prisma/client';
 import { ApiException } from '../../src/common/exceptions/api.exception.ts';
+import { MediaService } from '../../src/posts/media.service';
 
 describe('PostsService - addPost', () => {
     let service: PostsService;
@@ -47,6 +48,16 @@ describe('PostsService - addPost', () => {
         },
     };
 
+    const mockMediaService = {
+        uploadFile: jest.fn().mockResolvedValue('http://download-url.com/video'),
+    };
+
+    const mockFile = {
+        buffer: Buffer.from('test'),
+        originalname: 'test.mp4',
+        mimetype: 'video/mp4',
+    } as Express.Multer.File;
+
     beforeEach(async () => {
         const module: TestingModule = await Test.createTestingModule({
             providers: [
@@ -54,6 +65,10 @@ describe('PostsService - addPost', () => {
                 {
                     provide: PrismaService,
                     useValue: mockPrisma,
+                },
+                {
+                    provide: MediaService,
+                    useValue: mockMediaService,
                 },
             ],
         }).compile();
@@ -68,8 +83,8 @@ describe('PostsService - addPost', () => {
 
         const result = await service.addPost(
             'teacher-token',
-            'v-left.mp4',
-            'v-right.mp4',
+            mockFile,
+            mockFile,
             'test content',
             'slave-1',
         );
@@ -85,8 +100,8 @@ describe('PostsService - addPost', () => {
 
         const result = await service.addPost(
             'student-token',
-            'v-left.mp4',
-            'v-right.mp4',
+            mockFile,
+            mockFile,
             'student submission',
             'slave-1',
             'teacher-id', // course_id
@@ -102,8 +117,8 @@ describe('PostsService - addPost', () => {
         const call = () =>
             service.addPost(
                 'student-token',
-                'v-left.mp4',
-                'v-right.mp4',
+                mockFile,
+                mockFile,
                 'content',
                 'slave-1',
                 undefined,
@@ -122,7 +137,7 @@ describe('PostsService - addPost', () => {
         mockPrisma.user.findFirst.mockResolvedValue(null);
 
         const call = () =>
-            service.addPost('invalid-token', 'v-left.mp4', 'v-right.mp4', 'content', 'slave-1');
+            service.addPost('invalid-token', mockFile, mockFile, 'content', 'slave-1');
 
         await expect(call()).rejects.toThrow(ApiException);
         try {
@@ -136,7 +151,7 @@ describe('PostsService - addPost', () => {
         mockPrisma.user.findFirst.mockResolvedValue({ ...mockTeacher, status: UserStatus.LOCKED });
 
         const call = () =>
-            service.addPost('teacher-token', 'v-left.mp4', 'v-right.mp4', 'content', 'slave-1');
+            service.addPost('teacher-token', mockFile, mockFile, 'content', 'slave-1');
 
         await expect(call()).rejects.toThrow(ApiException);
         try {
@@ -153,8 +168,8 @@ describe('PostsService - addPost', () => {
         const call = () =>
             service.addPost(
                 'student-token',
-                'v-left.mp4',
-                'v-right.mp4',
+                mockFile,
+                mockFile,
                 'content',
                 'slave-1',
                 'teacher-id',
@@ -179,8 +194,8 @@ describe('PostsService - addPost', () => {
         const call = () =>
             service.addPost(
                 'student-token',
-                'v-left.mp4',
-                'v-right.mp4',
+                mockFile,
+                mockFile,
                 'content',
                 'slave-1',
                 'other-student-id',
@@ -202,8 +217,8 @@ describe('PostsService - addPost', () => {
         const call = () =>
             service.addPost(
                 'student-token',
-                'v-left.mp4',
-                'v-right.mp4',
+                mockFile,
+                mockFile,
                 'content',
                 'slave-1',
                 'wrong-teacher-id',
@@ -223,7 +238,7 @@ describe('PostsService - addPost', () => {
         mockPrisma.post.create.mockRejectedValue(new Error('DB failure'));
 
         await expect(
-            service.addPost('teacher-token', 'v-left.mp4', 'v-right.mp4', 'content', 'slave-1'),
+            service.addPost('teacher-token', mockFile, mockFile, 'content', 'slave-1'),
         ).rejects.toThrow('DB failure');
     });
 });

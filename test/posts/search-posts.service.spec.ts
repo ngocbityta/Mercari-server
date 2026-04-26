@@ -4,6 +4,7 @@ import { PrismaService } from '../../src/prisma/prisma.service.ts';
 import { ResponseCode } from '../../src/enums/response-code.enum.ts';
 import { Post, User, Block } from '@prisma/client';
 import { ApiException } from '../../src/common/exceptions/api.exception.ts';
+import { MediaService } from '../../src/posts/media.service';
 
 describe('PostsService - searchPosts', () => {
     let service: PostsService;
@@ -32,6 +33,10 @@ describe('PostsService - searchPosts', () => {
                             create: jest.fn(),
                         },
                     },
+                },
+                {
+                    provide: MediaService,
+                    useValue: { uploadFile: jest.fn() },
                 },
             ],
         }).compile();

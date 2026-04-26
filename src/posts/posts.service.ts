@@ -5,16 +5,21 @@ import { ResponseCode } from '../enums/response-code.enum';
 import { IPostQuery, IPostCommand, PostResponse } from './posts.interfaces.ts';
 import { ApiException } from '../common/exceptions/api.exception.ts';
 
+import { MediaService } from './media.service';
+
 @Injectable()
 export class PostsService implements IPostQuery, IPostCommand {
-    constructor(private prisma: PrismaService) {}
+    constructor(
+        private prisma: PrismaService,
+        private mediaService: MediaService,
+    ) {}
 
     async addPost(
         token: string,
-        left_video: string,
-        right_video: string,
-        described: string,
-        device_slave: string,
+        left_video?: Express.Multer.File,
+        right_video?: Express.Multer.File,
+        described?: string,
+        device_slave?: string,
         course_id?: string,
         exercise_id?: string,
         device_master?: string,
@@ -70,8 +75,21 @@ export class PostsService implements IPostQuery, IPostCommand {
             }
         }
 
-        // Create media array with video files
-        const media: string[] = [left_video, right_video];
+        // Upload videos to media server
+        let leftVideoUrl = '';
+        let rightVideoUrl = '';
+
+        if (left_video) {
+            leftVideoUrl = await this.mediaService.uploadFile(left_video);
+        }
+        if (right_video) {
+            rightVideoUrl = await this.mediaService.uploadFile(right_video);
+        }
+
+        // Create media array with video URLs
+        const media: string[] = [];
+        if (leftVideoUrl) media.push(leftVideoUrl);
+        if (rightVideoUrl) media.push(rightVideoUrl);
 
         // Create the post
         const post = await this.prisma.post.create({
@@ -84,8 +102,8 @@ export class PostsService implements IPostQuery, IPostCommand {
                 exerciseId: exercise_id || null,
                 deviceMaster: device_master || null,
                 deviceSlave: device_slave || null,
-                leftVideo: left_video,
-                rightVideo: right_video,
+                leftVideo: leftVideoUrl || null,
+                rightVideo: rightVideoUrl || null,
             },
         });
 
@@ -99,8 +117,8 @@ export class PostsService implements IPostQuery, IPostCommand {
         postId: string,
         described?: string,
         video_indices?: string,
-        left_video?: string,
-        right_video?: string,
+        left_video?: Express.Multer.File,
+        right_video?: Express.Multer.File,
     ) {
         // 1. Validate token - get user
         const user = await this.prisma.user.findFirst({
@@ -165,8 +183,8 @@ export class PostsService implements IPostQuery, IPostCommand {
         // 8. Validate video replacement logic (TC 6, 7, 8)
         const hasLeftVideoToDelete = videosToDelete.includes('left');
         const hasRightVideoToDelete = videosToDelete.includes('right');
-        const hasLeftVideoToAdd = left_video !== undefined && left_video !== '';
-        const hasRightVideoToAdd = right_video !== undefined && right_video !== '';
+        const hasLeftVideoToAdd = !!left_video;
+        const hasRightVideoToAdd = !!right_video;
 
         // TC 6 & 7: If deleting video, must have replacement
         if (hasLeftVideoToDelete && !hasLeftVideoToAdd) {
@@ -204,10 +222,14 @@ export class PostsService implements IPostQuery, IPostCommand {
         }
 
         if (hasLeftVideoToAdd) {
-            newMedia.push(left_video);
+            const url = await this.mediaService.uploadFile(left_video!);
+            newMedia.push(url);
+            post.leftVideo = url; // Update temp object for DB update below
         }
         if (hasRightVideoToAdd) {
-            newMedia.push(right_video);
+            const url = await this.mediaService.uploadFile(right_video!);
+            newMedia.push(url);
+            post.rightVideo = url; // Update temp object for DB update below
         }
 
         // Ensure at least one video exists
@@ -225,12 +247,12 @@ export class PostsService implements IPostQuery, IPostCommand {
                 content: described !== undefined ? described : post.content,
                 media: newMedia,
                 leftVideo: hasLeftVideoToAdd
-                    ? left_video
+                    ? post.leftVideo
                     : hasLeftVideoToDelete
                       ? null
                       : post.leftVideo,
                 rightVideo: hasRightVideoToAdd
-                    ? right_video
+                    ? post.rightVideo
                     : hasRightVideoToDelete
                       ? null
                       : post.rightVideo,
