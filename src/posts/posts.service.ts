@@ -345,7 +345,6 @@ export class PostsService implements IPostQuery, IPostCommand {
             id: post.owner.id,
             name: post.owner.username || 'Người dùng',
             avatar: post.owner.avatar || 'default_avatar.jpg',
-            online: post.owner.online ? '1' : '0',
         };
 
         let lecturer: { id: string; name: string; avatar: string } | undefined;
@@ -371,8 +370,8 @@ export class PostsService implements IPostQuery, IPostCommand {
 
         if (is_blocked === '0') {
             responseData.described = post.content || '';
-            responseData.created = post.createdAt.toISOString();
-            responseData.modified = post.updatedAt.toISOString();
+            responseData.created = Math.floor(post.createdAt.getTime() / 1000).toString();
+            responseData.modified = Math.floor(post.updatedAt.getTime() / 1000).toString();
             responseData.like = likeCount.toString();
             responseData.comment = commentCount.toString();
             responseData.is_liked = isLiked ? '1' : '0';
@@ -381,7 +380,13 @@ export class PostsService implements IPostQuery, IPostCommand {
                 thumb: `thumbnail_${index}.jpg`,
             }));
             responseData.author = author;
-            responseData.exercise_id = post.exerciseId || '';
+
+            // "nếu author và lecturer là một thì không cần trường này"
+            if (lecturer) {
+                responseData.lecturer = lecturer;
+                responseData.exercise_id = post.exerciseId || '';
+            }
+
             responseData.edited_times = '0';
 
             if (lecturer) {
@@ -390,17 +395,20 @@ export class PostsService implements IPostQuery, IPostCommand {
 
             // Time series poses logic (if student viewing a teacher's post)
             if (viewer.role === 'HV' && post.owner.role === 'GV') {
-                // Structure matches get_post(3) doc with string coordinates
                 responseData.time_series_poses = [
                     {
                         frame: [
                             {
                                 frame_id: '0',
-                                created: Date.now().toString(),
+                                created: Math.floor(Date.now() / 1000).toString(),
                                 poses: [
                                     {
                                         pose_name: 'nose',
-                                        pose_coord: ['0.0', '0.0', '0.0'], // x, y, z as strings
+                                        pose_coord: {
+                                            x: '0.0',
+                                            y: '0.0',
+                                            z: '0.0',
+                                        },
                                         confident: '0.0',
                                     },
                                 ],
@@ -430,50 +438,62 @@ export class PostsService implements IPostQuery, IPostCommand {
         token?: string,
         category_id?: string,
         last_id?: string,
-        index: number = 0,
-        count: number = 10,
+        index?: string,
+        count?: string,
         user_id?: string,
     ) {
-        if (!token) {
-            throw new ApiException(ResponseCode.TOKEN_INVALID, 'Token is invalid');
+        let requester: User | null = null;
+        if (token) {
+            requester = await this.prisma.user.findFirst({ where: { token } });
+            if (!requester) {
+                throw new ApiException(ResponseCode.TOKEN_INVALID, 'Token is invalid');
+            }
+            if (requester.status === 'LOCKED') {
+                throw new ApiException(ResponseCode.ACCOUNT_LOCKED, 'Account is locked');
+            }
         }
 
-        const requester = await this.prisma.user.findFirst({ where: { token } });
-        if (!requester) {
-            throw new ApiException(ResponseCode.TOKEN_INVALID, 'Token is invalid');
+        const nIndex = index ? parseInt(index, 10) : 0;
+        const nCount = count ? parseInt(count, 10) : 10;
+
+        if (isNaN(nIndex) || isNaN(nCount) || nIndex < 0 || nCount <= 0) {
+            throw new ApiException(ResponseCode.INVALID_PARAMETER_VALUE, 'Invalid parameter value');
         }
 
-        if (requester.status === 'LOCKED') {
-            throw new ApiException(ResponseCode.ACCOUNT_LOCKED, 'Account is locked');
-        }
-
-        let viewer = requester;
-        if (user_id) {
-            if (requester.role === 'GV') {
-                const targetUser = await this.prisma.user.findUnique({ where: { id: user_id } });
-                if (targetUser) {
-                    viewer = targetUser;
-                }
+        let viewerId: string | undefined = requester?.id;
+        if (user_id && requester && requester.role === 'GV') {
+            const targetUser = await this.prisma.user.findUnique({ where: { id: user_id } });
+            if (targetUser) {
+                viewerId = targetUser.id;
             }
         }
 
         // [REQ]: Không hiển thị bài của những người bị chặn
-        const blockedUsers = await this.prisma.block.findMany({
-            where: {
-                OR: [{ blockerId: viewer.id }, { blockedId: viewer.id }],
-            },
-        });
-        const blockedIds = blockedUsers.map((b) =>
-            b.blockerId === viewer.id ? b.blockedId : b.blockerId,
-        );
+        let blockedIds: string[] = [];
+        if (viewerId) {
+            const blockedUsers = await this.prisma.block.findMany({
+                where: {
+                    OR: [{ blockerId: viewerId }, { blockedId: viewerId }],
+                },
+            });
+            blockedIds = blockedUsers.map((b) =>
+                b.blockerId === viewerId ? b.blockedId : b.blockerId,
+            );
+        }
 
-        const where: Prisma.PostWhereInput = {
-            ownerId: { notIn: blockedIds },
-        };
+        const where: Prisma.PostWhereInput = {};
 
-        // Category filter (if implemented in schema, currently not used)
-        if (category_id && category_id !== '0') {
-            // where.categoryId = category_id;
+        if (blockedIds.length > 0) {
+            where.ownerId = { notIn: blockedIds };
+        }
+
+        if (user_id) {
+            if (blockedIds.includes(user_id)) {
+                // If searching for a blocked user, return no data
+                where.ownerId = 'non_existent_id';
+            } else {
+                where.ownerId = user_id;
+            }
         }
 
         let lastPost: Post | null = null;
@@ -487,14 +507,17 @@ export class PostsService implements IPostQuery, IPostCommand {
         }
 
         // [REQ]: Ưu tiên các bài viết của khóa học đã đăng ký
-        const enrollments = await this.prisma.enrollment.findMany({
-            where: { studentId: viewer.id },
-            select: { teacherId: true },
-        });
-        const teacherIds = enrollments.map((e) => e.teacherId);
+        let teacherIds: string[] = [];
+        if (viewerId) {
+            const enrollments = await this.prisma.enrollment.findMany({
+                where: { studentId: viewerId },
+                select: { teacherId: true },
+            });
+            teacherIds = enrollments.map((e) => e.teacherId);
+        }
 
-        const skipTotal = (index || 0) * count;
-        const takeTotal = count;
+        const skipTotal = nIndex * nCount;
+        const takeTotal = nCount;
 
         let finalPosts: (Post & { owner: User })[] = [];
 
@@ -503,7 +526,8 @@ export class PostsService implements IPostQuery, IPostCommand {
             ...where,
             ownerId: { in: teacherIds },
         };
-        const totalTeacherPosts = await this.prisma.post.count({ where: teacherWhere });
+        const totalTeacherPosts =
+            teacherIds.length > 0 ? await this.prisma.post.count({ where: teacherWhere }) : 0;
 
         // 2. Prepare others filter
         const othersWhere: Prisma.PostWhereInput = {
@@ -537,22 +561,23 @@ export class PostsService implements IPostQuery, IPostCommand {
         } else {
             // Skip past teacher posts, fetch only from others
             const othersSkip = skipTotal - totalTeacherPosts;
-            finalPosts = await this.prisma.post.findMany({
+            const oPosts = await this.prisma.post.findMany({
                 where: othersWhere,
                 include: { owner: true },
                 orderBy: { createdAt: 'desc' },
                 skip: othersSkip,
                 take: takeTotal,
             });
+            finalPosts = [...oPosts];
         }
 
         const posts: (Post & { owner: User })[] = finalPosts;
 
-        if (posts.length === 0 && (index || 0) === 0) {
+        if (posts.length === 0 && nIndex === 0) {
             throw new ApiException(ResponseCode.NO_DATA, 'No data');
         }
 
-        const lastIdReported = posts.length > 0 ? posts[posts.length - 1].id : last_id;
+        const lastIdReported = posts.length > 0 ? posts[posts.length - 1].id : last_id || '';
 
         // Calculate new_items count
         let newItemsCount = 0;
@@ -570,32 +595,32 @@ export class PostsService implements IPostQuery, IPostCommand {
                     const content = post.content || '';
                     const media = post.media || [];
 
-                    const isLiked = viewer ? (post.likeIds || []).includes(viewer.id) : false;
+                    const isLiked = viewerId ? (post.likeIds || []).includes(viewerId) : false;
 
                     let isBlocked = false;
-                    if (viewer) {
+                    if (viewerId) {
                         const blockRelationship = await this.prisma.block.findFirst({
                             where: {
                                 OR: [
-                                    { blockerId: post.ownerId, blockedId: viewer.id },
-                                    { blockerId: viewer.id, blockedId: post.ownerId },
+                                    { blockerId: post.ownerId, blockedId: viewerId },
+                                    { blockerId: viewerId, blockedId: post.ownerId },
                                 ],
                             },
                         });
                         isBlocked = !!blockRelationship;
                     }
 
-                    const canEdit = viewer ? post.ownerId === viewer.id && !post.isLocked : false;
+                    const canEdit = viewerId ? post.ownerId === viewerId && !post.isLocked : false;
                     const canComment = !post.isLocked;
 
                     return {
-                        id: post.id,
+                        post_id: post.id,
                         described: content,
                         video: media.map((url, idx) => ({
                             url: this.mediaService.getProxiedUrl(url),
                             thumb: `thumbnail_${idx}.jpg`,
                         })),
-                        created: post.createdAt.toISOString(),
+                        created: (post.createdAt.getTime() / 1000).toString(),
                         like: (post.likeIds?.length || 0).toString(),
                         comment: (post.commentIds?.length || 0).toString(),
                         is_liked: isLiked ? '1' : '0',
@@ -605,7 +630,7 @@ export class PostsService implements IPostQuery, IPostCommand {
                         banned: post.owner.status === 'LOCKED' ? '1' : '0',
                         author: {
                             id: post.owner.id,
-                            name: post.owner.username || '',
+                            username: post.owner.username || '',
                             avatar: post.owner.avatar || '',
                             role: post.owner.role,
                         },
@@ -614,9 +639,9 @@ export class PostsService implements IPostQuery, IPostCommand {
                     };
                 }),
             )
-        ).filter((post) => post.described !== '' || post.video.length > 0);
+        ).filter((post) => post !== null && (post.described !== '' || post.video.length > 0));
 
-        if (mappedPosts.length === 0 && posts.length > 0 && index === 0) {
+        if (mappedPosts.length === 0 && posts.length > 0 && nIndex === 0) {
             throw new ApiException(ResponseCode.NO_DATA, 'No data');
         }
 
@@ -653,11 +678,11 @@ export class PostsService implements IPostQuery, IPostCommand {
         token?: string,
         keyword?: string,
         category_id?: string,
-        _duration_min?: string,
-        _duration_max?: string,
+        duration_min?: string,
+        duration_max?: string,
         user_id?: string,
-        index: number = 0,
-        count: number = 10,
+        index?: string,
+        count?: string,
     ) {
         if (!keyword) {
             throw new ApiException(ResponseCode.INVALID_PARAMETER_VALUE, 'Invalid keyword');
@@ -676,15 +701,18 @@ export class PostsService implements IPostQuery, IPostCommand {
             throw new ApiException(ResponseCode.ACCOUNT_LOCKED, 'Account is locked');
         }
 
+        // Ứng dụng phải tạo ra xâu chuẩn từ keyword
+        const standardizedKeyword = keyword.trim().replace(/\s+/g, ' ').toLowerCase();
+
         // Save to SearchHistory (unless it's a hashtag)
-        if (keyword && !keyword.startsWith('#')) {
+        if (standardizedKeyword && !standardizedKeyword.startsWith('#')) {
             try {
                 await this.prisma.searchHistory.create({
                     data: {
                         userId: requester.id,
-                        keyword: keyword,
-                        durationMin: _duration_min,
-                        durationMax: _duration_max,
+                        keyword: standardizedKeyword,
+                        durationMin: duration_min,
+                        durationMax: duration_max,
                     },
                 });
             } catch (err) {
@@ -692,8 +720,11 @@ export class PostsService implements IPostQuery, IPostCommand {
             }
         }
 
+        const nIndex = index ? parseInt(index, 10) : 0;
+        const nCount = count ? parseInt(count, 10) : 10;
+
         // [Test Case 13]: Kiểm tra index và count hợp lệ
-        if (index < 0 || count <= 0) {
+        if (isNaN(nIndex) || isNaN(nCount) || nIndex < 0 || nCount <= 0) {
             throw new ApiException(ResponseCode.INVALID_PARAMETER_VALUE, 'Invalid index or count');
         }
 
@@ -709,29 +740,35 @@ export class PostsService implements IPostQuery, IPostCommand {
 
         const where: Prisma.PostWhereInput = {
             content: { contains: keyword, mode: 'insensitive' },
-            // Filter out blocked users
-            ...(blockedUserIds.length > 0 ? { ownerId: { notIn: blockedUserIds } } : {}),
         };
+
+        if (blockedUserIds.length > 0) {
+            where.ownerId = { notIn: blockedUserIds };
+        }
 
         if (user_id) {
             const targetUser = await this.prisma.user.findUnique({ where: { id: user_id } });
             if (!targetUser) {
                 throw new ApiException(ResponseCode.INVALID_PARAMETER_VALUE, 'User not found');
             }
-            where.ownerId = user_id;
+            if (blockedUserIds.includes(user_id)) {
+                where.ownerId = 'non_existent_id';
+            } else {
+                where.ownerId = user_id;
+            }
         }
 
-        const skip = index * count;
+        const skip = nIndex * nCount;
 
         const posts = await this.prisma.post.findMany({
             where,
             include: { owner: true },
             orderBy: { createdAt: 'desc' },
             skip,
-            take: count,
+            take: nCount,
         });
 
-        if (posts.length === 0 && index === 0) {
+        if (posts.length === 0 && nIndex === 0) {
             throw new ApiException(ResponseCode.NO_DATA, 'No data');
         }
 
@@ -761,7 +798,7 @@ export class PostsService implements IPostQuery, IPostCommand {
                     const canComment = !post.isLocked;
 
                     return {
-                        id: post.id,
+                        post_id: post.id,
                         described: content,
                         video: media.map((url, idx) => ({
                             url: this.mediaService.getProxiedUrl(url),
@@ -777,7 +814,7 @@ export class PostsService implements IPostQuery, IPostCommand {
                         banned: post.owner.status === 'LOCKED' ? '1' : '0',
                         author: {
                             id: post.owner.id,
-                            name: post.owner.username || '',
+                            username: post.owner.username || '',
                             avatar: post.owner.avatar || '',
                             role: post.owner.role,
                         },
@@ -788,7 +825,7 @@ export class PostsService implements IPostQuery, IPostCommand {
             )
         ).filter((post) => post !== null && (post.described !== '' || post.video.length > 0));
 
-        if (mappedPosts.length === 0 && posts.length > 0 && index === 0) {
+        if (mappedPosts.length === 0 && posts.length > 0 && nIndex === 0) {
             throw new ApiException(ResponseCode.NO_DATA, 'No data');
         }
 

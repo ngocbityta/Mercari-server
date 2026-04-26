@@ -30,8 +30,8 @@ export interface IPostQuery {
         token?: string,
         category_id?: string,
         last_id?: string,
-        index?: number,
-        count?: number,
+        index?: string,
+        count?: string,
         user_id?: string,
     ): Promise<any>;
     checkNewItem(lastId?: string, category_id?: string): Promise<any>;
@@ -42,8 +42,8 @@ export interface IPostQuery {
         duration_min?: string,
         duration_max?: string,
         user_id?: string,
-        index?: number,
-        count?: number,
+        index?: string,
+        count?: string,
     ): Promise<any>;
 
     getComment(

@@ -47,6 +47,14 @@ describe('PostsService - searchPosts', () => {
 
         service = module.get<PostsService>(PostsService);
         prisma = module.get<PrismaService>(PrismaService);
+
+        // Default mock implementations
+        jest.spyOn(prisma.user, 'findUnique').mockResolvedValue({
+            id: 'any',
+            status: 'ACTIVE',
+        } as any);
+        jest.spyOn(prisma.block, 'findMany').mockResolvedValue([]);
+        jest.spyOn(prisma.searchHistory, 'create').mockResolvedValue({} as any);
     });
 
     const mockToken = 'valid_token';
@@ -66,17 +74,31 @@ describe('PostsService - searchPosts', () => {
         ];
 
         jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as unknown as User);
+        jest.spyOn(prisma.user, 'findUnique').mockResolvedValue({
+            id: 'user2',
+            status: 'ACTIVE',
+        } as any);
         jest.spyOn(prisma.block, 'findMany').mockResolvedValue([]);
         jest.spyOn(prisma.post, 'findMany').mockResolvedValue(mockPosts as unknown as Post[]);
 
-        const result = await service.searchPosts(mockToken, mockKeyword, '0', '0', '0');
+        const result = await service.searchPosts(
+            mockToken,
+            mockKeyword,
+            '0',
+            '0',
+            '0',
+            'user2',
+            '0',
+            '10',
+        );
         expect(result.posts).toHaveLength(1);
     });
 
     it('[TC2] should throw TOKEN_INVALID when token is wrong', async () => {
         jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(null);
 
-        const call = () => service.searchPosts('wrong_token', mockKeyword, '0', '0', '0');
+        const call = () =>
+            service.searchPosts('wrong_token', mockKeyword, '0', '0', '0', 'user2', '0', '10');
         await expect(call()).rejects.toThrow(ApiException);
         try {
             await call();
@@ -88,10 +110,15 @@ describe('PostsService - searchPosts', () => {
     it('[TC3] should throw NO_DATA when no results found', async () => {
         const mockUser = { id: 'user1', token: mockToken, status: 'ACTIVE' };
         jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as unknown as User);
+        jest.spyOn(prisma.user, 'findUnique').mockResolvedValue({
+            id: 'user2',
+            status: 'ACTIVE',
+        } as any);
         jest.spyOn(prisma.block, 'findMany').mockResolvedValue([]);
         jest.spyOn(prisma.post, 'findMany').mockResolvedValue([]);
 
-        const call = () => service.searchPosts(mockToken, 'randomkeyword', '0', '0', '0');
+        const call = () =>
+            service.searchPosts(mockToken, 'randomkeyword', '0', '0', '0', 'user2', '0', '10');
         await expect(call()).rejects.toThrow(ApiException);
         try {
             await call();
@@ -104,7 +131,8 @@ describe('PostsService - searchPosts', () => {
         const mockUser = { id: 'user1', token: mockToken, status: 'LOCKED' };
         jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as unknown as User);
 
-        const call = () => service.searchPosts(mockToken, mockKeyword, '0', '0', '0');
+        const call = () =>
+            service.searchPosts(mockToken, mockKeyword, '0', '0', '0', 'user2', '0', '10');
         await expect(call()).rejects.toThrow(ApiException);
         try {
             await call();
@@ -120,7 +148,16 @@ describe('PostsService - searchPosts', () => {
         jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(null);
 
         const call = () =>
-            service.searchPosts(mockToken, mockKeyword, '0', '0', '0', 'non_existent_user');
+            service.searchPosts(
+                mockToken,
+                mockKeyword,
+                '0',
+                '0',
+                '0',
+                'non_existent_user',
+                '0',
+                '10',
+            );
         await expect(call()).rejects.toThrow(ApiException);
         try {
             await call();
@@ -130,7 +167,7 @@ describe('PostsService - searchPosts', () => {
     });
 
     it('[TC6] should throw INVALID_PARAMETER_VALUE when keyword is missing', async () => {
-        const call = () => service.searchPosts(mockToken, '', '0', '0', '0');
+        const call = () => service.searchPosts(mockToken, '', '0', '0', '0', 'user2', '0', '10');
         await expect(call()).rejects.toThrow(ApiException);
         try {
             await call();
@@ -144,7 +181,7 @@ describe('PostsService - searchPosts', () => {
         jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as unknown as User);
 
         const call = () =>
-            service.searchPosts(mockToken, mockKeyword, '0', '0', '0', undefined, -1, 10);
+            service.searchPosts(mockToken, mockKeyword, '0', '0', '0', 'user2', '-1', '10');
         await expect(call()).rejects.toThrow(ApiException);
         try {
             await call();
@@ -168,16 +205,20 @@ describe('PostsService - searchPosts', () => {
         ];
 
         jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as unknown as User);
+        jest.spyOn(prisma.user, 'findUnique').mockResolvedValue({
+            id: 'user2',
+            status: 'ACTIVE',
+        } as any);
         jest.spyOn(prisma.block, 'findMany').mockResolvedValue(mockBlocks as unknown as Block[]);
         // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         const findManySpy = jest.spyOn(prisma.post, 'findMany').mockResolvedValue(mockPosts as any);
 
-        await service.searchPosts(mockToken, mockKeyword, '0', '0', '0');
+        await service.searchPosts(mockToken, mockKeyword, '0', '0', '0', undefined, '0', '10');
 
         expect(findManySpy).toHaveBeenCalledWith(
             expect.objectContaining({
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                 where: expect.objectContaining({
+                    content: { contains: mockKeyword, mode: 'insensitive' },
                     ownerId: { notIn: ['blocked_user'] },
                 }),
             }),
