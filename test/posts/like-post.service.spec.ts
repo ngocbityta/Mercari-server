@@ -3,6 +3,7 @@ import { PostsService } from '../../src/posts/posts.service.ts';
 import { PrismaService } from '../../src/prisma/prisma.service.ts';
 import { ApiException } from '../../src/common/exceptions/api.exception.ts';
 import { ResponseCode } from '../../src/enums/response-code.enum.ts';
+import { MediaService } from '../../src/posts/media.service';
 
 // --- Mock data ---
 const mockActiveUser = {
@@ -56,7 +57,11 @@ describe('PostsService - likePost', () => {
 
     beforeEach(async () => {
         const module: TestingModule = await Test.createTestingModule({
-            providers: [PostsService, { provide: PrismaService, useValue: mockPrisma }],
+            providers: [
+                PostsService,
+                { provide: PrismaService, useValue: mockPrisma },
+                { provide: MediaService, useValue: { uploadFile: jest.fn() } },
+            ],
         }).compile();
 
         service = module.get<PostsService>(PostsService);

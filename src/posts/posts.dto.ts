@@ -6,14 +6,6 @@ export class AddPostDto {
     @IsNotEmpty()
     token: string;
 
-    @IsString()
-    @IsNotEmpty()
-    left_video: string;
-
-    @IsString()
-    @IsNotEmpty()
-    right_video: string;
-
     @IsOptional()
     @IsString()
     course_id?: string;
@@ -65,14 +57,6 @@ export class EditPostDto {
     @IsOptional()
     @IsString()
     video_indices?: string;
-
-    @IsOptional()
-    @IsString()
-    left_video?: string;
-
-    @IsOptional()
-    @IsString()
-    right_video?: string;
 }
 
 export class GetListPostsDto {

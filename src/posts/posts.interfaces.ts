@@ -57,8 +57,8 @@ export interface IPostQuery {
 export interface IPostCommand {
     addPost(
         token: string,
-        left_video?: string,
-        right_video?: string,
+        left_video?: Express.Multer.File,
+        right_video?: Express.Multer.File,
         course_id?: string,
         exercise_id?: string,
         described?: string,
@@ -70,8 +70,8 @@ export interface IPostCommand {
         postId: string,
         described?: string,
         video_indices?: string,
-        left_video?: string,
-        right_video?: string,
+        left_video?: Express.Multer.File,
+        right_video?: Express.Multer.File,
     ): Promise<any>;
     deletePost(postId: string): Promise<any>;
 

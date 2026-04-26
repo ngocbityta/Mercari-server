@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PostsService } from '../../src/posts/posts.service.ts';
 import { PrismaService } from '../../src/prisma/prisma.service.ts';
 import { Post } from '@prisma/client';
+import { MediaService } from '../../src/posts/media.service';
 
 describe('PostsService - checkNewItem', () => {
     let service: PostsService;
@@ -19,6 +20,10 @@ describe('PostsService - checkNewItem', () => {
                             count: jest.fn(),
                         },
                     },
+                },
+                {
+                    provide: MediaService,
+                    useValue: { uploadFile: jest.fn() },
                 },
             ],
         }).compile();

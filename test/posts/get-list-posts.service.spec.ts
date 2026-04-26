@@ -4,6 +4,7 @@ import { PrismaService } from '../../src/prisma/prisma.service.ts';
 import { ResponseCode } from '../../src/enums/response-code.enum.ts';
 import { Post, User } from '@prisma/client';
 import { ApiException } from '../../src/common/exceptions/api.exception.ts';
+import { MediaService } from '../../src/posts/media.service';
 
 describe('PostsService - getListPosts', () => {
     let service: PostsService;
@@ -33,6 +34,10 @@ describe('PostsService - getListPosts', () => {
                             findMany: jest.fn(),
                         },
                     },
+                },
+                {
+                    provide: MediaService,
+                    useValue: { uploadFile: jest.fn() },
                 },
             ],
         }).compile();
@@ -185,6 +190,6 @@ describe('PostsService - getListPosts', () => {
 
         const result = await service.getListPosts('token');
         expect(result.posts).toHaveLength(1);
-        expect(result.posts[0].described).toBe('Partial info');
+        expect(result.posts[0]?.described).toBe('Partial info');
     });
 });

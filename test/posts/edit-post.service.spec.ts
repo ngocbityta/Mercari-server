@@ -4,6 +4,7 @@ import { PrismaService } from '../../src/prisma/prisma.service.ts';
 import { ResponseCode } from '../../src/enums/response-code.enum.ts';
 import { User, Post } from '@prisma/client';
 import { ApiException } from '../../src/common/exceptions/api.exception.ts';
+import { MediaService } from '../../src/posts/media.service';
 
 describe('PostsService - editPost', () => {
     let service: PostsService;
@@ -25,6 +26,12 @@ describe('PostsService - editPost', () => {
                             count: jest.fn(),
                             update: jest.fn(),
                         },
+                    },
+                },
+                {
+                    provide: MediaService,
+                    useValue: {
+                        uploadFile: jest.fn().mockResolvedValue('http://download-url.com/new-video'),
                     },
                 },
             ],
@@ -49,6 +56,12 @@ describe('PostsService - editPost', () => {
         media: ['v1.mp4'],
         leftVideo: 'v1.mp4',
     };
+
+    const mockFile = {
+        buffer: Buffer.from('test'),
+        originalname: 'test.mp4',
+        mimetype: 'video/mp4',
+    } as Express.Multer.File;
 
     it('[TC1] should edit post successfully when parameters are valid', async () => {
         jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as User);
@@ -157,13 +170,13 @@ describe('PostsService - editPost', () => {
             .spyOn(prisma.post, 'update')
             .mockResolvedValue({ id: mockPostId } as Post);
 
-        await service.editPost(mockToken, mockPostId, undefined, 'L', 'new_l.mp4');
+        await service.editPost(mockToken, mockPostId, undefined, 'L', mockFile);
 
         expect(updateSpy).toHaveBeenCalledWith(
             expect.objectContaining({
                 // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                 data: expect.objectContaining({
-                    leftVideo: 'new_l.mp4',
+                    leftVideo: 'http://download-url.com/new-video',
                 }),
             }),
         );

@@ -4,6 +4,7 @@ import { PrismaService } from '../../src/prisma/prisma.service.ts';
 import { ResponseCode } from '../../src/enums/response-code.enum.ts';
 import { User, Post, Block } from '@prisma/client';
 import { ApiException } from '../../src/common/exceptions/api.exception.ts';
+import { MediaService } from '../../src/posts/media.service';
 
 describe('PostsService - getPost', () => {
     let service: PostsService;
@@ -64,6 +65,10 @@ describe('PostsService - getPost', () => {
                         },
                     },
                 },
+                {
+                    provide: MediaService,
+                    useValue: { uploadFile: jest.fn() },
+                },
             ],
         }).compile();
 
@@ -81,7 +86,7 @@ describe('PostsService - getPost', () => {
         const result = await service.getPost(mockToken, 'post1');
 
         expect(result.id).toBe('post1');
-        expect(result.author.name).toBe('Teacher 1');
+        expect(result.author?.name).toBe('Teacher 1');
     });
 
     it('[TC2] should throw ApiException (TOKEN_INVALID) if token is invalid', async () => {
@@ -137,8 +142,8 @@ describe('PostsService - getPost', () => {
 
         const result = await service.getPost(mockToken, 'post1');
 
-        expect(result.author.name).toBe('Người dùng');
-        expect(result.author.avatar).toBe('default_avatar.jpg');
+        expect(result.author?.name).toBe('Người dùng');
+        expect(result.author?.avatar).toBe('default_avatar.jpg');
     });
 
     it('[TC10] should throw ApiException (POST_NOT_FOUND) if post ID is wrong', async () => {

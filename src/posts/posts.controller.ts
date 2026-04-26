@@ -1,4 +1,16 @@
-import { Controller, Post, Get, Delete, Body, Param, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+    Controller,
+    Post,
+    Get,
+    Delete,
+    Body,
+    Param,
+    HttpCode,
+    HttpStatus,
+    UseInterceptors,
+    UploadedFiles,
+} from '@nestjs/common';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { PostsService } from './posts.service.ts';
 import { SearchHistoryService } from './search-history.service.ts';
 import {
@@ -26,11 +38,24 @@ export class PostsController {
 
     @Post('add_post')
     @HttpCode(HttpStatus.OK)
-    async addPost(@Body() body: AddPostDto) {
+    @UseInterceptors(
+        FileFieldsInterceptor([
+            { name: 'left_video', maxCount: 1 },
+            { name: 'right_video', maxCount: 1 },
+        ]),
+    )
+    async addPost(
+        @Body() body: AddPostDto,
+        @UploadedFiles()
+        files: {
+            left_video?: Express.Multer.File[];
+            right_video?: Express.Multer.File[];
+        },
+    ) {
         const result = await this.postsService.addPost(
             body.token,
-            body.left_video,
-            body.right_video,
+            files.left_video?.[0],
+            files.right_video?.[0],
             body.described,
             body.device_slave,
             body.course_id,
@@ -49,14 +74,27 @@ export class PostsController {
 
     @Post('edit_post')
     @HttpCode(HttpStatus.OK)
-    async editPost(@Body() body: EditPostDto) {
+    @UseInterceptors(
+        FileFieldsInterceptor([
+            { name: 'left_video', maxCount: 1 },
+            { name: 'right_video', maxCount: 1 },
+        ]),
+    )
+    async editPost(
+        @Body() body: EditPostDto,
+        @UploadedFiles()
+        files: {
+            left_video?: Express.Multer.File[];
+            right_video?: Express.Multer.File[];
+        },
+    ) {
         const result = await this.postsService.editPost(
             body.token,
             body.id,
             body.described,
             body.video_indices,
-            body.left_video,
-            body.right_video,
+            files.left_video?.[0],
+            files.right_video?.[0],
         );
         return ApiResponse.success(result);
     }
