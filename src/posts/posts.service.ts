@@ -88,8 +88,12 @@ export class PostsService implements IPostQuery, IPostCommand {
 
         // Create media array with video URLs
         const media: string[] = [];
-        if (leftVideoUrl) media.push(leftVideoUrl);
-        if (rightVideoUrl) media.push(rightVideoUrl);
+        if (leftVideoUrl) {
+            media.push(leftVideoUrl);
+        }
+        if (rightVideoUrl) {
+            media.push(rightVideoUrl);
+        }
 
         // Create the post
         const post = await this.prisma.post.create({
@@ -222,12 +226,12 @@ export class PostsService implements IPostQuery, IPostCommand {
         }
 
         if (hasLeftVideoToAdd) {
-            const url = await this.mediaService.uploadFile(left_video!);
+            const url = await this.mediaService.uploadFile(left_video);
             newMedia.push(url);
             post.leftVideo = url; // Update temp object for DB update below
         }
         if (hasRightVideoToAdd) {
-            const url = await this.mediaService.uploadFile(right_video!);
+            const url = await this.mediaService.uploadFile(right_video);
             newMedia.push(url);
             post.rightVideo = url; // Update temp object for DB update below
         }
@@ -372,7 +376,7 @@ export class PostsService implements IPostQuery, IPostCommand {
             responseData.comment = commentCount.toString();
             responseData.is_liked = isLiked ? '1' : '0';
             responseData.video = post.media.map((url, index) => ({
-                url: url,
+                url: this.mediaService.getProxiedUrl(url),
                 thumb: `thumbnail_${index}.jpg`,
             }));
             responseData.author = author;
@@ -587,7 +591,7 @@ export class PostsService implements IPostQuery, IPostCommand {
                         id: post.id,
                         described: content,
                         video: media.map((url, idx) => ({
-                            url,
+                            url: this.mediaService.getProxiedUrl(url),
                             thumb: `thumbnail_${idx}.jpg`,
                         })),
                         created: post.createdAt.toISOString(),
@@ -759,7 +763,7 @@ export class PostsService implements IPostQuery, IPostCommand {
                         id: post.id,
                         described: content,
                         video: media.map((url, idx) => ({
-                            url,
+                            url: this.mediaService.getProxiedUrl(url),
                             thumb: `thumbnail_${idx}.jpg`,
                         })),
                         created: post.createdAt.toISOString(),

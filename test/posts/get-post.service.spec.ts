@@ -67,7 +67,11 @@ describe('PostsService - getPost', () => {
                 },
                 {
                     provide: MediaService,
-                    useValue: { uploadFile: jest.fn() },
+                    useValue: {
+                        uploadFile: jest.fn(),
+                        getProxiedUrl: jest.fn((url) => url),
+                        getVideoResponse: jest.fn(),
+                    },
                 },
             ],
         }).compile();
