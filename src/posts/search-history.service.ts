@@ -7,7 +7,7 @@ import { ApiException } from '../common/exceptions/api.exception.ts';
 export class SearchHistoryService {
     constructor(private prisma: PrismaService) {}
 
-    async getSavedSearch(token: string, index?: string, count?: string, user_id?: string) {
+    async getSavedSearch(token: string, index: string, count: string, user_id?: string) {
         if (!token) {
             throw new ApiException(ResponseCode.TOKEN_INVALID, 'Token is invalid');
         }
@@ -54,7 +54,8 @@ export class SearchHistoryService {
         }));
     }
 
-    async delSavedSearch(token: string, search_id?: string, all: string = '0') {
+    async delSavedSearch(token: string, search_id?: string, all?: string) {
+        const isAll = all === '1';
         if (!token) {
             throw new ApiException(ResponseCode.TOKEN_INVALID, 'Token is invalid');
         }
@@ -68,7 +69,7 @@ export class SearchHistoryService {
             throw new ApiException(ResponseCode.ACCOUNT_LOCKED, 'Account is locked');
         }
 
-        if (all === '1') {
+        if (isAll) {
             const count = await this.prisma.searchHistory.count({
                 where: { userId: requester.id },
             });

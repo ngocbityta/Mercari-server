@@ -52,7 +52,7 @@ describe('SearchHistoryService', () => {
                 } as unknown as SearchHistory,
             ]);
 
-            const result = await service.getSavedSearch(mockToken);
+            const result = await service.getSavedSearch(mockToken, '0', '10');
             expect(result.length).toBeGreaterThan(0);
             expect(result[0].keyword).toBe('nike');
         });
@@ -81,7 +81,7 @@ describe('SearchHistoryService', () => {
             jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as unknown as User);
             jest.spyOn(prisma.searchHistory, 'findMany').mockResolvedValue([]);
 
-            const call = () => service.getSavedSearch(mockToken);
+            const call = () => service.getSavedSearch(mockToken, '0', '10');
             await expect(call()).rejects.toThrow(ApiException);
             try {
                 await call();

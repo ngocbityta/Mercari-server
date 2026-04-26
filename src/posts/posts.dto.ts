@@ -1,5 +1,4 @@
-import { IsString, IsOptional, IsNumber, IsNotEmpty } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsString, IsOptional, IsNotEmpty } from 'class-validator';
 
 export class AddPostDto {
     @IsString()
@@ -66,21 +65,15 @@ export class GetListPostsDto {
 
     @IsOptional()
     @IsString()
-    id?: string;
-
-    @IsOptional()
-    @IsString()
     category_id?: string;
 
-    @IsOptional()
-    @IsNumber()
-    @Type(() => Number)
-    index?: number;
+    @IsString()
+    @IsNotEmpty()
+    index: string;
 
-    @IsOptional()
-    @IsNumber()
-    @Type(() => Number)
-    count?: number;
+    @IsString()
+    @IsNotEmpty()
+    count: string;
 
     @IsOptional()
     @IsString()
@@ -105,13 +98,13 @@ export class GetSavedSearchDto {
     @IsString()
     token: string;
 
-    @IsOptional()
+    @IsNotEmpty()
     @IsString()
-    index?: string;
+    index: string;
 
-    @IsOptional()
+    @IsNotEmpty()
     @IsString()
-    count?: string;
+    count: string;
 
     @IsOptional()
     @IsString()
@@ -119,39 +112,37 @@ export class GetSavedSearchDto {
 }
 
 export class SearchPostsDto {
-    @IsOptional()
     @IsString()
-    token?: string;
-
-    @IsOptional()
-    @IsString()
-    keyword?: string;
+    @IsNotEmpty()
+    token: string;
 
     @IsString()
     @IsNotEmpty()
-    category_id: string;
+    keyword: string;
+
+    @IsOptional()
+    @IsString()
+    category_id?: string;
+
+    @IsOptional()
+    @IsString()
+    duration_min?: string;
+
+    @IsOptional()
+    @IsString()
+    duration_max?: string;
 
     @IsString()
     @IsNotEmpty()
-    duration_min: string;
+    user_id: string;
 
     @IsString()
     @IsNotEmpty()
-    duration_max: string;
+    index: string;
 
-    @IsOptional()
     @IsString()
-    user_id?: string;
-
-    @IsOptional()
-    @IsNumber()
-    @Type(() => Number)
-    index?: number;
-
-    @IsOptional()
-    @IsNumber()
-    @Type(() => Number)
-    count?: number;
+    @IsNotEmpty()
+    count: string;
 }
 
 export class GetCommentDto {
@@ -243,7 +234,7 @@ export class DelSavedSearchDto {
     @IsString()
     search_id?: string;
 
-    @IsNotEmpty()
+    @IsOptional()
     @IsString()
-    all: string; // "1" for all, "0" for single
+    all?: string; // "1" for all, "0" for single
 }

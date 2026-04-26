@@ -79,7 +79,7 @@ describe('PostsService - getListPosts', () => {
         jest.spyOn(prisma.post, 'findMany').mockResolvedValue(mockPosts as unknown as Post[]);
         jest.spyOn(prisma.post, 'findUnique').mockResolvedValue(null);
 
-        const result = await service.getListPosts('valid_token');
+        const result = await service.getListPosts('valid_token', '0', '0', '0', '10');
         expect(result.posts).toHaveLength(1);
     });
 
@@ -102,7 +102,7 @@ describe('PostsService - getListPosts', () => {
         jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as unknown as User);
         jest.spyOn(prisma.post, 'findMany').mockResolvedValue([]);
 
-        const call = () => service.getListPosts('valid_token', undefined, undefined, 0);
+        const call = () => service.getListPosts('valid_token', '0', '0', '0', '10');
         await expect(call()).rejects.toThrow(ApiException);
         try {
             await call();
@@ -116,7 +116,7 @@ describe('PostsService - getListPosts', () => {
         const mockUser = { id: 'user1', token: 'banned_token', status: 'LOCKED' };
         jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as unknown as User);
 
-        const call = () => service.getListPosts('banned_token');
+        const call = () => service.getListPosts('banned_token', '0', '0', '0', '10');
         await expect(call()).rejects.toThrow(ApiException);
         try {
             await call();
@@ -144,7 +144,7 @@ describe('PostsService - getListPosts', () => {
         jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as unknown as User);
         jest.spyOn(prisma.post, 'findMany').mockResolvedValue(mockPosts as unknown as Post[]);
 
-        const result = await service.getListPosts('token');
+        const result = await service.getListPosts('token', '0', '0', '0', '10');
         expect(result.posts[0].like).toBe('0');
         expect(result.posts[0].comment).toBe('0');
     });
@@ -166,7 +166,7 @@ describe('PostsService - getListPosts', () => {
         jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as unknown as User);
         jest.spyOn(prisma.post, 'findMany').mockResolvedValue(mockPosts as unknown as Post[]);
 
-        const call = () => service.getListPosts('token');
+        const call = () => service.getListPosts('token', '0', '0', '0', '10');
         await expect(call()).rejects.toThrow(ApiException);
         try {
             await call();
@@ -192,7 +192,7 @@ describe('PostsService - getListPosts', () => {
         jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as unknown as User);
         jest.spyOn(prisma.post, 'findMany').mockResolvedValue(mockPosts as unknown as Post[]);
 
-        const result = await service.getListPosts('token');
+        const result = await service.getListPosts('token', '0', '0', '0', '10');
         expect(result.posts).toHaveLength(1);
         expect(result.posts[0]?.described).toBe('Partial info');
     });
