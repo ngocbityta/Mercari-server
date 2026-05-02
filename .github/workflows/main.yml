@@ -72,8 +72,8 @@ jobs:
     - name: Deploy
       uses: appleboy/ssh-action@v1.2.5
       env:
-        DATABASE_URL=${{ secrets.PRISMA_DATABASE_URL }}
-        IMAGE_TAG=${{ github.sha }}
+        DATABASE_URL: ${{ secrets.PRISMA_DATABASE_URL }}
+        IMAGE_TAG: ${{ github.sha }}
       with:
         host: ${{ secrets.HOST }}
         username: ${{ secrets.ACTION_DEPLOY_USERNAME }}
