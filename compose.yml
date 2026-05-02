@@ -1,6 +1,6 @@
 services:
   group1-backend:
-    image: ghcr.io/ngocbityta/mercari-server:latest
+    image: ghcr.io/ngocbityta/mercari-server:${IMAGE_TAG}
     restart: unless-stopped
     environment:
       - NODE_ENV=production

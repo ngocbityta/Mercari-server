@@ -45,11 +45,11 @@ jobs:
         PRISMA_DATABASE_URL: ${{ secrets.PRISMA_DATABASE_URL }}
         DOCKER_BUILDKIT: 1
       run: |
-        docker build --secret id=DATABASE_URL,env=PRISMA_DATABASE_URL -t ghcr.io/ngocbityta/mercari-server:latest .
+        docker build --secret id=DATABASE_URL,env=PRISMA_DATABASE_URL -t ghcr.io/ngocbityta/mercari-server:${{ github.sha }} .
 
     - name: Push image
       run: |
-        docker push ghcr.io/ngocbityta/mercari-server:latest
+        docker push ghcr.io/ngocbityta/mercari-server:${{ github.sha }}
         
   deploy:
     needs: [build, image-build]
@@ -71,13 +71,15 @@ jobs:
 
     - name: Deploy
       uses: appleboy/ssh-action@v1.2.5
+      env:
+        DATABASE_URL=${{ secrets.PRISMA_DATABASE_URL }}
+        IMAGE_TAG=${{ github.sha }}
       with:
         host: ${{ secrets.HOST }}
         username: ${{ secrets.ACTION_DEPLOY_USERNAME }}
         key: ${{ secrets.ACTION_DEPLOY_SSH_KEY }}
+        envs: DATABASE_URL, IMAGE_TAG
         script: |
           cd /home/deploy/group1
           docker compose pull
-          DATABASE_URL='${{ secrets.PRISMA_DATABASE_URL }}' docker compose up -d
-
-    
+          docker compose up -d --force-recreate
