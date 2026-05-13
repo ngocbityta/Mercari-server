@@ -9,7 +9,9 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.group1-backend.rule=Host(`group1.it4788.sukkaito.id.vn`)"
-      - "traefik.http.routers.group1-backend.entrypoints=web"
+      - "traefik.http.routers.group1-backend.entrypoints=websecure"
+      - "traefik.http.routers.group1-backend.tls=true"
+      - "traefik.http.routers.group1-backend.tls.certresolver=letsencrypt"
     networks:
       - proxy-net
     deploy:
