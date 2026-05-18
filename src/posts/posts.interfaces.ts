@@ -60,10 +60,10 @@ export interface IPostCommand {
         token: string,
         left_video?: Express.Multer.File,
         right_video?: Express.Multer.File,
-        course_id?: string,
-        exercise_id?: string,
         described?: string,
         device_slave?: string,
+        course_id?: string,
+        exercise_id?: string,
         device_master?: string,
     ): Promise<any>;
     editPost(

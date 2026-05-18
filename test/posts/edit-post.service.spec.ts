@@ -185,4 +185,25 @@ describe('PostsService - editPost', () => {
             }),
         );
     });
+
+    it('should successfully update both videos when all/lr is passed in video_indices', async () => {
+        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as User);
+        jest.spyOn(prisma.post, 'findUnique').mockResolvedValue(mockPost as Post);
+        jest.spyOn(prisma.post, 'count').mockResolvedValue(0);
+        const updateSpy = jest
+            .spyOn(prisma.post, 'update')
+            .mockResolvedValue({ id: mockPostId } as Post);
+
+        await service.editPost(mockToken, mockPostId, undefined, 'all', mockFile, mockFile);
+
+        expect(updateSpy).toHaveBeenCalledWith(
+            expect.objectContaining({
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+                data: expect.objectContaining({
+                    leftVideo: 'http://download-url.com/new-video',
+                    rightVideo: 'http://download-url.com/new-video',
+                }),
+            }),
+        );
+    });
 });

@@ -13,17 +13,17 @@ export class AddPostDto {
     @IsString()
     exercise_id?: string;
 
+    @IsOptional()
     @IsString()
-    @IsNotEmpty()
-    described: string;
-
-    @IsString()
-    @IsNotEmpty()
-    device_slave: string;
+    described?: string;
 
     @IsOptional()
     @IsString()
-    device_master?: string;
+    device_slave?: string;
+
+    @IsString()
+    @IsNotEmpty()
+    device_master: string;
 }
 
 export class GetPostDto {

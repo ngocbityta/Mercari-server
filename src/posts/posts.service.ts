@@ -177,9 +177,12 @@ export class PostsService implements IPostQuery, IPostCommand {
             const indices = video_indices.split(',').map((s) => s.trim().toLowerCase());
 
             for (const index of indices) {
-                if (index === 'l' || index === 'left' || index === 'all' || index === 'lr') {
+                if (index === 'l' || index === 'left') {
                     videosToDelete.push('left');
                 } else if (index === 'r' || index === 'right') {
+                    videosToDelete.push('right');
+                } else if (index === 'all' || index === 'lr') {
+                    videosToDelete.push('left');
                     videosToDelete.push('right');
                 }
             }
