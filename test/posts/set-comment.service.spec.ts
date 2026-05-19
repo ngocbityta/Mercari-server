@@ -112,6 +112,29 @@ describe('PostsService - setComment', () => {
 
         service = module.get<PostsService>(PostsService);
         jest.clearAllMocks();
+
+        // Default mock setups for pushSettings and notifications to prevent undefined errors
+        mockPrisma.pushSetting.findUnique.mockResolvedValue({
+            userId: 'owner-1',
+            notificationOn: 1,
+            likeComment: 1,
+        });
+        mockPrisma.pushSetting.create.mockResolvedValue({
+            userId: 'owner-1',
+            notificationOn: 1,
+            likeComment: 1,
+        });
+        mockPrisma.notification.create.mockResolvedValue({
+            id: 'notif-comment-1',
+            userId: 'owner-1',
+            type: 'comment',
+            objectId: 'post-1',
+            title: 'TestUser đã bình luận về bài viết của bạn',
+            avatar: 'avatar.jpg',
+            groupType: 2,
+            isRead: false,
+            createdAt: new Date(),
+        });
     });
 
     /**

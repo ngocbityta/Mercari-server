@@ -92,7 +92,7 @@ describe('NotificationsService', () => {
                 notificationId: 'notif-1',
                 created: mockNotification.createdAt.toISOString(),
                 avatar: 'avatar-url',
-                group: 1,
+                group: '1',
                 read: '0',
             });
         });

@@ -74,6 +74,29 @@ describe('PostsService - likePost', () => {
 
         service = module.get<PostsService>(PostsService);
         jest.clearAllMocks();
+
+        // Default mock setups for pushSettings and notifications to prevent undefined errors
+        mockPrisma.pushSetting.findUnique.mockResolvedValue({
+            userId: 'owner-1',
+            notificationOn: 1,
+            likeComment: 1,
+        });
+        mockPrisma.pushSetting.create.mockResolvedValue({
+            userId: 'owner-1',
+            notificationOn: 1,
+            likeComment: 1,
+        });
+        mockPrisma.notification.create.mockResolvedValue({
+            id: 'notif-1',
+            userId: 'owner-1',
+            type: 'like',
+            objectId: 'post-1',
+            title: 'TestUser đã thích bài viết của bạn',
+            avatar: 'avatar.jpg',
+            groupType: 1,
+            isRead: false,
+            createdAt: new Date(),
+        });
     });
 
     /**
