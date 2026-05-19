@@ -26,6 +26,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
         let code = ResponseCode.EXCEPTION_ERROR;
         let message = 'Exception error';
 
+        console.error('Unhandled exception caught in filter:', exception);
+
         if (exception instanceof ApiException) {
             status = exception.getStatus();
             code = exception.code;

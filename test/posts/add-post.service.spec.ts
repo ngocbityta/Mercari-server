@@ -50,6 +50,9 @@ describe('PostsService - addPost', () => {
 
     const mockMediaService = {
         uploadFile: jest.fn().mockResolvedValue('http://download-url.com/video'),
+        generateAndUploadThumbnail: jest
+            .fn()
+            .mockResolvedValue('http://download-url.com/thumbnail'),
     };
 
     const mockFile = {

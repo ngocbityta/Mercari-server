@@ -163,6 +163,8 @@ model Post {
   deviceSlave  String?   @map("device_slave") @db.Uuid
   leftVideo    String?   @map("left_video") @db.VarChar
   rightVideo   String?   @map("right_video") @db.VarChar
+  leftVideoThumb  String?   @map("left_video_thumb") @db.VarChar
+  rightVideoThumb String?   @map("right_video_thumb") @db.VarChar
   isLocked     Boolean   @default(false) @map("is_locked")
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz

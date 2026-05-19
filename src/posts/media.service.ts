@@ -1,6 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import 'multer';
+import * as fs from 'fs';
+import * as path from 'path';
+import ffmpegPath from 'ffmpeg-static';
+import ffmpeg from 'fluent-ffmpeg';
+
+if (typeof ffmpegPath === 'string') {
+    ffmpeg.setFfmpegPath(ffmpegPath);
+} else if (ffmpegPath && (ffmpegPath as any).default) {
+    ffmpeg.setFfmpegPath((ffmpegPath as any).default);
+}
 
 @Injectable()
 export class MediaService {
@@ -85,5 +95,67 @@ export class MediaService {
         }
 
         return originalUrl;
+    }
+
+    async generateAndUploadThumbnail(videoFile: Express.Multer.File): Promise<string> {
+        const tempDir = path.join(process.cwd(), 'tmp');
+        if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true });
+        }
+
+        const uniqueId = Math.random().toString(36).substring(7);
+        const tempVideoPath = path.join(tempDir, `${uniqueId}_input.mp4`);
+        const tempThumbPath = path.join(tempDir, `${uniqueId}_thumb.jpg`);
+
+        try {
+            // 1. Write video buffer to temporary file
+            await fs.promises.writeFile(tempVideoPath, videoFile.buffer);
+
+            // 2. Extract first frame using fluent-ffmpeg
+            await new Promise<void>((resolve, reject) => {
+                ffmpeg(tempVideoPath)
+                    .seekInput(1) // seek to 1 second
+                    .frames(1)
+                    .output(tempThumbPath)
+                    .on('end', () => resolve())
+                    .on('error', (err) => reject(err))
+                    .run();
+            });
+
+            // 3. Read generated thumbnail image
+            if (!fs.existsSync(tempThumbPath)) {
+                throw new Error('Thumbnail was not generated');
+            }
+            const thumbBuffer = await fs.promises.readFile(tempThumbPath);
+
+            // 4. Create mock Express.Multer.File object
+            const mockFile: Express.Multer.File = {
+                fieldname: 'file',
+                originalname: `${path.basename(videoFile.originalname, path.extname(videoFile.originalname))}_thumb.mp4`,
+                encoding: '7bit',
+                mimetype: 'video/mp4',
+                buffer: thumbBuffer,
+                size: thumbBuffer.length,
+                stream: null as any,
+                destination: '',
+                filename: '',
+                path: '',
+            };
+
+            // 5. Upload thumbnail
+            return await this.uploadFile(mockFile);
+        } finally {
+            // Cleanup temp files
+            try {
+                if (fs.existsSync(tempVideoPath)) {
+                    await fs.promises.unlink(tempVideoPath);
+                }
+                if (fs.existsSync(tempThumbPath)) {
+                    await fs.promises.unlink(tempThumbPath);
+                }
+            } catch (err) {
+                console.error('Error cleaning up temp video files:', err);
+            }
+        }
     }
 }
