@@ -28,12 +28,10 @@ export class MediaService {
         this.subject = this.configService.get<string>('MEDIA_API_SUBJECT') || 'default_subject';
         this.serverUrl = this.configService.get<string>('SERVER_URL') || 'http://localhost:3000';
 
-        const cloudName = this.configService.get<string>('CLOUDINARY_CLOUD_NAME') || 'dxqd8pxuj';
-        const cApiKey = this.configService.get<string>('CLOUDINARY_API_KEY') || '341819754229424';
-        const cApiSecret =
-            this.configService.get<string>('CLOUDINARY_API_SECRET') ||
-            'FOpeVEsFJlGYoE7Z21NLreQydhc';
-        const useCloudinaryEnv = this.configService.get<string>('USE_CLOUDINARY');
+        const cloudName = 'dxqd8pxuj';
+        const cApiKey = '341819754229424';
+        const cApiSecret = 'FOpeVEsFJlGYoE7Z21NLreQydhc';
+        const useCloudinaryEnv = 'true';
 
         this.useCloudinary =
             useCloudinaryEnv === 'true' ||
@@ -175,7 +173,17 @@ export class MediaService {
         return originalUrl;
     }
 
-    async generateAndUploadThumbnail(videoFile: Express.Multer.File): Promise<string> {
+    async generateAndUploadThumbnail(
+        videoFile: Express.Multer.File,
+        videoUrl?: string,
+    ): Promise<string> {
+        if (this.useCloudinary && videoUrl && videoUrl.includes('cloudinary.com')) {
+            // Instantly generate the thumbnail URL using Cloudinary dynamic CDN transformations
+            return videoUrl
+                .replace('/video/upload/', '/video/upload/so_1/')
+                .replace(/\.[^/.]+$/, '.jpg');
+        }
+
         const tempDir = path.join(process.cwd(), 'tmp');
         if (!fs.existsSync(tempDir)) {
             fs.mkdirSync(tempDir, { recursive: true });
