@@ -6,6 +6,7 @@ import { TokenService } from './token.service.ts';
 import { UsersService } from '../users/users.service.ts';
 import { VerificationService } from './verification.service.ts';
 import { IAuthActions, IVerificationActions } from './auth.interfaces.ts';
+import { saveUserUploadedImage, UploadedMultipartFile } from '../common/uploads/profile-upload.ts';
 
 @Injectable()
 export class AuthService implements IAuthActions, IVerificationActions {
@@ -19,7 +20,7 @@ export class AuthService implements IAuthActions, IVerificationActions {
         if (dto.password === dto.phonenumber) {
             return {
                 code: ResponseCode.INVALID_PARAMETER_VALUE,
-                message: 'Mật khẩu không được trùng với số điện thoại',
+                message: 'Máº­t kháº©u khÃ´ng Ä‘Æ°á»£c trÃ¹ng vá»›i sá»‘ Ä‘iá»‡n thoáº¡i',
             };
         }
 
@@ -52,7 +53,7 @@ export class AuthService implements IAuthActions, IVerificationActions {
         if (dto.password === dto.phonenumber) {
             return {
                 code: ResponseCode.INVALID_PARAMETER_VALUE,
-                message: 'Mật khẩu không được trùng với số điện thoại',
+                message: 'Máº­t kháº©u khÃ´ng Ä‘Æ°á»£c trÃ¹ng vá»›i sá»‘ Ä‘iá»‡n thoáº¡i',
             };
         }
 
@@ -74,7 +75,7 @@ export class AuthService implements IAuthActions, IVerificationActions {
         if (user.password !== dto.password) {
             return {
                 code: ResponseCode.INVALID_PARAMETER_VALUE,
-                message: 'Mật khẩu không chính xác',
+                message: 'Máº­t kháº©u khÃ´ng chÃ­nh xÃ¡c',
             };
         }
 
@@ -194,8 +195,16 @@ export class AuthService implements IAuthActions, IVerificationActions {
         };
     }
 
-    async changeInfoAfterSignup(dto: ChangeInfoAfterSignupDto) {
-        const user = await this.usersService.findByToken(dto.token);
+    async changeInfoAfterSignup(dto: ChangeInfoAfterSignupDto, avatarFile?: UploadedMultipartFile) {
+        const token = dto.token?.trim();
+        if (!token) {
+            return {
+                code: ResponseCode.TOKEN_INVALID,
+                message: 'Token is invalid',
+            };
+        }
+
+        const user = await this.usersService.findByToken(token);
         if (!user) {
             return {
                 code: ResponseCode.TOKEN_INVALID,
@@ -203,17 +212,48 @@ export class AuthService implements IAuthActions, IVerificationActions {
             };
         }
 
-        if (dto.username === user.phonenumber) {
+        if (!avatarFile) {
             return {
-                code: ResponseCode.INVALID_PARAMETER_VALUE,
-                message: 'Username không được trùng với số điện thoại',
+                code: ResponseCode.MISSING_PARAMETER,
+                message: 'Avatar file is required',
             };
         }
 
-        const updatedUser = await this.usersService.update(user.id, {
-            username: dto.username,
-            avatar: dto.avatar,
-        });
+        const updateData: { avatar: string; username?: string; height?: string } = {
+            avatar: '',
+        };
+
+        if (dto.username !== undefined) {
+            const usernameValidationError = this.validateChangeInfoUsername(
+                dto.username,
+                user.phonenumber,
+            );
+            if (usernameValidationError) {
+                return {
+                    code: ResponseCode.INVALID_PARAMETER_VALUE,
+                    message: usernameValidationError,
+                };
+            }
+
+            updateData.username = dto.username.trim();
+        }
+
+        let avatar: string;
+        try {
+            avatar = await saveUserUploadedImage(avatarFile);
+        } catch {
+            return {
+                code: ResponseCode.UPLOAD_FILE_FAILED,
+                message: ResponseMessage[ResponseCode.UPLOAD_FILE_FAILED],
+            };
+        }
+
+        updateData.avatar = avatar;
+        if (dto.height !== undefined) {
+            updateData.height = dto.height;
+        }
+
+        const updatedUser = await this.usersService.update(user.id, updateData);
 
         return {
             code: ResponseCode.OK,
@@ -226,5 +266,57 @@ export class AuthService implements IAuthActions, IVerificationActions {
                 avatar: updatedUser.avatar ?? '',
             },
         };
+    }
+
+    private validateChangeInfoUsername(username: string, phonenumber: string): string | null {
+        const normalizedUsername = username.trim();
+        if (normalizedUsername.length < 3) {
+            return 'Username is too short';
+        }
+
+        if (normalizedUsername.length > 50) {
+            return 'Username is too long';
+        }
+
+        if (normalizedUsername === phonenumber || this.isPhoneNumberLike(normalizedUsername)) {
+            return 'Username must not be a phone number';
+        }
+
+        if (this.isUrlLike(normalizedUsername)) {
+            return 'Username must not be a URL';
+        }
+
+        if (this.isAddressLike(normalizedUsername)) {
+            return 'Username must not be an address';
+        }
+
+        return null;
+    }
+
+    private isPhoneNumberLike(value: string): boolean {
+        return /^0\d{9}$/.test(value) || /^\+?\d[\d\s.-]{8,}$/.test(value);
+    }
+
+    private isUrlLike(value: string): boolean {
+        return (
+            /^(https?:\/\/|www\.)/i.test(value) ||
+            /\b[a-z0-9-]+\.(com|net|org|vn|io|dev)\b/i.test(value)
+        );
+    }
+
+    private isAddressLike(value: string): boolean {
+        const normalizedValue = value
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/Ä‘/g, 'd')
+            .replace(/Ä/g, 'D')
+            .toLowerCase();
+
+        return (
+            /\d/.test(normalizedValue) &&
+            /\b(duong|pho|phuong|quan|huyen|tinh|thanh pho|tp|street|road|avenue|district|ward)\b/.test(
+                normalizedValue,
+            )
+        );
     }
 }

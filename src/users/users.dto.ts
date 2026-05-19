@@ -69,6 +69,10 @@ export class UpdateUserDto {
 
     @IsString()
     @IsOptional()
+    height?: string;
+
+    @IsString()
+    @IsOptional()
     description?: string;
 
     @IsEnum(UserStatus)
@@ -92,40 +96,12 @@ export class GetUserInfoDto {
 
 export class SetUserInfoDto {
     @IsString()
-    @IsNotEmpty()
-    token: string;
+    @IsOptional()
+    token?: string;
 
     @IsString()
     @IsOptional()
     username?: string;
-
-    @IsString()
-    @IsOptional()
-    avatar?: string;
-
-    @IsString()
-    @IsOptional()
-    coverImage?: string;
-
-    @IsString()
-    @IsOptional()
-    description?: string;
-
-    @IsString()
-    @IsOptional()
-    link?: string;
-
-    @IsString()
-    @IsOptional()
-    address?: string;
-
-    @IsString()
-    @IsOptional()
-    city?: string;
-
-    @IsString()
-    @IsOptional()
-    country?: string;
 }
 
 export class ChangePasswordDto {
@@ -134,17 +110,21 @@ export class ChangePasswordDto {
     token: string;
 
     @IsString()
-    @IsNotEmpty({ message: 'Mật khẩu cũ không được để trống' })
-    @MinLength(6, { message: 'Mật khẩu cũ quá ngắn' })
-    @MaxLength(10, { message: 'Mật khẩu cũ quá dài' })
-    @Matches(/^[a-zA-Z0-9]+$/, { message: 'Mật khẩu cũ không được chứa ký tự đặc biệt' })
+    @IsNotEmpty({ message: 'Máº­t kháº©u cÅ© khÃ´ng Ä‘Æ°á»£c Ä‘á»ƒ trá»‘ng' })
+    @MinLength(6, { message: 'Máº­t kháº©u cÅ© quÃ¡ ngáº¯n' })
+    @MaxLength(10, { message: 'Máº­t kháº©u cÅ© quÃ¡ dÃ i' })
+    @Matches(/^[a-zA-Z0-9]+$/, {
+        message: 'Máº­t kháº©u cÅ© khÃ´ng Ä‘Æ°á»£c chá»©a kÃ½ tá»± Ä‘áº·c biá»‡t',
+    })
     password: string;
 
     @IsString()
-    @IsNotEmpty({ message: 'Mật khẩu mới không được để trống' })
-    @MinLength(6, { message: 'Mật khẩu mới quá ngắn' })
-    @MaxLength(10, { message: 'Mật khẩu mới quá dài' })
-    @Matches(/^[a-zA-Z0-9]+$/, { message: 'Mật khẩu mới không được chứa ký tự đặc biệt' })
+    @IsNotEmpty({ message: 'Máº­t kháº©u má»›i khÃ´ng Ä‘Æ°á»£c Ä‘á»ƒ trá»‘ng' })
+    @MinLength(6, { message: 'Máº­t kháº©u má»›i quÃ¡ ngáº¯n' })
+    @MaxLength(10, { message: 'Máº­t kháº©u má»›i quÃ¡ dÃ i' })
+    @Matches(/^[a-zA-Z0-9]+$/, {
+        message: 'Máº­t kháº©u má»›i khÃ´ng Ä‘Æ°á»£c chá»©a kÃ½ tá»± Ä‘áº·c biá»‡t',
+    })
     newPassword: string;
 }
 

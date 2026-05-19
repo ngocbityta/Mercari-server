@@ -151,6 +151,12 @@ describe('ProfileService', () => {
             expect(prisma.user.update).toHaveBeenCalled();
         });
 
+        it('should require at least one of username, avatar, or cover_image', async () => {
+            prisma.user.findUnique.mockResolvedValue(mockUser);
+
+            await expect(service.setUserInfo(mockUser, {})).rejects.toThrow(BadRequestException);
+        });
+
         it('TC5a: should throw error when username is empty', async () => {
             prisma.user.findUnique.mockResolvedValue(mockUser);
 
@@ -239,6 +245,7 @@ describe('ProfileService', () => {
             prisma.user.update.mockResolvedValue(updatedUser);
 
             const result = await service.setUserInfo(mockUser, {
+                avatar: mockUser.avatar ?? '',
                 description: 'New bio',
             });
 

@@ -47,6 +47,16 @@ export class ProfileService {
             throw new NotFoundException('User not found');
         }
 
+        if (
+            data.username === undefined &&
+            data.avatar === undefined &&
+            data.coverImage === undefined
+        ) {
+            throw new BadRequestException(
+                'At least one of username, avatar, or cover_image is required',
+            );
+        }
+
         const updateData: {
             username?: string;
             avatar?: string;

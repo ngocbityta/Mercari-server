@@ -11,86 +11,94 @@ import { UserRole } from '../enums/users.enum.ts';
 
 export class SignupDto {
     @IsString()
-    @IsNotEmpty({ message: 'Số điện thoại không được để trống' })
-    @Matches(/^0\d{9}$/, { message: 'Số điện thoại phải đủ 10 số và bắt đầu bằng 0' })
+    @IsNotEmpty({ message: 'Sá»‘ Ä‘iá»‡n thoáº¡i khÃ´ng Ä‘Æ°á»£c Ä‘á»ƒ trá»‘ng' })
+    @Matches(/^0\d{9}$/, {
+        message: 'Sá»‘ Ä‘iá»‡n thoáº¡i pháº£i Ä‘á»§ 10 sá»‘ vÃ  báº¯t Ä‘áº§u báº±ng 0',
+    })
     phonenumber: string;
 
     @IsString()
-    @IsNotEmpty({ message: 'Mật khẩu không được để trống' })
-    @MinLength(6, { message: 'Mật khẩu phải có ít nhất 6 ký tự' })
-    @MaxLength(10, { message: 'Mật khẩu không được quá 10 ký tự' })
-    @Matches(/^[a-zA-Z0-9]+$/, { message: 'Mật khẩu không được chứa ký tự đặc biệt' })
+    @IsNotEmpty({ message: 'Máº­t kháº©u khÃ´ng Ä‘Æ°á»£c Ä‘á»ƒ trá»‘ng' })
+    @MinLength(6, { message: 'Máº­t kháº©u pháº£i cÃ³ Ã­t nháº¥t 6 kÃ½ tá»±' })
+    @MaxLength(10, { message: 'Máº­t kháº©u khÃ´ng Ä‘Æ°á»£c quÃ¡ 10 kÃ½ tá»±' })
+    @Matches(/^[a-zA-Z0-9]+$/, {
+        message: 'Máº­t kháº©u khÃ´ng Ä‘Æ°á»£c chá»©a kÃ½ tá»± Ä‘áº·c biá»‡t',
+    })
     password: string;
 
-    @IsEnum(UserRole, { message: 'Loại tài khoản phải là HV hoặc GV' })
-    @IsNotEmpty({ message: 'Loại tài khoản không được để trống' })
+    @IsEnum(UserRole, { message: 'Loáº¡i tÃ i khoáº£n pháº£i lÃ  HV hoáº·c GV' })
+    @IsNotEmpty({ message: 'Loáº¡i tÃ i khoáº£n khÃ´ng Ä‘Æ°á»£c Ä‘á»ƒ trá»‘ng' })
     role: UserRole;
 
     @IsString()
-    @IsNotEmpty({ message: 'UUID thiết bị không được để trống' })
+    @IsNotEmpty({ message: 'UUID thiáº¿t bá»‹ khÃ´ng Ä‘Æ°á»£c Ä‘á»ƒ trá»‘ng' })
     uuid: string;
 }
 
 export class LoginDto {
     @IsString()
-    @IsNotEmpty({ message: 'Số điện thoại không được để trống' })
-    @Matches(/^0\d{9}$/, { message: 'Số điện thoại phải đủ 10 số và bắt đầu bằng 0' })
+    @IsNotEmpty({ message: 'Sá»‘ Ä‘iá»‡n thoáº¡i khÃ´ng Ä‘Æ°á»£c Ä‘á»ƒ trá»‘ng' })
+    @Matches(/^0\d{9}$/, {
+        message: 'Sá»‘ Ä‘iá»‡n thoáº¡i pháº£i Ä‘á»§ 10 sá»‘ vÃ  báº¯t Ä‘áº§u báº±ng 0',
+    })
     phonenumber: string;
 
     @IsString()
-    @IsNotEmpty({ message: 'Mật khẩu không được để trống' })
-    @MinLength(6, { message: 'Mật khẩu phải có ít nhất 6 ký tự' })
-    @MaxLength(10, { message: 'Mật khẩu không được quá 10 ký tự' })
-    @Matches(/^[a-zA-Z0-9]+$/, { message: 'Mật khẩu không được chứa ký tự đặc biệt' })
+    @IsNotEmpty({ message: 'Máº­t kháº©u khÃ´ng Ä‘Æ°á»£c Ä‘á»ƒ trá»‘ng' })
+    @MinLength(6, { message: 'Máº­t kháº©u pháº£i cÃ³ Ã­t nháº¥t 6 kÃ½ tá»±' })
+    @MaxLength(10, { message: 'Máº­t kháº©u khÃ´ng Ä‘Æ°á»£c quÃ¡ 10 kÃ½ tá»±' })
+    @Matches(/^[a-zA-Z0-9]+$/, {
+        message: 'Máº­t kháº©u khÃ´ng Ä‘Æ°á»£c chá»©a kÃ½ tá»± Ä‘áº·c biá»‡t',
+    })
     password: string;
 
     @IsString()
-    @IsNotEmpty({ message: 'Device token không được để trống' })
+    @IsNotEmpty({ message: 'Device token khÃ´ng Ä‘Æ°á»£c Ä‘á»ƒ trá»‘ng' })
     devtoken: string;
 }
 
 export class LogoutDto {
     @IsString()
-    @IsNotEmpty({ message: 'Token không được để trống' })
+    @IsNotEmpty({ message: 'Token khÃ´ng Ä‘Æ°á»£c Ä‘á»ƒ trá»‘ng' })
     token: string;
 }
 
 export class GetVerifyCodeDto {
     @IsString()
-    @IsNotEmpty({ message: 'Số điện thoại không được để trống' })
-    @Matches(/^0\d{9}$/, { message: 'Số điện thoại phải đủ 10 số và bắt đầu bằng 0' })
+    @IsNotEmpty({ message: 'Sá»‘ Ä‘iá»‡n thoáº¡i khÃ´ng Ä‘Æ°á»£c Ä‘á»ƒ trá»‘ng' })
+    @Matches(/^0\d{9}$/, {
+        message: 'Sá»‘ Ä‘iá»‡n thoáº¡i pháº£i Ä‘á»§ 10 sá»‘ vÃ  báº¯t Ä‘áº§u báº±ng 0',
+    })
     phonenumber: string;
 }
 
 export class CheckVerifyCodeDto {
     @IsString()
-    @IsNotEmpty({ message: 'Số điện thoại không được để trống' })
-    @Matches(/^0\d{9}$/, { message: 'Số điện thoại phải đủ 10 số và bắt đầu bằng 0' })
+    @IsNotEmpty({ message: 'Sá»‘ Ä‘iá»‡n thoáº¡i khÃ´ng Ä‘Æ°á»£c Ä‘á»ƒ trá»‘ng' })
+    @Matches(/^0\d{9}$/, {
+        message: 'Sá»‘ Ä‘iá»‡n thoáº¡i pháº£i Ä‘á»§ 10 sá»‘ vÃ  báº¯t Ä‘áº§u báº±ng 0',
+    })
     phonenumber: string;
 
     @IsString()
-    @IsNotEmpty({ message: 'Mã xác thực không được để trống' })
+    @IsNotEmpty({ message: 'MÃ£ xÃ¡c thá»±c khÃ´ng Ä‘Æ°á»£c Ä‘á»ƒ trá»‘ng' })
     codeVerify: string;
 }
 
 export class ChangeInfoAfterSignupDto {
     @IsString()
-    @IsNotEmpty({ message: 'Token không được để trống' })
-    @MinLength(36, { message: 'Token không đúng định dạng (quá ngắn)' })
-    token: string;
-
-    @IsString()
-    @IsNotEmpty({ message: 'Username không được để trống' })
-    @MinLength(1, { message: 'Username quá ngắn' })
-    @MaxLength(50, { message: 'Username quá dài' })
-    @Matches(/^[a-zA-Z0-9_\u00C0-\u024F\u1E00-\u1EFF ]+$/, {
-        message: 'Username không được chứa ký tự đặc biệt',
-    })
-    username: string;
+    @IsOptional()
+    @MinLength(36, { message: 'Token khÃ´ng Ä‘Ãºng Ä‘á»‹nh dáº¡ng (quÃ¡ ngáº¯n)' })
+    token?: string;
 
     @IsString()
     @IsOptional()
-    avatar?: string;
+    @MinLength(3, { message: 'Username quÃ¡ ngáº¯n' })
+    @MaxLength(50, { message: 'Username quÃ¡ dÃ i' })
+    @Matches(/^[a-zA-Z0-9_\u00C0-\u024F\u1E00-\u1EFF ]+$/, {
+        message: 'Username khÃ´ng Ä‘Æ°á»£c chá»©a kÃ½ tá»± Ä‘áº·c biá»‡t',
+    })
+    username?: string;
 
     @IsString()
     @IsOptional()
