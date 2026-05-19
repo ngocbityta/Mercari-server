@@ -16,7 +16,7 @@ import {
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import type { Request } from 'express';
-import { User, UserStatus } from '@prisma/client';
+import { UserStatus, type User } from '@prisma/client';
 import { UsersService } from './users.service.ts';
 import { ProfileService } from './profile.service.ts';
 import { AccountService } from './account.service.ts';

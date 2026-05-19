@@ -3,6 +3,32 @@ import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { IPostQuery, IPostCommand } from './posts.interfaces.ts';
 
+export interface PostDetailResponse {
+    id: string;
+    described: string;
+    created: string;
+    modified: string;
+    like: string;
+    comment: string;
+    is_liked: string;
+    video: Array<{ url: string; thumb: string }>;
+    author: {
+        id: string;
+        name: string;
+        avatar: string;
+        online: string;
+    };
+    exercise_id: string;
+    edited_times: string;
+    is_blocked: string;
+    lecturer?: {
+        id: string;
+        name: string;
+        avatar: string;
+    };
+    time_series_poses?: unknown[];
+}
+
 @Injectable()
 export class PostsService implements IPostQuery, IPostCommand {
     constructor(private prisma: PrismaService) {}
@@ -287,7 +313,7 @@ export class PostsService implements IPostQuery, IPostCommand {
         // Check if viewer is student and post owner is teacher for time_series_poses
         const isViewerStudent = viewer.role === 'HV';
         const isOwnerTeacher = post.owner.role === 'GV';
-        let timeSeriesPoses: any[] | undefined;
+        let timeSeriesPoses: unknown[] | undefined;
 
         // Only include time_series_poses if viewer is student and owner is teacher
         if (isViewerStudent && isOwnerTeacher) {
@@ -297,7 +323,7 @@ export class PostsService implements IPostQuery, IPostCommand {
         }
 
         // Build the response data
-        const responseData = {
+        const responseData: PostDetailResponse = {
             id: post.id,
             described: post.content,
             created: post.createdAt.toISOString(),
@@ -331,7 +357,7 @@ export class PostsService implements IPostQuery, IPostCommand {
             });
 
             if (lecturer) {
-                (responseData as any).lecturer = {
+                responseData.lecturer = {
                     id: lecturer.id,
                     name: lecturer.username || 'Giảng viên',
                     avatar: lecturer.avatar || 'default_lecturer_avatar.jpg',
@@ -341,7 +367,7 @@ export class PostsService implements IPostQuery, IPostCommand {
 
         // Add time_series_poses only if viewer is student and owner is teacher
         if (timeSeriesPoses !== undefined) {
-            (responseData as any).time_series_poses = timeSeriesPoses;
+            responseData.time_series_poses = timeSeriesPoses;
         }
 
         return responseData;

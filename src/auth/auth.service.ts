@@ -20,7 +20,7 @@ export class AuthService implements IAuthActions, IVerificationActions {
         if (dto.password === dto.phonenumber) {
             return {
                 code: ResponseCode.INVALID_PARAMETER_VALUE,
-                message: 'Máº­t kháº©u khÃ´ng Ä‘Æ°á»£c trÃ¹ng vá»›i sá»‘ Ä‘iá»‡n thoáº¡i',
+                message: 'Mật khẩu không được trùng với số điện thoại',
             };
         }
 
@@ -53,7 +53,7 @@ export class AuthService implements IAuthActions, IVerificationActions {
         if (dto.password === dto.phonenumber) {
             return {
                 code: ResponseCode.INVALID_PARAMETER_VALUE,
-                message: 'Máº­t kháº©u khÃ´ng Ä‘Æ°á»£c trÃ¹ng vá»›i sá»‘ Ä‘iá»‡n thoáº¡i',
+                message: 'Mật khẩu không được trùng với số điện thoại',
             };
         }
 
@@ -75,7 +75,7 @@ export class AuthService implements IAuthActions, IVerificationActions {
         if (user.password !== dto.password) {
             return {
                 code: ResponseCode.INVALID_PARAMETER_VALUE,
-                message: 'Máº­t kháº©u khÃ´ng chÃ­nh xÃ¡c',
+                message: 'Mật khẩu không chính xác',
             };
         }
 
@@ -212,45 +212,44 @@ export class AuthService implements IAuthActions, IVerificationActions {
             };
         }
 
-        if (!avatarFile) {
+        const username = dto.username?.trim();
+        if (!username) {
             return {
                 code: ResponseCode.MISSING_PARAMETER,
-                message: 'Avatar file is required',
+                message: 'Username is required',
             };
         }
 
-        const updateData: { avatar: string; username?: string; height?: string } = {
-            avatar: '',
+        const height = dto.height?.trim();
+        if (!height) {
+            return {
+                code: ResponseCode.MISSING_PARAMETER,
+                message: 'Height is required',
+            };
+        }
+
+        const usernameValidationError = this.validateChangeInfoUsername(username, user.phonenumber);
+        if (usernameValidationError) {
+            return {
+                code: ResponseCode.INVALID_PARAMETER_VALUE,
+                message: usernameValidationError,
+            };
+        }
+
+        const updateData: { username: string; height: string; avatar?: string } = {
+            username,
+            height,
         };
 
-        if (dto.username !== undefined) {
-            const usernameValidationError = this.validateChangeInfoUsername(
-                dto.username,
-                user.phonenumber,
-            );
-            if (usernameValidationError) {
+        if (avatarFile) {
+            try {
+                updateData.avatar = await saveUserUploadedImage(avatarFile);
+            } catch {
                 return {
-                    code: ResponseCode.INVALID_PARAMETER_VALUE,
-                    message: usernameValidationError,
+                    code: ResponseCode.UPLOAD_FILE_FAILED,
+                    message: ResponseMessage[ResponseCode.UPLOAD_FILE_FAILED],
                 };
             }
-
-            updateData.username = dto.username.trim();
-        }
-
-        let avatar: string;
-        try {
-            avatar = await saveUserUploadedImage(avatarFile);
-        } catch {
-            return {
-                code: ResponseCode.UPLOAD_FILE_FAILED,
-                message: ResponseMessage[ResponseCode.UPLOAD_FILE_FAILED],
-            };
-        }
-
-        updateData.avatar = avatar;
-        if (dto.height !== undefined) {
-            updateData.height = dto.height;
         }
 
         const updatedUser = await this.usersService.update(user.id, updateData);
@@ -308,8 +307,8 @@ export class AuthService implements IAuthActions, IVerificationActions {
         const normalizedValue = value
             .normalize('NFD')
             .replace(/[\u0300-\u036f]/g, '')
-            .replace(/Ä‘/g, 'd')
-            .replace(/Ä/g, 'D')
+            .replace(/đ/g, 'd')
+            .replace(/Đ/g, 'D')
             .toLowerCase();
 
         return (

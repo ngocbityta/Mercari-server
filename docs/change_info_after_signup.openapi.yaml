@@ -13,12 +13,12 @@ paths:
                         schema:
                             type: object
                             required:
-                                - avatar
+                                - token
+                                - username
+                                - height
                             properties:
                                 token:
                                     type: string
-                                    nullable: true
-                                    description: Optional in the request schema, but the current auth flow still needs a valid token to resolve the user.
                                 username:
                                     type: string
                                 height:

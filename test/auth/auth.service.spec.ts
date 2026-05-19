@@ -6,6 +6,7 @@ import { VerificationService } from '../../src/auth/verification.service.ts';
 import { ResponseCode } from '../../src/enums/response-code.enum.ts';
 import { UserStatus, UserRole } from '@prisma/client';
 import { saveUserUploadedImage } from '../../src/common/uploads/profile-upload.ts';
+import type { ChangeInfoAfterSignupDto } from '../../src/auth/auth.dto.ts';
 
 jest.mock('../../src/common/uploads/profile-upload.ts', () => ({
     saveUserUploadedImage: jest.fn(),
@@ -16,7 +17,7 @@ const mockUser = {
     phonenumber: '0901234567',
     password: 'password123',
     username: 'user1',
-    avatar: null,
+    avatar: 'current-avatar',
     coverImage: null,
     description: null,
     role: UserRole.HV,
@@ -26,6 +27,12 @@ const mockUser = {
     online: false,
     createdAt: new Date(),
     updatedAt: new Date(),
+};
+
+const validChangeInfoDto: ChangeInfoAfterSignupDto = {
+    token: 'x'.repeat(36),
+    username: 'new_user',
+    height: '170',
 };
 
 describe('AuthService', () => {
@@ -108,65 +115,118 @@ describe('AuthService', () => {
             buffer: Buffer.from('avatar'),
         };
 
-        it('should require a valid token even though the request schema allows omitting it', async () => {
-            const result = await service.changeInfoAfterSignup({}, avatarFile);
+        it('should require a valid token', async () => {
+            const result = await service.changeInfoAfterSignup({
+                ...validChangeInfoDto,
+                token: '',
+            });
 
             expect(result.code).toBe(ResponseCode.TOKEN_INVALID);
         });
 
-        it('should require an avatar file', async () => {
-            usersService.findByToken.mockResolvedValue({ ...mockUser, token: 'x'.repeat(36) });
+        it('should require username', async () => {
+            usersService.findByToken.mockResolvedValue({
+                ...mockUser,
+                token: validChangeInfoDto.token,
+            });
 
-            const result = await service.changeInfoAfterSignup(
-                { token: 'x'.repeat(36) },
-                undefined,
-            );
+            const result = await service.changeInfoAfterSignup({
+                ...validChangeInfoDto,
+                username: '',
+            });
 
             expect(result.code).toBe(ResponseCode.MISSING_PARAMETER);
-            expect(result.message).toBe('Avatar file is required');
+            expect(result.message).toBe('Username is required');
         });
 
-        it('should update avatar without forcing username or height', async () => {
-            const uploadedAvatarPath = '/uploads/users/avatar.png';
-            usersService.findByToken.mockResolvedValue({ ...mockUser, token: 'x'.repeat(36) });
+        it('should require height', async () => {
+            usersService.findByToken.mockResolvedValue({
+                ...mockUser,
+                token: validChangeInfoDto.token,
+            });
+
+            const result = await service.changeInfoAfterSignup({
+                ...validChangeInfoDto,
+                height: '',
+            });
+
+            expect(result.code).toBe(ResponseCode.MISSING_PARAMETER);
+            expect(result.message).toBe('Height is required');
+        });
+
+        it('should update username and height without requiring avatar', async () => {
+            usersService.findByToken.mockResolvedValue({
+                ...mockUser,
+                token: validChangeInfoDto.token,
+            });
             usersService.update.mockResolvedValue({
                 ...mockUser,
-                avatar: uploadedAvatarPath,
-                token: 'x'.repeat(36),
+                username: validChangeInfoDto.username,
+                height: validChangeInfoDto.height,
+                token: validChangeInfoDto.token,
             });
-            mockedSaveUserUploadedImage.mockResolvedValue(uploadedAvatarPath);
 
-            const result = await service.changeInfoAfterSignup(
-                { token: 'x'.repeat(36) },
-                avatarFile,
-            );
+            const result = await service.changeInfoAfterSignup(validChangeInfoDto);
 
-            expect(mockedSaveUserUploadedImage).toHaveBeenCalledWith(avatarFile);
+            expect(mockedSaveUserUploadedImage).not.toHaveBeenCalled();
             expect(usersService.update.mock.calls[0]).toEqual([
                 mockUser.id,
                 {
-                    avatar: uploadedAvatarPath,
+                    username: validChangeInfoDto.username,
+                    height: validChangeInfoDto.height,
                 },
             ]);
             expect(result.code).toBe(ResponseCode.OK);
             expect(result.data).toMatchObject({
                 id: mockUser.id,
-                username: mockUser.username,
+                username: validChangeInfoDto.username,
                 phonenumber: mockUser.phonenumber,
+                avatar: mockUser.avatar,
+            });
+        });
+
+        it('should upload avatar when avatar file is provided', async () => {
+            const uploadedAvatarPath = '/uploads/users/avatar.png';
+            usersService.findByToken.mockResolvedValue({
+                ...mockUser,
+                token: validChangeInfoDto.token,
+            });
+            usersService.update.mockResolvedValue({
+                ...mockUser,
+                username: validChangeInfoDto.username,
+                height: validChangeInfoDto.height,
+                avatar: uploadedAvatarPath,
+                token: validChangeInfoDto.token,
+            });
+            mockedSaveUserUploadedImage.mockResolvedValue(uploadedAvatarPath);
+
+            const result = await service.changeInfoAfterSignup(validChangeInfoDto, avatarFile);
+
+            expect(mockedSaveUserUploadedImage).toHaveBeenCalledWith(avatarFile);
+            expect(usersService.update.mock.calls[0]).toEqual([
+                mockUser.id,
+                {
+                    username: validChangeInfoDto.username,
+                    height: validChangeInfoDto.height,
+                    avatar: uploadedAvatarPath,
+                },
+            ]);
+            expect(result.code).toBe(ResponseCode.OK);
+            expect(result.data).toMatchObject({
                 avatar: uploadedAvatarPath,
             });
         });
 
-        it('should validate username when it is provided', async () => {
-            usersService.findByToken.mockResolvedValue({ ...mockUser, token: 'x'.repeat(36) });
+        it('should validate username', async () => {
+            usersService.findByToken.mockResolvedValue({
+                ...mockUser,
+                token: validChangeInfoDto.token,
+            });
 
-            const result = await service.changeInfoAfterSignup(
-                {
-                    token: 'x'.repeat(36),
-                    username: 'https://example.com',
-                },
-                avatarFile,
-            );
+            const result = await service.changeInfoAfterSignup({
+                ...validChangeInfoDto,
+                username: 'https://example.com',
+            });
 
             expect(result.code).toBe(ResponseCode.INVALID_PARAMETER_VALUE);
             expect(result.message).toBe('Username must not be a URL');

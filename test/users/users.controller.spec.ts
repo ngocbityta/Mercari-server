@@ -4,7 +4,7 @@ import { UsersService } from '../../src/users/users.service.ts';
 import { ProfileService } from '../../src/users/profile.service.ts';
 import { AccountService } from '../../src/users/account.service.ts';
 import { BlockService } from '../../src/users/block.service.ts';
-import { CreateUserDto } from '../../src/users/users.dto.ts';
+import { CreateUserDto, type SetUserInfoDto } from '../../src/users/users.dto.ts';
 import { UserRole, UserStatus } from '../../src/enums/users.enum.ts';
 import { saveUserUploadedImage } from '../../src/common/uploads/profile-upload.ts';
 import { ResponseCode } from '../../src/enums/response-code.enum.ts';
@@ -155,13 +155,13 @@ describe('UserInfoController', () => {
     });
 
     it('should reject non-multipart requests for set_user_info', async () => {
-        const result = await controller.setUserInfo(buildRequest(false), {}, {});
+        const result = await controller.setUserInfo(buildRequest(false), {} as SetUserInfoDto, {});
 
         expect(result.code).toBe(ResponseCode.INVALID_PARAMETER_TYPE);
     });
 
     it('should reject missing token for set_user_info', async () => {
-        const result = await controller.setUserInfo(buildRequest(true), {}, {});
+        const result = await controller.setUserInfo(buildRequest(true), {} as SetUserInfoDto, {});
 
         expect(result.code).toBe(ResponseCode.TOKEN_INVALID);
     });
@@ -173,10 +173,10 @@ describe('UserInfoController', () => {
             .mockResolvedValueOnce('/uploads/users/cover.png');
         profileService.setUserInfo.mockResolvedValue({
             id: mockUser.id,
-            username: mockUser.username,
+            username: mockUser.username ?? '',
             avatar: '/uploads/users/avatar.png',
             coverImage: '/uploads/users/cover.png',
-            description: mockUser.description,
+            description: mockUser.description ?? '',
             online: '0',
             created: mockUser.createdAt.toISOString(),
         });

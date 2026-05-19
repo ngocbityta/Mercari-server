@@ -22,11 +22,12 @@ const USER_UPLOAD_URL_PREFIX = '/uploads/users';
 
 const IMAGE_MIME_TO_EXTENSION: Record<string, string> = {
     'image/jpeg': '.jpg',
+    'image/jpg': '.jpg',
     'image/png': '.png',
     'image/webp': '.webp',
 };
 
-const ALLOWED_IMAGE_EXTENSIONS = new Set(Object.values(IMAGE_MIME_TO_EXTENSION));
+const ALLOWED_IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp']);
 
 function createProfileImageUploadOptions(maxFiles: number): MulterOptions {
     return {
@@ -35,7 +36,7 @@ function createProfileImageUploadOptions(maxFiles: number): MulterOptions {
             files: maxFiles,
         },
         fileFilter: (_request, file, callback) => {
-            if (!IMAGE_MIME_TO_EXTENSION[file.mimetype]) {
+            if (!isAllowedProfileImage(file.mimetype, file.originalname)) {
                 callback(
                     new BadRequestException('Only jpeg, png, or webp images are allowed'),
                     false,
@@ -46,6 +47,14 @@ function createProfileImageUploadOptions(maxFiles: number): MulterOptions {
             callback(null, true);
         },
     };
+}
+
+function isAllowedProfileImage(mimetype: string, originalname: string): boolean {
+    if (IMAGE_MIME_TO_EXTENSION[mimetype]) {
+        return true;
+    }
+
+    return ALLOWED_IMAGE_EXTENSIONS.has(extname(originalname).toLowerCase());
 }
 
 export const PROFILE_AVATAR_UPLOAD_OPTIONS: MulterOptions = createProfileImageUploadOptions(1);
@@ -89,5 +98,5 @@ function getSafeImageExtension(file: UploadedMultipartFile): string {
         return extensionFromName;
     }
 
-    return '.jpg';
+    throw new Error('Invalid image type');
 }

@@ -12,11 +12,11 @@ paths:
                     multipart/form-data:
                         schema:
                             type: object
+                            required:
+                                - token
                             properties:
                                 token:
                                     type: string
-                                    nullable: true
-                                    description: Optional in the request table, but the current auth flow still needs a valid token to resolve the user.
                                 username:
                                     type: string
                                 avatar:

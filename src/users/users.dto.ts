@@ -96,8 +96,8 @@ export class GetUserInfoDto {
 
 export class SetUserInfoDto {
     @IsString()
-    @IsOptional()
-    token?: string;
+    @IsNotEmpty()
+    token: string;
 
     @IsString()
     @IsOptional()
@@ -110,20 +110,20 @@ export class ChangePasswordDto {
     token: string;
 
     @IsString()
-    @IsNotEmpty({ message: 'Máº­t kháº©u cÅ© khÃ´ng Ä‘Æ°á»£c Ä‘á»ƒ trá»‘ng' })
-    @MinLength(6, { message: 'Máº­t kháº©u cÅ© quÃ¡ ngáº¯n' })
-    @MaxLength(10, { message: 'Máº­t kháº©u cÅ© quÃ¡ dÃ i' })
+    @IsNotEmpty({ message: 'Mật khẩu cũ không được để trống' })
+    @MinLength(6, { message: 'Mật khẩu cũ quá ngắn' })
+    @MaxLength(10, { message: 'Mật khẩu cũ quá dài' })
     @Matches(/^[a-zA-Z0-9]+$/, {
-        message: 'Máº­t kháº©u cÅ© khÃ´ng Ä‘Æ°á»£c chá»©a kÃ½ tá»± Ä‘áº·c biá»‡t',
+        message: 'Mật khẩu cũ không được chứa ký tự đặc biệt',
     })
     password: string;
 
     @IsString()
-    @IsNotEmpty({ message: 'Máº­t kháº©u má»›i khÃ´ng Ä‘Æ°á»£c Ä‘á»ƒ trá»‘ng' })
-    @MinLength(6, { message: 'Máº­t kháº©u má»›i quÃ¡ ngáº¯n' })
-    @MaxLength(10, { message: 'Máº­t kháº©u má»›i quÃ¡ dÃ i' })
+    @IsNotEmpty({ message: 'Mật khẩu mới không được để trống' })
+    @MinLength(6, { message: 'Mật khẩu mới quá ngắn' })
+    @MaxLength(10, { message: 'Mật khẩu mới quá dài' })
     @Matches(/^[a-zA-Z0-9]+$/, {
-        message: 'Máº­t kháº©u má»›i khÃ´ng Ä‘Æ°á»£c chá»©a kÃ½ tá»± Ä‘áº·c biá»‡t',
+        message: 'Mật khẩu mới không được chứa ký tự đặc biệt',
     })
     newPassword: string;
 }
