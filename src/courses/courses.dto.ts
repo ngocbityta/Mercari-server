@@ -81,3 +81,17 @@ export class GetRequestedEnrollmentDto {
     @IsString()
     user_id?: string;
 }
+
+export class GetListCoursesDto {
+    @IsString()
+    @IsNotEmpty()
+    token: string;
+
+    @IsString()
+    @IsNotEmpty()
+    index: string;
+
+    @IsString()
+    @IsNotEmpty()
+    count: string;
+}

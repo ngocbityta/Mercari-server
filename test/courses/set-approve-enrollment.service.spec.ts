@@ -4,6 +4,7 @@ import { PrismaService } from '../../src/prisma/prisma.service.ts';
 import { Prisma } from '@prisma/client';
 import { ApiException } from '../../src/common/exceptions/api.exception.ts';
 import { ResponseCode } from '../../src/enums/response-code.enum.ts';
+import { MediaService } from '../../src/posts/media.service.ts';
 
 const mockTx = {
     enrollment: { create: jest.fn() },
@@ -37,7 +38,14 @@ describe('CoursesService - setApproveEnrollment', () => {
 
     beforeEach(async () => {
         const module: TestingModule = await Test.createTestingModule({
-            providers: [CoursesService, { provide: PrismaService, useValue: mockPrisma }],
+            providers: [
+                CoursesService,
+                { provide: PrismaService, useValue: mockPrisma },
+                {
+                    provide: MediaService,
+                    useValue: { getProxiedUrl: jest.fn((url) => url) },
+                },
+            ],
         }).compile();
 
         service = module.get<CoursesService>(CoursesService);

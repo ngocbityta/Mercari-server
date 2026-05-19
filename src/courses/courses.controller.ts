@@ -1,6 +1,7 @@
 import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
 import { CoursesService } from './courses.service.ts';
 import {
+    GetListCoursesDto,
     GetListCoursesOfStudentDto,
     GetListStudentsDto,
     GetRequestedEnrollmentDto,
@@ -67,6 +68,17 @@ export class CoursesController {
             body.token,
             body.course_id,
             body.user_id,
+        );
+        return ApiResponse.success(result);
+    }
+
+    @Post('get_list_courses')
+    @HttpCode(HttpStatus.OK)
+    async getListCourses(@Body() body: GetListCoursesDto) {
+        const result = await this.coursesService.getListCourses(
+            body.token,
+            parseInt(body.index),
+            parseInt(body.count),
         );
         return ApiResponse.success(result);
     }
