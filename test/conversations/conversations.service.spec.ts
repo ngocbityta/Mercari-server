@@ -191,7 +191,7 @@ describe('ConversationsService', () => {
 
             expect(result.conversation.id).toBe('conv-1');
             expect(result.conversation.partner.id).toBe('user-b');
-            expect(result.conversation.is_blocked).toBe('0');
+            expect(result.conversation.isBlocked).toBe('0');
             expect(result.data).toHaveLength(1);
         });
 
@@ -227,7 +227,7 @@ describe('ConversationsService', () => {
 
             const result = await service.getConversation(mockUser, 0, 10, undefined, 'conv-1');
 
-            expect(result.conversation.is_blocked).toBe('1');
+            expect(result.conversation.isBlocked).toBe('1');
         });
 
         it('should skip deleted conversations', async () => {
