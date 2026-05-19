@@ -8,6 +8,11 @@ import { ApiException } from '../common/exceptions/api.exception.ts';
 import { MediaService } from './media.service';
 import 'multer';
 
+interface PostWithThumbs {
+    leftVideoThumb?: string | null;
+    rightVideoThumb?: string | null;
+}
+
 @Injectable()
 export class PostsService implements IPostQuery, IPostCommand {
     constructor(
@@ -79,12 +84,25 @@ export class PostsService implements IPostQuery, IPostCommand {
         // Upload videos to media server
         let leftVideoUrl = '';
         let rightVideoUrl = '';
+        let leftVideoThumbUrl = '';
+        let rightVideoThumbUrl = '';
 
         if (left_video) {
             leftVideoUrl = await this.mediaService.uploadFile(left_video);
+            try {
+                leftVideoThumbUrl = await this.mediaService.generateAndUploadThumbnail(left_video);
+            } catch (err) {
+                console.error('Failed to generate thumbnail for left video:', err);
+            }
         }
         if (right_video) {
             rightVideoUrl = await this.mediaService.uploadFile(right_video);
+            try {
+                rightVideoThumbUrl =
+                    await this.mediaService.generateAndUploadThumbnail(right_video);
+            } catch (err) {
+                console.error('Failed to generate thumbnail for right video:', err);
+            }
         }
 
         // Create media array with video URLs
@@ -109,6 +127,8 @@ export class PostsService implements IPostQuery, IPostCommand {
                 deviceSlave: device_slave || null,
                 leftVideo: leftVideoUrl || null,
                 rightVideo: rightVideoUrl || null,
+                leftVideoThumb: leftVideoThumbUrl || null,
+                rightVideoThumb: rightVideoThumbUrl || null,
             },
         });
 
@@ -229,15 +249,36 @@ export class PostsService implements IPostQuery, IPostCommand {
             }
         }
 
+        let leftVideoThumbUrl = (post as unknown as PostWithThumbs).leftVideoThumb;
+        let rightVideoThumbUrl = (post as unknown as PostWithThumbs).rightVideoThumb;
+
         if (hasLeftVideoToAdd) {
             const url = await this.mediaService.uploadFile(left_video);
             newMedia.push(url);
             post.leftVideo = url; // Update temp object for DB update below
+            try {
+                leftVideoThumbUrl = await this.mediaService.generateAndUploadThumbnail(left_video);
+            } catch (err) {
+                console.error('Failed to generate left video thumb on edit:', err);
+                leftVideoThumbUrl = null;
+            }
+        } else if (hasLeftVideoToDelete) {
+            leftVideoThumbUrl = null;
         }
+
         if (hasRightVideoToAdd) {
             const url = await this.mediaService.uploadFile(right_video);
             newMedia.push(url);
             post.rightVideo = url; // Update temp object for DB update below
+            try {
+                rightVideoThumbUrl =
+                    await this.mediaService.generateAndUploadThumbnail(right_video);
+            } catch (err) {
+                console.error('Failed to generate right video thumb on edit:', err);
+                rightVideoThumbUrl = null;
+            }
+        } else if (hasRightVideoToDelete) {
+            rightVideoThumbUrl = null;
         }
 
         // Ensure at least one video exists
@@ -264,6 +305,8 @@ export class PostsService implements IPostQuery, IPostCommand {
                     : hasRightVideoToDelete
                       ? null
                       : post.rightVideo,
+                leftVideoThumb: leftVideoThumbUrl,
+                rightVideoThumb: rightVideoThumbUrl,
             },
         });
 
@@ -378,10 +421,19 @@ export class PostsService implements IPostQuery, IPostCommand {
             responseData.like = likeCount.toString();
             responseData.comment = commentCount.toString();
             responseData.is_liked = isLiked ? '1' : '0';
-            responseData.video = post.media.map((url, index) => ({
-                url: this.mediaService.getProxiedUrl(url),
-                thumb: `thumbnail_${index}.jpg`,
-            }));
+            responseData.video = post.media.map((url, index) => {
+                let thumbUrl = '';
+                const postWithThumbs = post as unknown as PostWithThumbs;
+                if (url === post.leftVideo && postWithThumbs.leftVideoThumb) {
+                    thumbUrl = this.mediaService.getProxiedUrl(postWithThumbs.leftVideoThumb);
+                } else if (url === post.rightVideo && postWithThumbs.rightVideoThumb) {
+                    thumbUrl = this.mediaService.getProxiedUrl(postWithThumbs.rightVideoThumb);
+                }
+                return {
+                    url: this.mediaService.getProxiedUrl(url),
+                    thumb: thumbUrl || `thumbnail_${index}.jpg`,
+                };
+            });
             responseData.author = author;
 
             // "nếu author và lecturer là một thì không cần trường này"
@@ -619,10 +671,23 @@ export class PostsService implements IPostQuery, IPostCommand {
                     return {
                         post_id: post.id,
                         described: content,
-                        video: media.map((url, idx) => ({
-                            url: this.mediaService.getProxiedUrl(url),
-                            thumb: `thumbnail_${idx}.jpg`,
-                        })),
+                        video: media.map((url, idx) => {
+                            let thumbUrl = '';
+                            const postWithThumbs = post as unknown as PostWithThumbs;
+                            if (url === post.leftVideo && postWithThumbs.leftVideoThumb) {
+                                thumbUrl = this.mediaService.getProxiedUrl(
+                                    postWithThumbs.leftVideoThumb,
+                                );
+                            } else if (url === post.rightVideo && postWithThumbs.rightVideoThumb) {
+                                thumbUrl = this.mediaService.getProxiedUrl(
+                                    postWithThumbs.rightVideoThumb,
+                                );
+                            }
+                            return {
+                                url: this.mediaService.getProxiedUrl(url),
+                                thumb: thumbUrl || `thumbnail_${idx}.jpg`,
+                            };
+                        }),
                         created: (post.createdAt.getTime() / 1000).toString(),
                         like: (post.likeIds?.length || 0).toString(),
                         comment: (post.commentIds?.length || 0).toString(),
@@ -803,10 +868,23 @@ export class PostsService implements IPostQuery, IPostCommand {
                     return {
                         post_id: post.id,
                         described: content,
-                        video: media.map((url, idx) => ({
-                            url: this.mediaService.getProxiedUrl(url),
-                            thumb: `thumbnail_${idx}.jpg`,
-                        })),
+                        video: media.map((url, idx) => {
+                            let thumbUrl = '';
+                            const postWithThumbs = post as unknown as PostWithThumbs;
+                            if (url === post.leftVideo && postWithThumbs.leftVideoThumb) {
+                                thumbUrl = this.mediaService.getProxiedUrl(
+                                    postWithThumbs.leftVideoThumb,
+                                );
+                            } else if (url === post.rightVideo && postWithThumbs.rightVideoThumb) {
+                                thumbUrl = this.mediaService.getProxiedUrl(
+                                    postWithThumbs.rightVideoThumb,
+                                );
+                            }
+                            return {
+                                url: this.mediaService.getProxiedUrl(url),
+                                thumb: thumbUrl || `thumbnail_${idx}.jpg`,
+                            };
+                        }),
                         created: post.createdAt.toISOString(),
                         like: (post.likeIds?.length || 0).toString(),
                         comment: (post.commentIds?.length || 0).toString(),

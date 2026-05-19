@@ -34,6 +34,9 @@ describe('PostsService - editPost', () => {
                         uploadFile: jest
                             .fn()
                             .mockResolvedValue('http://download-url.com/new-video'),
+                        generateAndUploadThumbnail: jest
+                            .fn()
+                            .mockResolvedValue('http://download-url.com/new-video-thumb'),
                         getProxiedUrl: jest.fn((url) => url),
                         getVideoResponse: jest.fn(),
                     },
