@@ -14,4 +14,5 @@ export interface ICourseQuery {
         user_id?: string,
     ): Promise<any>;
     setRequestCourse(token: string, course_id: string, user_id: string): Promise<any>;
+    getListCourses(token: string, index: number, count: number): Promise<any>;
 }
