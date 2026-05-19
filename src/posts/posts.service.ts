@@ -90,7 +90,10 @@ export class PostsService implements IPostQuery, IPostCommand {
         if (left_video) {
             leftVideoUrl = await this.mediaService.uploadFile(left_video);
             try {
-                leftVideoThumbUrl = await this.mediaService.generateAndUploadThumbnail(left_video);
+                leftVideoThumbUrl = await this.mediaService.generateAndUploadThumbnail(
+                    left_video,
+                    leftVideoUrl,
+                );
             } catch (err) {
                 console.error('Failed to generate thumbnail for left video:', err);
             }
@@ -98,8 +101,10 @@ export class PostsService implements IPostQuery, IPostCommand {
         if (right_video) {
             rightVideoUrl = await this.mediaService.uploadFile(right_video);
             try {
-                rightVideoThumbUrl =
-                    await this.mediaService.generateAndUploadThumbnail(right_video);
+                rightVideoThumbUrl = await this.mediaService.generateAndUploadThumbnail(
+                    right_video,
+                    rightVideoUrl,
+                );
             } catch (err) {
                 console.error('Failed to generate thumbnail for right video:', err);
             }
@@ -257,7 +262,10 @@ export class PostsService implements IPostQuery, IPostCommand {
             newMedia.push(url);
             post.leftVideo = url; // Update temp object for DB update below
             try {
-                leftVideoThumbUrl = await this.mediaService.generateAndUploadThumbnail(left_video);
+                leftVideoThumbUrl = await this.mediaService.generateAndUploadThumbnail(
+                    left_video,
+                    url,
+                );
             } catch (err) {
                 console.error('Failed to generate left video thumb on edit:', err);
                 leftVideoThumbUrl = null;
@@ -271,8 +279,10 @@ export class PostsService implements IPostQuery, IPostCommand {
             newMedia.push(url);
             post.rightVideo = url; // Update temp object for DB update below
             try {
-                rightVideoThumbUrl =
-                    await this.mediaService.generateAndUploadThumbnail(right_video);
+                rightVideoThumbUrl = await this.mediaService.generateAndUploadThumbnail(
+                    right_video,
+                    url,
+                );
             } catch (err) {
                 console.error('Failed to generate right video thumb on edit:', err);
                 rightVideoThumbUrl = null;
