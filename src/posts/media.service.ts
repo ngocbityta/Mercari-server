@@ -89,11 +89,16 @@ export class MediaService {
     }
 
     async uploadFile(file: Express.Multer.File): Promise<string> {
-        if (this.useCloudinary) {
+        const isImage =
+            file.mimetype?.startsWith('image/') ||
+            ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'].includes(
+                path.extname(file.originalname || '').toLowerCase(),
+            );
+
+        if (this.useCloudinary && isImage) {
             return this.uploadToCloudinary(file);
         }
 
-        /* Commented out original service upload logic as per request
         const formData = new FormData();
 
         // Fix: Use Uint8Array to wrap buffer for standard fetch Blob compatibility
@@ -121,10 +126,6 @@ export class MediaService {
 
         // Return the download URL pointing to our proxy
         return `${this.serverUrl}/${this.it4788Prefix}/videos/${videoId}/download`;
-        */
-        throw new Error(
-            'RunPod media server upload is temporarily disabled. Please enable and configure Cloudinary.',
-        );
     }
 
     async getVideoResponse(videoId: string): Promise<Response> {
