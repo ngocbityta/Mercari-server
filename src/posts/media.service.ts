@@ -5,6 +5,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import ffmpegPath from 'ffmpeg-static';
 import ffmpeg from 'fluent-ffmpeg';
+import { v2 as cloudinary } from 'cloudinary';
 
 if (typeof ffmpegPath === 'string') {
     ffmpeg.setFfmpegPath(ffmpegPath);
@@ -19,15 +20,80 @@ export class MediaService {
     private readonly subject: string;
     private readonly serverUrl: string;
     private readonly it4788Prefix = 'it4788';
+    private readonly useCloudinary: boolean;
 
     constructor(private configService: ConfigService) {
         this.baseUrl = this.configService.get<string>('MEDIA_BASE_URL') || 'http://localhost:8000';
         this.apiKey = this.configService.get<string>('MEDIA_API_KEY') || 'default_key';
         this.subject = this.configService.get<string>('MEDIA_API_SUBJECT') || 'default_subject';
         this.serverUrl = this.configService.get<string>('SERVER_URL') || 'http://localhost:3000';
+
+        const cloudName = this.configService.get<string>('CLOUDINARY_CLOUD_NAME');
+        const cApiKey = this.configService.get<string>('CLOUDINARY_API_KEY');
+        const cApiSecret = this.configService.get<string>('CLOUDINARY_API_SECRET');
+        const useCloudinaryEnv = this.configService.get<string>('USE_CLOUDINARY');
+
+        this.useCloudinary =
+            useCloudinaryEnv === 'true' ||
+            (!useCloudinaryEnv && !!cloudName && !!cApiKey && !!cApiSecret);
+
+        if (this.useCloudinary && cloudName && cApiKey && cApiSecret) {
+            cloudinary.config({
+                cloud_name: cloudName,
+                api_key: cApiKey,
+                api_secret: cApiSecret,
+            });
+        }
+    }
+
+    private async uploadToCloudinary(file: Express.Multer.File): Promise<string> {
+        return new Promise<string>((resolve, reject) => {
+            let resourceType: 'image' | 'video' | 'raw' | 'auto' = 'auto';
+            if (file.mimetype) {
+                if (file.mimetype.startsWith('video/')) {
+                    resourceType = 'video';
+                } else if (file.mimetype.startsWith('image/')) {
+                    resourceType = 'image';
+                }
+            } else if (file.originalname) {
+                const ext = path.extname(file.originalname).toLowerCase();
+                if (['.mp4', '.mov', '.avi', '.mkv', '.webm', '.3gp'].includes(ext)) {
+                    resourceType = 'video';
+                } else if (['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'].includes(ext)) {
+                    resourceType = 'image';
+                }
+            }
+
+            const uploadStream = cloudinary.uploader.upload_stream(
+                {
+                    resource_type: resourceType,
+                    folder: 'mercari_media',
+                },
+                (error, result) => {
+                    if (error) {
+                        reject(new Error(`Cloudinary upload failed: ${error.message}`));
+                    } else if (result && result.secure_url) {
+                        resolve(result.secure_url);
+                    } else {
+                        reject(
+                            new Error(
+                                'Cloudinary upload failed: secure_url is missing in response',
+                            ),
+                        );
+                    }
+                },
+            );
+
+            uploadStream.end(file.buffer);
+        });
     }
 
     async uploadFile(file: Express.Multer.File): Promise<string> {
+        if (this.useCloudinary) {
+            return this.uploadToCloudinary(file);
+        }
+
+        /* Commented out original service upload logic as per request
         const formData = new FormData();
 
         // Fix: Use Uint8Array to wrap buffer for standard fetch Blob compatibility
@@ -55,6 +121,10 @@ export class MediaService {
 
         // Return the download URL pointing to our proxy
         return `${this.serverUrl}/${this.it4788Prefix}/videos/${videoId}/download`;
+        */
+        throw new Error(
+            'RunPod media server upload is temporarily disabled. Please enable and configure Cloudinary.',
+        );
     }
 
     async getVideoResponse(videoId: string): Promise<Response> {
@@ -78,6 +148,11 @@ export class MediaService {
      */
     getProxiedUrl(originalUrl: string): string {
         if (!originalUrl) {
+            return originalUrl;
+        }
+
+        // If it's a Cloudinary URL, return as is immediately
+        if (originalUrl.includes('cloudinary.com')) {
             return originalUrl;
         }
 
@@ -131,9 +206,11 @@ export class MediaService {
             // 4. Create mock Express.Multer.File object
             const mockFile: Express.Multer.File = {
                 fieldname: 'file',
-                originalname: `${path.basename(videoFile.originalname, path.extname(videoFile.originalname))}_thumb.mp4`,
+                originalname: this.useCloudinary
+                    ? `${path.basename(videoFile.originalname, path.extname(videoFile.originalname))}_thumb.jpg`
+                    : `${path.basename(videoFile.originalname, path.extname(videoFile.originalname))}_thumb.mp4`,
                 encoding: '7bit',
-                mimetype: 'video/mp4',
+                mimetype: this.useCloudinary ? 'image/jpeg' : 'video/mp4',
                 buffer: thumbBuffer,
                 size: thumbBuffer.length,
                 stream: null as any,
