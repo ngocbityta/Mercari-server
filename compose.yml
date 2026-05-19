@@ -5,7 +5,10 @@ services:
     environment:
       - NODE_ENV=production
       - DATABASE_URL=${DATABASE_URL}
-    command: node dist/src/main.js
+    command: sh -c "npx prisma migrate deploy && node dist/src/main.js"
+    depends_on:
+      group1-db:
+        condition: service_healthy
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.group1-backend.rule=Host(`group1.it4788.sukkaito.id.vn`)"
@@ -31,6 +34,11 @@ services:
       - ./pgdata:/var/lib/postgresql/data
     networks:
       - proxy-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U prisma -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 networks:
   proxy-net:
