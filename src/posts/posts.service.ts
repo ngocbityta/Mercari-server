@@ -1089,7 +1089,11 @@ export class PostsService implements IPostQuery, IPostCommand {
                 });
             }
 
-            if (ownerPushSetting.notificationOn === 1 && ownerPushSetting.likeComment === 1) {
+            if (
+                ownerPushSetting &&
+                ownerPushSetting.notificationOn === 1 &&
+                ownerPushSetting.likeComment === 1
+            ) {
                 const notif = await this.prisma.notification.create({
                     data: {
                         userId: post.ownerId,
@@ -1204,7 +1208,11 @@ export class PostsService implements IPostQuery, IPostCommand {
                 });
             }
 
-            if (ownerPushSetting.notificationOn === 1 && ownerPushSetting.likeComment === 1) {
+            if (
+                ownerPushSetting &&
+                ownerPushSetting.notificationOn === 1 &&
+                ownerPushSetting.likeComment === 1
+            ) {
                 const notif = await this.prisma.notification.create({
                     data: {
                         userId: post.ownerId,

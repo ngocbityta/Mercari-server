@@ -19,10 +19,12 @@ export class MediaService {
         this.subject = this.configService.get<string>('MEDIA_API_SUBJECT') || 'default_subject';
         this.serverUrl = this.configService.get<string>('SERVER_URL') || 'http://localhost:3000';
 
-        const cloudName = 'dxqd8pxuj';
-        const cApiKey = '341819754229424';
-        const cApiSecret = 'FOpeVEsFJlGYoE7Z21NLreQydhc';
-        this.useCloudinary = false;
+        const cloudName = this.configService.get<string>('CLOUDINARY_CLOUD_NAME') || 'dxqd8pxuj';
+        const cApiKey = this.configService.get<string>('CLOUDINARY_API_KEY') || '341819754229424';
+        const cApiSecret =
+            this.configService.get<string>('CLOUDINARY_API_SECRET') ||
+            'FOpeVEsFJlGYoE7Z21NLreQydhc';
+        this.useCloudinary = this.configService.get<string>('USE_CLOUDINARY') === 'true';
 
         if (this.useCloudinary && cloudName && cApiKey && cApiSecret) {
             cloudinary.config({
@@ -76,9 +78,9 @@ export class MediaService {
     }
 
     async uploadFile(file: Express.Multer.File): Promise<string> {
-        if (this.useCloudinary) {
-            return this.uploadToCloudinary(file);
-        }
+        // if (this.useCloudinary) {
+        //     return this.uploadToCloudinary(file);
+        // }
 
         const formData = new FormData();
 
