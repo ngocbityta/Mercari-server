@@ -1,0 +1,12 @@
+node_modules
+dist
+.git
+pgdata
+*.log
+npm-debug.log*
+.env
+.env.prod
+/coverage
+/.nyc_output
+.vscode
+.idea

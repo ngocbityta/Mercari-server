@@ -13,16 +13,43 @@ export class NotificationsService implements INotificationQuery, INotificationCo
         private readonly eventsGateway: EventsGateway,
     ) {}
 
-    async getNotifications(user: User, index: number, count: number) {
+    async getNotifications(
+        user: User,
+        index: number,
+        count: number,
+        targetUserId?: string,
+        group?: number,
+    ) {
+        let targetUser = user;
+        if (targetUserId) {
+            if (user.role !== 'GV') {
+                throw new ApiException(ResponseCode.NOT_ACCESS, 'Not access');
+            }
+            const target = await this.prisma.user.findUnique({ where: { id: targetUserId } });
+            if (!target) {
+                throw new ApiException(ResponseCode.USER_NOT_VALIDATED, 'User not validated');
+            }
+            targetUser = target;
+        }
+
+        const whereClause: any = { userId: targetUser.id };
+        if (group !== undefined) {
+            if (group === 0) {
+                whereClause.groupType = { in: [0, 1, 2] };
+            } else if (group === 1) {
+                whereClause.groupType = { notIn: [0, 1, 2] };
+            }
+        }
+
         const notifications = await this.prisma.notification.findMany({
-            where: { userId: user.id },
+            where: whereClause,
             orderBy: { createdAt: 'desc' },
             skip: index,
             take: count,
         });
 
         const badge = await this.prisma.notification.count({
-            where: { userId: user.id, isRead: false },
+            where: { userId: targetUser.id, isRead: false },
         });
 
         const lastUpdate = new Date().toISOString();
@@ -44,19 +71,19 @@ export class NotificationsService implements INotificationQuery, INotificationCo
                     return true;
                 })
                 .map((n) => ({
-                    // Requirement 8: Default values for type, avatar, group, read, object_id
+                    // Requirement 8: Default values for type, avatar, group, read, objectId
                     type: n.type ?? 'home',
-                    object_id: n.objectId ?? '0',
+                    objectId: n.objectId ?? '0',
                     title: n.title,
                     notificationId: n.id,
                     created: n.createdAt.toISOString(),
                     avatar: n.avatar ?? 'app_icon',
-                    group: n.groupType ?? 0,
+                    group: n.groupType === 0 ? '0' : '1',
                     read: n.isRead ? '1' : '0',
                 })),
             // Requirement 9: Ensure badge is at least 0
             badge: String(badge >= 0 ? badge : 0),
-            last_update: lastUpdate,
+            lastUpdate: lastUpdate,
         };
     }
 
@@ -80,7 +107,7 @@ export class NotificationsService implements INotificationQuery, INotificationCo
 
         return {
             badge: String(badge >= 0 ? badge : 0),
-            last_update: new Date().toISOString(),
+            lastUpdate: new Date().toISOString(),
         };
     }
 }

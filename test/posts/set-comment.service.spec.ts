@@ -5,6 +5,7 @@ import { Block } from '@prisma/client';
 import { ApiException } from '../../src/common/exceptions/api.exception.ts';
 import { ResponseCode } from '../../src/enums/response-code.enum.ts';
 import { MediaService } from '../../src/posts/media.service';
+import { EventsGateway } from '../../src/events/events.gateway.ts';
 
 // --- Mock data ---
 const mockActiveUser = {
@@ -88,6 +89,12 @@ const mockPrisma = {
     post: { findUnique: jest.fn() },
     block: { findFirst: jest.fn(), findMany: jest.fn() },
     comment: { create: jest.fn(), findMany: jest.fn() },
+    pushSetting: { findUnique: jest.fn(), create: jest.fn() },
+    notification: { create: jest.fn() },
+};
+
+const mockEventsGateway = {
+    sendPushNotification: jest.fn(),
 };
 
 describe('PostsService - setComment', () => {
@@ -99,6 +106,7 @@ describe('PostsService - setComment', () => {
                 PostsService,
                 { provide: PrismaService, useValue: mockPrisma },
                 { provide: MediaService, useValue: { uploadFile: jest.fn() } },
+                { provide: EventsGateway, useValue: mockEventsGateway },
             ],
         }).compile();
 
@@ -377,6 +385,51 @@ describe('PostsService - setComment', () => {
                     authorId: { notIn: ['commenter-x'] },
                 }),
             }),
+        );
+    });
+
+    /**
+     * TC13: Tạo thông báo khi comment bài viết của người khác
+     */
+    it('[TC13] Tạo thông báo khi user-1 comment bài viết của owner-1', async () => {
+        const mockPushSetting = { userId: 'owner-1', notificationOn: 1, likeComment: 1 };
+        const mockCreatedNotif = {
+            id: 'notif-comment-1',
+            userId: 'owner-1',
+            type: 'comment',
+            objectId: 'post-1',
+            title: 'TestUser đã bình luận về bài viết của bạn',
+            avatar: 'avatar.jpg',
+            groupType: 2,
+            isRead: false,
+            createdAt: new Date(),
+        };
+
+        mockPrisma.user.findFirst.mockResolvedValue(mockActiveUser);
+        mockPrisma.post.findUnique.mockResolvedValue(mockPost); // ownerId is 'owner-1'
+        mockPrisma.block.findFirst.mockResolvedValue(null);
+        mockPrisma.comment.create.mockResolvedValue(mockMyComment);
+        mockPrisma.block.findMany.mockResolvedValue([]);
+        mockPrisma.comment.findMany.mockResolvedValue([mockMyComment]);
+        mockPrisma.pushSetting.findUnique.mockResolvedValue(mockPushSetting);
+        mockPrisma.notification.create.mockResolvedValue(mockCreatedNotif);
+
+        await service.setComment('valid-token', 'post-1', 0, 20, 'Bình luận của tôi');
+
+        expect(mockPrisma.notification.create).toHaveBeenCalledWith({
+            data: {
+                userId: 'owner-1',
+                type: 'comment',
+                objectId: 'post-1',
+                title: 'TestUser đã bình luận về bài viết của bạn',
+                avatar: 'avatar.jpg',
+                groupType: 2,
+                isRead: false,
+            },
+        });
+        expect(mockEventsGateway.sendPushNotification).toHaveBeenCalledWith(
+            'owner-1',
+            expect.any(Object),
         );
     });
 });

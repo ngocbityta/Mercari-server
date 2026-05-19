@@ -153,7 +153,7 @@ export class ConversationsService implements IConversationQuery, IConversationCo
                     username: partner?.username ?? '',
                     avatar: partner?.avatar ?? '',
                 },
-                is_blocked: isBlocked ? '1' : '0',
+                isBlocked: isBlocked ? '1' : '0',
             },
             data: messages.map((m) => ({
                 messageId: m.id,
@@ -280,7 +280,7 @@ export class ConversationsService implements IConversationQuery, IConversationCo
             conversationId: conversation.id,
             messageId: savedMessage.id,
             message: savedMessage.content ?? '',
-            sender_id: user.id,
+            senderId: user.id,
             createdAt: savedMessage.createdAt.toISOString(),
         });
 
