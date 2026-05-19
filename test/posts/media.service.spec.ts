@@ -70,21 +70,16 @@ describe('MediaService', () => {
         });
     });
 
-    describe('uploadFile - Cloudinary', () => {
-        it('should upload video to Cloudinary when configured', async () => {
-            const mockSecureUrl = 'https://res.cloudinary.com/dxqd8pxuj/video/upload/sample.mp4';
-            const mockUploadStream = jest.fn(
-                (options: any, callback: (error: any, result: any) => void) => {
-                    setTimeout(() => {
-                        callback(null, { secure_url: mockSecureUrl });
-                    }, 0);
-                    return {
-                        end: jest.fn(),
-                    };
-                },
-            );
+    describe('uploadFile - Routing', () => {
+        it('should upload video to the original media server (RunPod) even when Cloudinary is configured', async () => {
+            const mockVideoId = 'vid_123';
+            const mockDownloadUrl = 'http://localhost:3000/it4788/videos/vid_123/download';
 
-            (cloudinary.uploader.upload_stream as jest.Mock).mockImplementation(mockUploadStream);
+            const mockFetch = jest.fn().mockResolvedValue({
+                ok: true,
+                json: jest.fn().mockResolvedValue({ video_id: mockVideoId }),
+            });
+            global.fetch = mockFetch;
 
             const mockFile = {
                 buffer: Buffer.from('fake-video-content'),
@@ -93,13 +88,12 @@ describe('MediaService', () => {
             } as Express.Multer.File;
 
             const url = await service.uploadFile(mockFile);
-            expect(url).toBe(mockSecureUrl);
-            expect(cloudinary.uploader.upload_stream).toHaveBeenCalledWith(
+            expect(url).toBe(mockDownloadUrl);
+            expect(mockFetch).toHaveBeenCalledWith(
+                'http://localhost:8000/v1/videos/upload',
                 expect.objectContaining({
-                    resource_type: 'video',
-                    folder: 'mercari_media',
+                    method: 'POST',
                 }),
-                expect.any(Function),
             );
         });
 
