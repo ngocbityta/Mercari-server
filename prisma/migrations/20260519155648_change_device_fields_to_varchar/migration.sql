@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "posts" ALTER COLUMN "device_master" SET DATA TYPE VARCHAR,
+ALTER COLUMN "device_slave" SET DATA TYPE VARCHAR;
