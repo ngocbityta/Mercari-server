@@ -28,13 +28,16 @@ export class MediaService {
         this.subject = this.configService.get<string>('MEDIA_API_SUBJECT') || 'default_subject';
         this.serverUrl = this.configService.get<string>('SERVER_URL') || 'http://localhost:3000';
 
-        const cloudName = this.configService.get<string>('CLOUDINARY_CLOUD_NAME');
-        const cApiKey = this.configService.get<string>('CLOUDINARY_API_KEY');
-        const cApiSecret = this.configService.get<string>('CLOUDINARY_API_SECRET');
+        const cloudName = this.configService.get<string>('CLOUDINARY_CLOUD_NAME') || 'dxqd8pxuj';
+        const cApiKey = this.configService.get<string>('CLOUDINARY_API_KEY') || '341819754229424';
+        const cApiSecret =
+            this.configService.get<string>('CLOUDINARY_API_SECRET') ||
+            'FOpeVEsFJlGYoE7Z21NLreQydhc';
         const useCloudinaryEnv = this.configService.get<string>('USE_CLOUDINARY');
 
         this.useCloudinary =
             useCloudinaryEnv === 'true' ||
+            useCloudinaryEnv === undefined ||
             (!useCloudinaryEnv && !!cloudName && !!cApiKey && !!cApiSecret);
 
         if (this.useCloudinary && cloudName && cApiKey && cApiSecret) {
