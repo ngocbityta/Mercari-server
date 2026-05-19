@@ -22,12 +22,7 @@ export class MediaService {
         const cloudName = 'dxqd8pxuj';
         const cApiKey = '341819754229424';
         const cApiSecret = 'FOpeVEsFJlGYoE7Z21NLreQydhc';
-        const useCloudinaryEnv = 'true';
-
-        this.useCloudinary =
-            useCloudinaryEnv === 'true' ||
-            useCloudinaryEnv === undefined ||
-            (!useCloudinaryEnv && !!cloudName && !!cApiKey && !!cApiSecret);
+        this.useCloudinary = false;
 
         if (this.useCloudinary && cloudName && cApiKey && cApiSecret) {
             cloudinary.config({
@@ -85,7 +80,6 @@ export class MediaService {
             return this.uploadToCloudinary(file);
         }
 
-        /* Commented out original service upload logic as per request
         const formData = new FormData();
 
         // Fix: Use Uint8Array to wrap buffer for standard fetch Blob compatibility
@@ -113,10 +107,6 @@ export class MediaService {
 
         // Return the download URL pointing to our proxy
         return `${this.serverUrl}/${this.it4788Prefix}/videos/${videoId}/download`;
-        */
-        throw new Error(
-            'RunPod media server upload is temporarily disabled. Please enable and configure Cloudinary.',
-        );
     }
 
     async getVideoResponse(videoId: string): Promise<Response> {
