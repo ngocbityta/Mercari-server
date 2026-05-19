@@ -18,7 +18,20 @@ services:
       resources:
         limits:
           memory: 512M
-          
+  
+  group1-db:
+    container_name: group1-db
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=prisma
+      - POSTGRES_PASSWORD=prisma
+      - POSTGRES_DB=postgres
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+    networks:
+      - proxy-net
+
 networks:
   proxy-net:
     external: true
