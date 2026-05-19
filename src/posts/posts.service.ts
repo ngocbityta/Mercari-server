@@ -328,9 +328,9 @@ export class PostsService implements IPostQuery, IPostCommand {
             described: post.content,
             created: post.createdAt.toISOString(),
             modified: post.updatedAt.toISOString(),
-            like: '0', // Will be calculated from likeIds array
-            comment: '0', // Will be calculated from commentIds array
-            is_liked: '0', // Will be set based on viewer's like status
+            like: post.likeIds.length.toString(),
+            comment: post.commentIds.length.toString(),
+            is_liked: post.likeIds.includes(viewer.id) ? '1' : '0',
             video: post.media.map((url, index) => ({
                 url: url,
                 thumb: `thumbnail_${index}.jpg`, // Placeholder for thumbnail
