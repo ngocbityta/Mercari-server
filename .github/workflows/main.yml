@@ -3,8 +3,10 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+    
 jobs:
-  build:
+  test:
     runs-on: ubuntu-24.04
     permissions:
       contents: read #This is required for actions/checkout
@@ -20,15 +22,16 @@ jobs:
 
     - name: npm install, build and test
       env:
-        DATABASE_URL: ${{ secrets.PRISMA_DATABASE_URL }}
+        DATABASE_URL: dummy_database_url_for_prisma_generate
+        # Check https://github.com/prisma/prisma/issues/28590#issuecomment-3599662504 for more details
       run: |
-        npm install
+        npm ci
         npx prisma generate
         npx nest build 
         npx jest
         
   image-build:
-    needs: build
+    needs: test
     runs-on: ubuntu-24.04
     permissions:
       contents: read #This is required for actions/checkout
@@ -42,7 +45,7 @@ jobs:
 
     - name: Build image
       env:
-        PRISMA_DATABASE_URL: ${{ secrets.PRISMA_DATABASE_URL }}
+        PRISMA_DATABASE_URL: dummy_database_url_for_prisma_generate
         DOCKER_BUILDKIT: 1
       run: |
         docker build --secret id=DATABASE_URL,env=PRISMA_DATABASE_URL -t ghcr.io/ngocbityta/mercari-server:${{ github.sha }} .
@@ -52,7 +55,7 @@ jobs:
         docker push ghcr.io/ngocbityta/mercari-server:${{ github.sha }}
         
   deploy:
-    needs: [build, image-build]
+    needs: [test, image-build]
     runs-on: ubuntu-24.04
     permissions:
       contents: read #This is required for actions/checkout
