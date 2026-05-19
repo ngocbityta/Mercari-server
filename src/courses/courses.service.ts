@@ -292,7 +292,8 @@ export class CoursesService implements ICourseQuery {
                 OR: [{ blockerId: requester.id }, { blockedId: requester.id }],
             },
         });
-        const blockedUserIds = blocks.flatMap((b) => [b.blockerId, b.blockedId])
+        const blockedUserIds = blocks
+            .flatMap((b) => [b.blockerId, b.blockedId])
             .filter((id) => id !== requester.id);
 
         // 4. Query posts created by active GVs, excluding blocked users
@@ -337,8 +338,12 @@ export class CoursesService implements ICourseQuery {
 
         // 5. Map the posts to course format
         const courses = posts.map((post) => {
-            const leftVideoProxied = post.leftVideo ? this.mediaService.getProxiedUrl(post.leftVideo) : '';
-            const rightVideoProxied = post.rightVideo ? this.mediaService.getProxiedUrl(post.rightVideo) : '';
+            const leftVideoProxied = post.leftVideo
+                ? this.mediaService.getProxiedUrl(post.leftVideo)
+                : '';
+            const rightVideoProxied = post.rightVideo
+                ? this.mediaService.getProxiedUrl(post.rightVideo)
+                : '';
 
             return {
                 course_id: post.owner.id,

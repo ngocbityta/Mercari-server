@@ -176,7 +176,9 @@ describe('CoursesService - getListCourses', () => {
 
         await expect(service.getListCourses('student-token', -1, 10)).rejects.toThrow(ApiException);
         await expect(service.getListCourses('student-token', 0, 0)).rejects.toThrow(ApiException);
-        await expect(service.getListCourses('student-token', NaN, 10)).rejects.toThrow(ApiException);
+        await expect(service.getListCourses('student-token', NaN, 10)).rejects.toThrow(
+            ApiException,
+        );
     });
 
     /**
