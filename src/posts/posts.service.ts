@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma, Post, User } from '@prisma/client';
 import { ResponseCode } from '../enums/response-code.enum';
@@ -6,6 +6,7 @@ import { IPostQuery, IPostCommand, PostResponse } from './posts.interfaces.ts';
 import { ApiException } from '../common/exceptions/api.exception.ts';
 
 import { MediaService } from './media.service';
+import { EventsGateway } from '../events/events.gateway.ts';
 import 'multer';
 
 interface PostWithThumbs {
@@ -18,6 +19,7 @@ export class PostsService implements IPostQuery, IPostCommand {
     constructor(
         private prisma: PrismaService,
         private mediaService: MediaService,
+        @Optional() private readonly eventsGateway?: EventsGateway,
     ) {}
 
     async addPost(
@@ -1067,6 +1069,44 @@ export class PostsService implements IPostQuery, IPostCommand {
             },
         });
 
+        if (post.ownerId !== user.id && this.prisma.pushSetting && this.prisma.notification) {
+            let ownerPushSetting = await this.prisma.pushSetting.findUnique({
+                where: { userId: post.ownerId },
+            });
+            if (!ownerPushSetting) {
+                ownerPushSetting = await this.prisma.pushSetting.create({
+                    data: { userId: post.ownerId },
+                });
+            }
+
+            if (ownerPushSetting.notificationOn === 1 && ownerPushSetting.likeComment === 1) {
+                const notif = await this.prisma.notification.create({
+                    data: {
+                        userId: post.ownerId,
+                        type: 'comment',
+                        objectId: post.id,
+                        title: `${user.username || 'Người dùng'} đã bình luận về bài viết của bạn`,
+                        avatar: user.avatar || 'default_avatar.jpg',
+                        groupType: 2,
+                        isRead: false,
+                    },
+                });
+
+                if (this.eventsGateway) {
+                    this.eventsGateway.sendPushNotification(post.ownerId, {
+                        type: notif.type ?? 'home',
+                        objectId: notif.objectId ?? '0',
+                        title: notif.title,
+                        notificationId: notif.id,
+                        created: notif.createdAt.toISOString(),
+                        avatar: notif.avatar ?? 'app_icon',
+                        group: notif.groupType === 0 ? '0' : '1',
+                        read: '0',
+                    });
+                }
+            }
+        }
+
         const allBlocks = await this.prisma.block.findMany({
             where: {
                 OR: [{ blockerId: user.id }, { blockedId: user.id }],
@@ -1138,6 +1178,49 @@ export class PostsService implements IPostQuery, IPostCommand {
                     : { push: user.id },
             },
         });
+
+        if (
+            !alreadyLiked &&
+            post.ownerId !== user.id &&
+            this.prisma.pushSetting &&
+            this.prisma.notification
+        ) {
+            let ownerPushSetting = await this.prisma.pushSetting.findUnique({
+                where: { userId: post.ownerId },
+            });
+            if (!ownerPushSetting) {
+                ownerPushSetting = await this.prisma.pushSetting.create({
+                    data: { userId: post.ownerId },
+                });
+            }
+
+            if (ownerPushSetting.notificationOn === 1 && ownerPushSetting.likeComment === 1) {
+                const notif = await this.prisma.notification.create({
+                    data: {
+                        userId: post.ownerId,
+                        type: 'like',
+                        objectId: post.id,
+                        title: `${user.username || 'Người dùng'} đã thích bài viết của bạn`,
+                        avatar: user.avatar || 'default_avatar.jpg',
+                        groupType: 1,
+                        isRead: false,
+                    },
+                });
+
+                if (this.eventsGateway) {
+                    this.eventsGateway.sendPushNotification(post.ownerId, {
+                        type: notif.type ?? 'home',
+                        objectId: notif.objectId ?? '0',
+                        title: notif.title,
+                        notificationId: notif.id,
+                        created: notif.createdAt.toISOString(),
+                        avatar: notif.avatar ?? 'app_icon',
+                        group: notif.groupType === 0 ? '0' : '1',
+                        read: '0',
+                    });
+                }
+            }
+        }
 
         const rawCount = updated.likeIds.length;
         const safeCount = Math.max(0, rawCount);

@@ -18,6 +18,7 @@ export class NotificationsController {
     async getNotification(@Body() dto: GetNotificationDto, @CurrentUser() user: User) {
         const index = parseInt(dto.index, 10);
         const count = parseInt(dto.count, 10);
+        const group = dto.group !== undefined ? parseInt(dto.group, 10) : undefined;
 
         if (isNaN(index) || isNaN(count) || index < 0 || count <= 0) {
             throw new ApiException(
@@ -26,7 +27,20 @@ export class NotificationsController {
             );
         }
 
-        const result = await this.notificationsService.getNotifications(user, index, count);
+        if (group !== undefined && (isNaN(group) || (group !== 0 && group !== 1))) {
+            throw new ApiException(
+                ResponseCode.INVALID_PARAMETER_VALUE,
+                'Parameter value is invalid',
+            );
+        }
+
+        const result = await this.notificationsService.getNotifications(
+            user,
+            index,
+            count,
+            dto.userId,
+            group,
+        );
         return ApiResponse.success(result);
     }
 
@@ -34,6 +48,9 @@ export class NotificationsController {
     @HttpCode(HttpStatus.OK)
     @UseGuards(TokenGuard)
     async setReadNotification(@Body() dto: SetReadNotificationDto, @CurrentUser() user: User) {
+        if (!dto.notificationId) {
+            throw new ApiException(ResponseCode.MISSING_PARAMETER, 'Missing parameter');
+        }
         const result = await this.notificationsService.setReadNotification(
             user,
             dto.notificationId,

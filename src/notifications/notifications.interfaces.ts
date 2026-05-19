@@ -1,7 +1,13 @@
 import { User } from '@prisma/client';
 
 export interface INotificationQuery {
-    getNotifications(user: User, index: number, count: number): Promise<any>;
+    getNotifications(
+        user: User,
+        index: number,
+        count: number,
+        targetUserId?: string,
+        group?: number,
+    ): Promise<any>;
 }
 
 export interface INotificationCommand {

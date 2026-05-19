@@ -84,10 +84,10 @@ describe('NotificationsService', () => {
 
             expect(result.data).toHaveLength(1);
             expect(result.badge).toBe('1');
-            expect(result.last_update).toBeDefined();
+            expect(result.lastUpdate).toBeDefined();
             expect(result.data[0]).toEqual({
                 type: 'new_message',
-                object_id: 'obj-1',
+                objectId: 'obj-1',
                 title: 'New message',
                 notificationId: 'notif-1',
                 created: mockNotification.createdAt.toISOString(),
@@ -136,7 +136,7 @@ describe('NotificationsService', () => {
 
             expect(result.data).toHaveLength(1);
             expect(result.data[0].type).toBe('home');
-            expect(result.data[0].object_id).toBe('0');
+            expect(result.data[0].objectId).toBe('0');
             expect(result.data[0].avatar).toBe('app_icon');
         });
 
@@ -183,7 +183,7 @@ describe('NotificationsService', () => {
                 data: { isRead: true },
             });
             expect(result.badge).toBe('0');
-            expect(result.last_update).toBeDefined();
+            expect(result.lastUpdate).toBeDefined();
         });
 
         it('TC7: should still mark as read even if already read', async () => {

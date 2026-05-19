@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString, IsNumberString } from 'class-validator';
+import { IsNotEmpty, IsString, IsNumberString, IsOptional } from 'class-validator';
 
 export class GetNotificationDto {
     @IsString()
@@ -12,6 +12,14 @@ export class GetNotificationDto {
     @IsNumberString()
     @IsNotEmpty()
     count: string;
+
+    @IsString()
+    @IsOptional()
+    userId?: string;
+
+    @IsNumberString()
+    @IsOptional()
+    group?: string;
 }
 
 export class SetReadNotificationDto {
@@ -20,6 +28,6 @@ export class SetReadNotificationDto {
     token: string;
 
     @IsString()
-    @IsNotEmpty()
-    notificationId: string;
+    @IsOptional()
+    notificationId?: string;
 }

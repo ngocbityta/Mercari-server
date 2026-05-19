@@ -4,6 +4,7 @@ import { PrismaService } from '../../src/prisma/prisma.service.ts';
 import { ApiException } from '../../src/common/exceptions/api.exception.ts';
 import { ResponseCode } from '../../src/enums/response-code.enum.ts';
 import { MediaService } from '../../src/posts/media.service';
+import { EventsGateway } from '../../src/events/events.gateway.ts';
 
 // --- Mock data ---
 const mockActiveUser = {
@@ -50,6 +51,12 @@ const mockLockedPost = { ...mockPost, isLocked: true };
 const mockPrisma = {
     user: { findFirst: jest.fn() },
     post: { findUnique: jest.fn(), update: jest.fn() },
+    pushSetting: { findUnique: jest.fn(), create: jest.fn() },
+    notification: { create: jest.fn() },
+};
+
+const mockEventsGateway = {
+    sendPushNotification: jest.fn(),
 };
 
 describe('PostsService - likePost', () => {
@@ -61,6 +68,7 @@ describe('PostsService - likePost', () => {
                 PostsService,
                 { provide: PrismaService, useValue: mockPrisma },
                 { provide: MediaService, useValue: { uploadFile: jest.fn() } },
+                { provide: EventsGateway, useValue: mockEventsGateway },
             ],
         }).compile();
 
@@ -203,5 +211,47 @@ describe('PostsService - likePost', () => {
 
         expect(result.is_liked).toBe('1');
         expect(result.like).toBe('1');
+    });
+
+    /**
+     * TC10: Tạo thông báo khi like bài viết của người khác
+     */
+    it('[TC10] Tạo thông báo khi user-1 like bài viết của owner-1', async () => {
+        const mockPushSetting = { userId: 'owner-1', notificationOn: 1, likeComment: 1 };
+        const mockCreatedNotif = {
+            id: 'notif-1',
+            userId: 'owner-1',
+            type: 'like',
+            objectId: 'post-1',
+            title: 'TestUser đã thích bài viết của bạn',
+            avatar: 'avatar.jpg',
+            groupType: 1,
+            isRead: false,
+            createdAt: new Date(),
+        };
+
+        mockPrisma.user.findFirst.mockResolvedValue({ ...mockActiveUser, avatar: 'avatar.jpg' });
+        mockPrisma.post.findUnique.mockResolvedValue(mockPost); // ownerId is 'owner-1'
+        mockPrisma.post.update.mockResolvedValue({ ...mockPost, likeIds: ['user-1'] });
+        mockPrisma.pushSetting.findUnique.mockResolvedValue(mockPushSetting);
+        mockPrisma.notification.create.mockResolvedValue(mockCreatedNotif);
+
+        await service.likePost('valid-token', 'post-1');
+
+        expect(mockPrisma.notification.create).toHaveBeenCalledWith({
+            data: {
+                userId: 'owner-1',
+                type: 'like',
+                objectId: 'post-1',
+                title: 'TestUser đã thích bài viết của bạn',
+                avatar: 'avatar.jpg',
+                groupType: 1,
+                isRead: false,
+            },
+        });
+        expect(mockEventsGateway.sendPushNotification).toHaveBeenCalledWith(
+            'owner-1',
+            expect.any(Object),
+        );
     });
 });
