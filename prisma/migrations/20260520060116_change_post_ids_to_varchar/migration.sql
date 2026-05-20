@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "posts" ALTER COLUMN "course_id" SET DATA TYPE VARCHAR,
+ALTER COLUMN "exercise_id" SET DATA TYPE VARCHAR;

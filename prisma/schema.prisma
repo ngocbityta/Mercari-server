@@ -157,8 +157,8 @@ model Post {
   hashtags     String[]  @db.VarChar @default([])
   commentIds   String[]  @map("comment_ids") @db.Uuid @default([])
   likeIds      String[]  @map("like_ids") @db.Uuid @default([])
-  courseId     String?   @map("course_id") @db.Uuid
-  exerciseId   String?   @map("exercise_id") @db.Uuid
+  courseId     String?   @map("course_id") @db.VarChar
+  exerciseId   String?   @map("exercise_id") @db.VarChar
   deviceMaster String?   @map("device_master") @db.VarChar
   deviceSlave  String?   @map("device_slave") @db.VarChar
   leftVideo    String?   @map("left_video") @db.VarChar
