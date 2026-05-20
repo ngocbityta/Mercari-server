@@ -78,9 +78,9 @@ export class MediaService {
     }
 
     async uploadFile(file: Express.Multer.File): Promise<string> {
-        // if (this.useCloudinary) {
-        //     return this.uploadToCloudinary(file);
-        // }
+        if (this.useCloudinary) {
+            return this.uploadToCloudinary(file);
+        }
 
         const formData = new FormData();
 
