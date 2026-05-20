@@ -61,13 +61,20 @@ describe('MediaService', () => {
         it('should proxy RunPod server URLs', () => {
             const directUrl = 'http://localhost:8000/v1/videos/vid_123/download';
             expect(service.getProxiedUrl(directUrl)).toBe(
-                'http://localhost:3000/it4788/videos/vid_123/download',
+                'http://localhost:3000/it4788/videos/vid_123/stream',
             );
         });
 
-        it('should return already proxied URLs as-is', () => {
-            const proxiedUrl = 'http://localhost:3000/it4788/videos/vid_123/download';
+        it('should return already proxied URLs as-is (with stream)', () => {
+            const proxiedUrl = 'http://localhost:3000/it4788/videos/vid_123/stream';
             expect(service.getProxiedUrl(proxiedUrl)).toBe(proxiedUrl);
+        });
+
+        it('should convert download proxy URL to stream proxy URL', () => {
+            const downloadProxiedUrl = 'http://localhost:3000/it4788/videos/vid_123/download';
+            expect(service.getProxiedUrl(downloadProxiedUrl)).toBe(
+                'http://localhost:3000/it4788/videos/vid_123/stream',
+            );
         });
     });
 

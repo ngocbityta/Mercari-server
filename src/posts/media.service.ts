@@ -104,23 +104,28 @@ export class MediaService {
             );
         }
 
-        const data = await response.json();
+        const data = (await response.json()) as { video_id?: string; id?: string };
         const videoId = data.video_id || data.id;
 
-        // Return the download URL pointing to our proxy
-        return `${this.serverUrl}/${this.it4788Prefix}/videos/${videoId}/download`;
+        // Return the stream URL pointing to our proxy
+        return `${this.serverUrl}/${this.it4788Prefix}/videos/${videoId}/stream`;
     }
 
-    async getVideoResponse(videoId: string): Promise<Response> {
+    async getVideoResponse(videoId: string, range?: string): Promise<Response> {
+        const headers: Record<string, string> = {
+            'X-WHAM-Subject': this.subject,
+            'X-WHAM-Api-Key': this.apiKey,
+        };
+        if (range) {
+            headers['Range'] = range;
+        }
+
         const response = await fetch(`${this.baseUrl}/v1/videos/${videoId}/download`, {
             method: 'GET',
-            headers: {
-                'X-WHAM-Subject': this.subject,
-                'X-WHAM-Api-Key': this.apiKey,
-            },
+            headers,
         });
 
-        if (!response.ok) {
+        if (!response.ok && response.status !== 206) {
             throw new Error(`Failed to fetch video from storage: ${response.statusText}`);
         }
 
@@ -142,15 +147,16 @@ export class MediaService {
 
         // If it's already a proxied URL, return as is
         if (originalUrl.includes(`/${this.it4788Prefix}/videos/`)) {
-            return originalUrl;
+            // But make sure it uses /stream instead of /download
+            return originalUrl.replace('/download', '/stream');
         }
 
         // If it's a direct storage URL, extract videoId and convert
         // Example: http://localhost:8000/v1/videos/vid_123/download
-        const match = originalUrl.match(/\/v1\/videos\/([^/]+)\/download/);
+        const match = originalUrl.match(/\/v1\/videos\/([^/]+)/);
         if (match && match[1]) {
             const videoId = match[1];
-            return `${this.serverUrl}/${this.it4788Prefix}/videos/${videoId}/download`;
+            return `${this.serverUrl}/${this.it4788Prefix}/videos/${videoId}/stream`;
         }
 
         return originalUrl;
