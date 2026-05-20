@@ -244,4 +244,32 @@ describe('PostsService - addPost', () => {
             service.addPost('teacher-token', mockFile, mockFile, 'content', 'slave-1'),
         ).rejects.toThrow('DB failure');
     });
+
+    it('Thiếu left_video trả về MISSING_PARAMETER', async () => {
+        mockPrisma.user.findFirst.mockResolvedValue(mockTeacher);
+
+        const call = () =>
+            service.addPost('teacher-token', undefined, mockFile, 'content', 'slave-1');
+
+        await expect(call()).rejects.toThrow(ApiException);
+        try {
+            await call();
+        } catch (e) {
+            expect((e as ApiException).code).toBe(ResponseCode.MISSING_PARAMETER);
+        }
+    });
+
+    it('Thiếu right_video trả về MISSING_PARAMETER', async () => {
+        mockPrisma.user.findFirst.mockResolvedValue(mockTeacher);
+
+        const call = () =>
+            service.addPost('teacher-token', mockFile, undefined, 'content', 'slave-1');
+
+        await expect(call()).rejects.toThrow(ApiException);
+        try {
+            await call();
+        } catch (e) {
+            expect((e as ApiException).code).toBe(ResponseCode.MISSING_PARAMETER);
+        }
+    });
 });

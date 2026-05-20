@@ -46,6 +46,14 @@ export class PostsService implements IPostQuery, IPostCommand {
             throw new ApiException(ResponseCode.ACCOUNT_LOCKED, 'Account is locked');
         }
 
+        // Both left_video and right_video are required
+        if (!left_video || !right_video) {
+            throw new ApiException(
+                ResponseCode.MISSING_PARAMETER,
+                'Both left_video and right_video are required',
+            );
+        }
+
         // Logic for Student (HV) vs Teacher (GV)
         if (user.role === 'HV') {
             // If student is posting, exercise_id and course_id are mandatory (NN: X)
