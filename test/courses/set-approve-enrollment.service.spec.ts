@@ -19,6 +19,9 @@ const mockPrisma = {
         findFirst: jest.fn(),
         delete: jest.fn(),
     },
+    block: {
+        findFirst: jest.fn(),
+    },
     $transaction: jest.fn(),
 };
 
@@ -55,6 +58,7 @@ describe('CoursesService - setApproveEnrollment', () => {
         mockPrisma.$transaction.mockImplementation((cb: (tx: any) => any) => cb(mockTx));
         mockTx.enrollment.create.mockResolvedValue({});
         mockTx.enrollmentRequest.delete.mockResolvedValue({});
+        mockPrisma.block.findFirst.mockResolvedValue(null);
     });
 
     /**
@@ -201,6 +205,26 @@ describe('CoursesService - setApproveEnrollment', () => {
             await call();
         } catch (e) {
             expect((e as ApiException).code).toBe(ResponseCode.NOT_ACCESS);
+        }
+    });
+
+    /**
+     * Bonus: Giảng viên hoặc học viên có thiết lập block đối phương khi phê duyệt
+     */
+    it('[Bonus] Giảng viên hoặc học viên có thiết lập block đối phương → throws ApiException NOT_ACCESS', async () => {
+        mockPrisma.user.findFirst.mockResolvedValue(mockGV);
+        mockPrisma.enrollmentRequest.findFirst.mockResolvedValue(makeRequest());
+        mockPrisma.block.findFirst.mockResolvedValue({ blockerId: 'gv-1', blockedId: 'hv-1' });
+
+        const call = () => service.setApproveEnrollment('gv-token', 'hv-1', '1');
+        await expect(call()).rejects.toThrow(ApiException);
+        try {
+            await call();
+        } catch (e) {
+            expect((e as ApiException).code).toBe(ResponseCode.NOT_ACCESS);
+            expect((e as ApiException).message).toBe(
+                'Không thể phê duyệt yêu cầu đăng ký do có thiết lập chặn giữa giảng viên và học viên',
+            );
         }
     });
 });

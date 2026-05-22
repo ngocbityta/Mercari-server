@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Res, Headers, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Param, Res, Headers, HttpStatus, Query } from '@nestjs/common';
 import { MediaService } from './media.service';
 import type { Response } from 'express';
 import { Readable } from 'stream';
@@ -8,7 +8,12 @@ export class MediaController {
     constructor(private readonly mediaService: MediaService) {}
 
     @Get(':id/stream')
-    async stream(@Param('id') id: string, @Headers('range') range: string, @Res() res: Response) {
+    async stream(
+        @Param('id') id: string,
+        @Headers('range') range: string,
+        @Query('is_thumb') isThumb: string,
+        @Res() res: Response,
+    ) {
         try {
             const response = await this.mediaService.getVideoResponse(id, range);
 
@@ -18,7 +23,9 @@ export class MediaController {
             const acceptRanges = response.headers.get('accept-ranges');
             const contentRange = response.headers.get('content-range');
 
-            if (contentType) {
+            if (isThumb === 'true') {
+                res.setHeader('Content-Type', 'image/jpeg');
+            } else if (contentType) {
                 res.setHeader('Content-Type', contentType);
             }
             if (contentLength) {
@@ -49,7 +56,7 @@ export class MediaController {
     }
 
     @Get(':id/download')
-    async download(@Param('id') id: string, @Res() res: Response) {
+    async download(@Param('id') id: string, @Query('is_thumb') isThumb: string, @Res() res: Response) {
         try {
             const response = await this.mediaService.getVideoResponse(id);
 
@@ -58,14 +65,19 @@ export class MediaController {
             const contentLength = response.headers.get('content-length');
             const contentDisposition = response.headers.get('content-disposition');
 
-            if (contentType) {
-                res.setHeader('Content-Type', contentType);
+            if (isThumb === 'true') {
+                res.setHeader('Content-Type', 'image/jpeg');
+                res.setHeader('Content-Disposition', 'attachment; filename="thumbnail.jpg"');
+            } else {
+                if (contentType) {
+                    res.setHeader('Content-Type', contentType);
+                }
+                if (contentDisposition) {
+                    res.setHeader('Content-Disposition', contentDisposition);
+                }
             }
             if (contentLength) {
                 res.setHeader('Content-Length', contentLength);
-            }
-            if (contentDisposition) {
-                res.setHeader('Content-Disposition', contentDisposition);
             }
 
             // Stream the body

@@ -2,7 +2,21 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import 'multer';
 import * as path from 'path';
+import * as fs from 'fs';
 import { v2 as cloudinary } from 'cloudinary';
+import * as ffmpeg from 'fluent-ffmpeg';
+import ffmpegPath from 'ffmpeg-static';
+
+const ffmpegFn = typeof ffmpeg === 'function' ? ffmpeg : (ffmpeg as any).default;
+
+if (ffmpegPath) {
+    if (typeof ffmpeg.setFfmpegPath === 'function') {
+        ffmpeg.setFfmpegPath(ffmpegPath);
+    } else if (ffmpegFn && typeof ffmpegFn.setFfmpegPath === 'function') {
+        ffmpegFn.setFfmpegPath(ffmpegPath);
+    }
+}
+
 
 @Injectable()
 export class MediaService {
@@ -162,12 +176,29 @@ export class MediaService {
         return originalUrl;
     }
 
+    private async extractThumbnailFromVideo(
+        videoFilePath: string,
+        thumbnailFilePath: string,
+    ): Promise<void> {
+        return new Promise<void>((resolve, reject) => {
+            ffmpegFn(videoFilePath)
+                .screenshots({
+                    timestamps: [1], // Giây thứ 1
+                    filename: path.basename(thumbnailFilePath),
+                    folder: path.dirname(thumbnailFilePath),
+                    size: '640x?', // Scale giữ tỷ lệ
+                })
+                .on('end', () => resolve())
+                .on('error', (err: any) =>
+                    reject(err instanceof Error ? err : new Error(String(err))),
+                );
+        });
+    }
+
     async generateAndUploadThumbnail(
         videoFile: Express.Multer.File,
         videoUrl?: string,
     ): Promise<string> {
-        await Promise.resolve(); // Satisfies require-await ESLint rule
-
         if (videoUrl && videoUrl.includes('cloudinary.com')) {
             // Instantly generate the thumbnail URL using Cloudinary dynamic CDN transformations
             return videoUrl
@@ -175,6 +206,58 @@ export class MediaService {
                 .replace(/\.[^/.]+$/, '.jpg');
         }
 
-        return videoUrl || '';
+        const tempDir = path.join(process.cwd(), 'temp_media');
+        const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+        const tempVideoPath = path.join(tempDir, `temp-video-${uniqueSuffix}.mp4`);
+        const tempThumbPath = path.join(tempDir, `temp-thumb-${uniqueSuffix}.jpg`);
+
+        try {
+            // 1. Tạo thư mục tạm nếu chưa có
+            if (!fs.existsSync(tempDir)) {
+                fs.mkdirSync(tempDir, { recursive: true });
+            }
+
+            // 2. Ghi video buffer ra file tạm
+            await fs.promises.writeFile(tempVideoPath, videoFile.buffer);
+
+            // 3. Trích xuất frame hình bằng FFmpeg
+            await this.extractThumbnailFromVideo(tempVideoPath, tempThumbPath);
+
+            // 4. Đọc file thumbnail vừa tạo vào Buffer
+            const thumbBuffer = await fs.promises.readFile(tempThumbPath);
+
+            // 5. Dựng đối tượng file giả lập để upload lên storage
+            const mockThumbFile: Express.Multer.File = {
+                fieldname: 'file',
+                originalname: 'thumbnail.mp4',
+                encoding: '7bit',
+                mimetype: 'video/mp4',
+                buffer: thumbBuffer,
+                size: thumbBuffer.length,
+                destination: '',
+                filename: '',
+                path: '',
+                stream: null as any,
+            };
+
+            // 6. Upload ảnh thumbnail thông qua hàm upload của service
+            const uploadedThumbUrl = await this.uploadFile(mockThumbFile);
+            return `${uploadedThumbUrl}?is_thumb=true`;
+        } catch (err) {
+            console.error('Lỗi tự động tạo thumbnail:', err);
+            return videoUrl || ''; // Trả về link video làm fallback nếu lỗi
+        } finally {
+            // 7. Đảm bảo dọn dẹp sạch sẽ các file tạm trên ổ đĩa
+            try {
+                if (fs.existsSync(tempVideoPath)) {
+                    await fs.promises.unlink(tempVideoPath);
+                }
+                if (fs.existsSync(tempThumbPath)) {
+                    await fs.promises.unlink(tempThumbPath);
+                }
+            } catch (cleanupErr) {
+                console.error('Không thể dọn dẹp file tạm:', cleanupErr);
+            }
+        }
     }
 }

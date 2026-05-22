@@ -14,6 +14,9 @@ const mockPrisma = {
     enrollmentRequest: {
         create: jest.fn(),
     },
+    block: {
+        findFirst: jest.fn(),
+    },
 };
 
 describe('CoursesService - setRequestCourse', () => {
@@ -33,6 +36,7 @@ describe('CoursesService - setRequestCourse', () => {
 
         service = module.get<CoursesService>(CoursesService);
         jest.clearAllMocks();
+        mockPrisma.block.findFirst.mockResolvedValue(null);
     });
 
     // TC1: Gửi yêu cầu tham gia khoá học thành công
@@ -157,6 +161,28 @@ describe('CoursesService - setRequestCourse', () => {
             await call();
         } catch (e) {
             expect((e as ApiException).code).toBe(ResponseCode.USER_NOT_VALIDATED);
+        }
+    });
+
+    // TC9: Giảng viên hoặc học viên có thiết lập block đối phương
+    it('TC9: blocked user - throws ApiException NOT_ACCESS', async () => {
+        const teacher = { id: 'teacher-1', role: 'GV', status: 'ACTIVE' };
+        const student = { id: 'student-1', role: 'HV', status: 'ACTIVE' };
+        const requester = { id: 'student-1', token: 'valid-token', status: 'ACTIVE', role: 'HV' };
+
+        mockPrisma.user.findFirst.mockResolvedValue(requester);
+        mockPrisma.user.findUnique.mockResolvedValueOnce(teacher).mockResolvedValueOnce(student);
+        mockPrisma.block.findFirst.mockResolvedValue({ blockerId: 'teacher-1', blockedId: 'student-1' });
+
+        try {
+            await service.setRequestCourse('valid-token', teacher.id, student.id);
+            fail('Should throw ApiException');
+        } catch (e) {
+            expect(e).toBeInstanceOf(ApiException);
+            expect((e as ApiException).code).toBe(ResponseCode.NOT_ACCESS);
+            expect((e as ApiException).message).toBe(
+                'Không thể đăng ký học do có thiết lập chặn giữa giảng viên và học viên',
+            );
         }
     });
 });

@@ -42,6 +42,21 @@ export class CoursesService implements ICourseQuery {
             throw new ApiException(ResponseCode.USER_NOT_VALIDATED, 'User not validated');
         }
 
+        const isBlocked = await this.prisma.block.findFirst({
+            where: {
+                OR: [
+                    { blockerId: requester.id, blockedId: user_id },
+                    { blockerId: user_id, blockedId: requester.id },
+                ],
+            },
+        });
+        if (isBlocked) {
+            throw new ApiException(
+                ResponseCode.NOT_ACCESS,
+                'Không thể phê duyệt yêu cầu đăng ký do có thiết lập chặn giữa giảng viên và học viên',
+            );
+        }
+
         if (is_accept === '1') {
             await this.prisma.$transaction(async (tx) => {
                 await tx.enrollment.create({
@@ -258,6 +273,21 @@ export class CoursesService implements ICourseQuery {
         const student = await this.prisma.user.findUnique({ where: { id: user_id } });
         if (!student) {
             throw new ApiException(ResponseCode.USER_NOT_VALIDATED, 'User not validated');
+        }
+
+        const isBlocked = await this.prisma.block.findFirst({
+            where: {
+                OR: [
+                    { blockerId: course_id, blockedId: user_id },
+                    { blockerId: user_id, blockedId: course_id },
+                ],
+            },
+        });
+        if (isBlocked) {
+            throw new ApiException(
+                ResponseCode.NOT_ACCESS,
+                'Không thể đăng ký học do có thiết lập chặn giữa giảng viên và học viên',
+            );
         }
 
         await this.prisma.enrollmentRequest.create({
