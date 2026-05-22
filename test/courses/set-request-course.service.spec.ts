@@ -172,7 +172,10 @@ describe('CoursesService - setRequestCourse', () => {
 
         mockPrisma.user.findFirst.mockResolvedValue(requester);
         mockPrisma.user.findUnique.mockResolvedValueOnce(teacher).mockResolvedValueOnce(student);
-        mockPrisma.block.findFirst.mockResolvedValue({ blockerId: 'teacher-1', blockedId: 'student-1' });
+        mockPrisma.block.findFirst.mockResolvedValue({
+            blockerId: 'teacher-1',
+            blockedId: 'student-1',
+        });
 
         try {
             await service.setRequestCourse('valid-token', teacher.id, student.id);

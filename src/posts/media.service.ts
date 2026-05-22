@@ -17,7 +17,6 @@ if (ffmpegPath) {
     }
 }
 
-
 @Injectable()
 export class MediaService {
     private readonly baseUrl: string;

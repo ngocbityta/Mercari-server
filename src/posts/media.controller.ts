@@ -56,7 +56,11 @@ export class MediaController {
     }
 
     @Get(':id/download')
-    async download(@Param('id') id: string, @Query('is_thumb') isThumb: string, @Res() res: Response) {
+    async download(
+        @Param('id') id: string,
+        @Query('is_thumb') isThumb: string,
+        @Res() res: Response,
+    ) {
         try {
             const response = await this.mediaService.getVideoResponse(id);
 
