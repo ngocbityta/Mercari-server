@@ -10,6 +10,28 @@ describe('PostsService - searchPosts', () => {
     let service: PostsService;
     let prisma: PrismaService;
 
+    const mockToken = 'valid_token';
+    const mockKeyword = 'nest';
+
+    const userA = { id: 'userA', token: mockToken, status: 'ACTIVE', role: 'HV' };
+    const userB = { id: 'userB', token: 'token_B', status: 'ACTIVE', role: 'HV' };
+
+    const makePost = (id: string, ownerId: string, content: string) => ({
+        id,
+        content,
+        media: ['video.mp4'],
+        createdAt: new Date(),
+        likeIds: [],
+        isLocked: false,
+        leftVideo: null,
+        rightVideo: null,
+        leftVideoThumb: null,
+        rightVideoThumb: null,
+        ownerId,
+        owner: { id: ownerId, username: `user_${ownerId}`, status: 'ACTIVE', role: 'HV' },
+        _count: { comments: 0 },
+    });
+
     beforeEach(async () => {
         const module: TestingModule = await Test.createTestingModule({
             providers: [
@@ -38,7 +60,7 @@ describe('PostsService - searchPosts', () => {
                     provide: MediaService,
                     useValue: {
                         uploadFile: jest.fn(),
-                        getProxiedUrl: jest.fn((url) => url),
+                        getProxiedUrl: jest.fn((url: string) => url),
                         getVideoResponse: jest.fn(),
                     },
                 },
@@ -48,178 +70,156 @@ describe('PostsService - searchPosts', () => {
         service = module.get<PostsService>(PostsService);
         prisma = module.get<PrismaService>(PrismaService);
 
-        // Default mock implementations
-        jest.spyOn(prisma.user, 'findUnique').mockResolvedValue({
-            id: 'any',
-            status: 'ACTIVE',
-        } as any);
         jest.spyOn(prisma.block, 'findMany').mockResolvedValue([]);
+        jest.spyOn(prisma.block, 'findFirst').mockResolvedValue(null);
         jest.spyOn(prisma.searchHistory, 'create').mockResolvedValue({} as any);
     });
 
-    const mockToken = 'valid_token';
-    const mockKeyword = 'nest';
+    it('[TC1] should return posts when parameters are valid', async () => {
+        const mockPost = makePost('post1', userB.id, 'NestJS is great');
 
-    it('[TC1] should return OK when parameters are valid', async () => {
-        const mockUser = { id: 'user1', token: mockToken, status: 'ACTIVE' };
-        const mockPosts = [
-            {
-                id: 'post1',
-                content: 'NestJS is great',
-                media: ['video1.mp4'],
-                createdAt: new Date(),
-                ownerId: 'user2',
-                owner: { id: 'user2', username: 'user2', status: 'ACTIVE' },
-            },
-        ];
-
-        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as unknown as User);
-        jest.spyOn(prisma.user, 'findUnique').mockResolvedValue({
-            id: 'user2',
-            status: 'ACTIVE',
-        } as any);
-        jest.spyOn(prisma.block, 'findMany').mockResolvedValue([]);
-        jest.spyOn(prisma.post, 'findMany').mockResolvedValue(mockPosts as unknown as Post[]);
+        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(userA as unknown as User);
+        jest.spyOn(prisma.post, 'findMany').mockResolvedValue([mockPost] as unknown as Post[]);
 
         const result = await service.searchPosts(
             mockToken,
             mockKeyword,
-            '0',
-            '0',
-            '0',
-            'user2',
+            undefined,
+            undefined,
+            undefined,
+            undefined,
             '0',
             '10',
         );
+
         expect(result.posts).toHaveLength(1);
     });
 
     it('[TC2] should throw TOKEN_INVALID when token is wrong', async () => {
         jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(null);
 
-        const call = () =>
-            service.searchPosts('wrong_token', mockKeyword, '0', '0', '0', 'user2', '0', '10');
-        await expect(call()).rejects.toThrow(ApiException);
-        try {
-            await call();
-        } catch (e) {
-            expect((e as ApiException).code).toBe(ResponseCode.TOKEN_INVALID);
-        }
+        await expect(
+            service.searchPosts('wrong_token', mockKeyword, undefined, undefined, undefined, undefined, '0', '10'),
+        ).rejects.toMatchObject({ code: ResponseCode.TOKEN_INVALID });
     });
 
     it('[TC3] should throw NO_DATA when no results found', async () => {
-        const mockUser = { id: 'user1', token: mockToken, status: 'ACTIVE' };
-        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as unknown as User);
-        jest.spyOn(prisma.user, 'findUnique').mockResolvedValue({
-            id: 'user2',
-            status: 'ACTIVE',
-        } as any);
-        jest.spyOn(prisma.block, 'findMany').mockResolvedValue([]);
+        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(userA as unknown as User);
         jest.spyOn(prisma.post, 'findMany').mockResolvedValue([]);
 
-        const call = () =>
-            service.searchPosts(mockToken, 'randomkeyword', '0', '0', '0', 'user2', '0', '10');
-        await expect(call()).rejects.toThrow(ApiException);
-        try {
-            await call();
-        } catch (e) {
-            expect((e as ApiException).code).toBe(ResponseCode.NO_DATA);
-        }
+        await expect(
+            service.searchPosts(mockToken, 'randomkeyword', undefined, undefined, undefined, undefined, '0', '10'),
+        ).rejects.toMatchObject({ code: ResponseCode.NO_DATA });
     });
 
     it('[TC4] should throw ACCOUNT_LOCKED when requester is banned', async () => {
-        const mockUser = { id: 'user1', token: mockToken, status: 'LOCKED' };
-        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as unknown as User);
+        const lockedUser = { ...userA, status: 'LOCKED' };
+        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(lockedUser as unknown as User);
 
-        const call = () =>
-            service.searchPosts(mockToken, mockKeyword, '0', '0', '0', 'user2', '0', '10');
-        await expect(call()).rejects.toThrow(ApiException);
-        try {
-            await call();
-        } catch (e) {
-            expect((e as ApiException).code).toBe(ResponseCode.ACCOUNT_LOCKED);
-        }
+        await expect(
+            service.searchPosts(mockToken, mockKeyword, undefined, undefined, undefined, undefined, '0', '10'),
+        ).rejects.toMatchObject({ code: ResponseCode.ACCOUNT_LOCKED });
     });
 
-    it('[TC5] should throw INVALID_PARAMETER_VALUE when target user_id not exists', async () => {
-        const mockUser = { id: 'user1', token: mockToken, status: 'ACTIVE' };
-        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as unknown as User);
-        jest.spyOn(prisma.block, 'findMany').mockResolvedValue([]);
-        jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(null);
-
-        const call = () =>
-            service.searchPosts(
-                mockToken,
-                mockKeyword,
-                '0',
-                '0',
-                '0',
-                'non_existent_user',
-                '0',
-                '10',
-            );
-        await expect(call()).rejects.toThrow(ApiException);
-        try {
-            await call();
-        } catch (e) {
-            expect((e as ApiException).code).toBe(ResponseCode.INVALID_PARAMETER_VALUE);
-        }
+    it('[TC6] should throw INVALID_PARAMETER_VALUE when keyword is empty', async () => {
+        await expect(
+            service.searchPosts(mockToken, '', undefined, undefined, undefined, undefined, '0', '10'),
+        ).rejects.toMatchObject({ code: ResponseCode.INVALID_PARAMETER_VALUE });
     });
 
-    it('[TC6] should throw INVALID_PARAMETER_VALUE when keyword is missing', async () => {
-        const call = () => service.searchPosts(mockToken, '', '0', '0', '0', 'user2', '0', '10');
-        await expect(call()).rejects.toThrow(ApiException);
-        try {
-            await call();
-        } catch (e) {
-            expect((e as ApiException).code).toBe(ResponseCode.INVALID_PARAMETER_VALUE);
-        }
+    it('[TC13] should throw INVALID_PARAMETER_VALUE when index is negative', async () => {
+        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(userA as unknown as User);
+
+        await expect(
+            service.searchPosts(mockToken, mockKeyword, undefined, undefined, undefined, undefined, '-1', '10'),
+        ).rejects.toMatchObject({ code: ResponseCode.INVALID_PARAMETER_VALUE });
     });
 
-    it('[TC13] should throw INVALID_PARAMETER_VALUE when index or count is invalid', async () => {
-        const mockUser = { id: 'user1', token: mockToken, status: 'ACTIVE' };
-        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as unknown as User);
+    it('[TC_BLOCK_OLD] should pass notIn blockedIds to query when user has blocks', async () => {
+        const blocks = [{ blockerId: userA.id, blockedId: 'blocked_user' }];
+        const mockPost = makePost('post1', userB.id, 'NestJS is great');
 
-        const call = () =>
-            service.searchPosts(mockToken, mockKeyword, '0', '0', '0', 'user2', '-1', '10');
-        await expect(call()).rejects.toThrow(ApiException);
-        try {
-            await call();
-        } catch (e) {
-            expect((e as ApiException).code).toBe(ResponseCode.INVALID_PARAMETER_VALUE);
-        }
-    });
+        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(userA as unknown as User);
+        jest.spyOn(prisma.block, 'findMany').mockResolvedValue(blocks as unknown as Block[]);
+        const findManySpy = jest
+            .spyOn(prisma.post, 'findMany')
+            .mockResolvedValue([mockPost] as unknown as Post[]);
 
-    it('[TC_BLOCK] should filter out posts from blocked users', async () => {
-        const mockUser = { id: 'user1', token: mockToken, status: 'ACTIVE' };
-        const mockBlocks = [{ blockerId: 'user1', blockedId: 'blocked_user' }];
-        const mockPosts = [
-            {
-                id: 'post1',
-                content: 'NestJS is great',
-                media: ['video1.mp4'],
-                createdAt: new Date(),
-                ownerId: 'user2',
-                owner: { id: 'user2', username: 'user2', status: 'ACTIVE' },
-            },
-        ];
-
-        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as unknown as User);
-        jest.spyOn(prisma.user, 'findUnique').mockResolvedValue({
-            id: 'user2',
-            status: 'ACTIVE',
-        } as any);
-        jest.spyOn(prisma.block, 'findMany').mockResolvedValue(mockBlocks as unknown as Block[]);
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-        const findManySpy = jest.spyOn(prisma.post, 'findMany').mockResolvedValue(mockPosts as any);
-
-        await service.searchPosts(mockToken, mockKeyword, '0', '0', '0', undefined, '0', '10');
+        await service.searchPosts(mockToken, mockKeyword, undefined, undefined, undefined, undefined, '0', '10');
 
         expect(findManySpy).toHaveBeenCalledWith(
             expect.objectContaining({
                 where: expect.objectContaining({
                     content: { contains: mockKeyword, mode: 'insensitive' },
                     ownerId: { notIn: ['blocked_user'] },
+                }),
+            }),
+        );
+    });
+
+    // ─── New test cases ───────────────────────────────────────────────────────
+
+    it('[TC_SEARCH_1] user A finds posts of user B when there is no block', async () => {
+        const postByB = makePost('post_b', userB.id, 'NestJS tutorial');
+
+        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(userA as unknown as User);
+        jest.spyOn(prisma.block, 'findMany').mockResolvedValue([]);
+        jest.spyOn(prisma.block, 'findFirst').mockResolvedValue(null);
+        jest.spyOn(prisma.post, 'findMany').mockResolvedValue([postByB] as unknown as Post[]);
+
+        const result = await service.searchPosts(
+            mockToken,
+            'NestJS',
+            undefined,
+            undefined,
+            undefined,
+            '0',
+            '10',
+        );
+
+        expect(result.posts).toHaveLength(1);
+        expect(result.posts[0].author.id).toBe(userB.id);
+    });
+
+    it('[TC_SEARCH_2] user A cannot find posts of user B when A blocked B', async () => {
+        const blocks = [{ blockerId: userA.id, blockedId: userB.id }];
+
+        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(userA as unknown as User);
+        jest.spyOn(prisma.block, 'findMany').mockResolvedValue(blocks as unknown as Block[]);
+        const findManySpy = jest
+            .spyOn(prisma.post, 'findMany')
+            .mockResolvedValue([]);
+
+        await expect(
+            service.searchPosts(mockToken, 'NestJS', undefined, undefined, undefined, undefined, '0', '10'),
+        ).rejects.toMatchObject({ code: ResponseCode.NO_DATA });
+
+        expect(findManySpy).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    ownerId: { notIn: [userB.id] },
+                }),
+            }),
+        );
+    });
+
+    it('[TC_SEARCH_3] user A cannot find posts of user B when B blocked A', async () => {
+        const blocks = [{ blockerId: userB.id, blockedId: userA.id }];
+
+        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(userA as unknown as User);
+        jest.spyOn(prisma.block, 'findMany').mockResolvedValue(blocks as unknown as Block[]);
+        const findManySpy = jest
+            .spyOn(prisma.post, 'findMany')
+            .mockResolvedValue([]);
+
+        await expect(
+            service.searchPosts(mockToken, 'NestJS', undefined, undefined, undefined, undefined, '0', '10'),
+        ).rejects.toMatchObject({ code: ResponseCode.NO_DATA });
+
+        expect(findManySpy).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    ownerId: { notIn: [userB.id] },
                 }),
             }),
         );

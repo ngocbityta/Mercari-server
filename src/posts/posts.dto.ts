@@ -132,9 +132,9 @@ export class SearchPostsDto {
     @IsString()
     duration_max?: string;
 
+    @IsOptional()
     @IsString()
-    @IsNotEmpty()
-    user_id: string;
+    user_id?: string;
 
     @IsString()
     @IsNotEmpty()
