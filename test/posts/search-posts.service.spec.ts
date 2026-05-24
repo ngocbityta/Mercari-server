@@ -99,7 +99,16 @@ describe('PostsService - searchPosts', () => {
         jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(null);
 
         await expect(
-            service.searchPosts('wrong_token', mockKeyword, undefined, undefined, undefined, undefined, '0', '10'),
+            service.searchPosts(
+                'wrong_token',
+                mockKeyword,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                '0',
+                '10',
+            ),
         ).rejects.toMatchObject({ code: ResponseCode.TOKEN_INVALID });
     });
 
@@ -108,7 +117,16 @@ describe('PostsService - searchPosts', () => {
         jest.spyOn(prisma.post, 'findMany').mockResolvedValue([]);
 
         await expect(
-            service.searchPosts(mockToken, 'randomkeyword', undefined, undefined, undefined, undefined, '0', '10'),
+            service.searchPosts(
+                mockToken,
+                'randomkeyword',
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                '0',
+                '10',
+            ),
         ).rejects.toMatchObject({ code: ResponseCode.NO_DATA });
     });
 
@@ -117,13 +135,31 @@ describe('PostsService - searchPosts', () => {
         jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(lockedUser as unknown as User);
 
         await expect(
-            service.searchPosts(mockToken, mockKeyword, undefined, undefined, undefined, undefined, '0', '10'),
+            service.searchPosts(
+                mockToken,
+                mockKeyword,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                '0',
+                '10',
+            ),
         ).rejects.toMatchObject({ code: ResponseCode.ACCOUNT_LOCKED });
     });
 
     it('[TC6] should throw INVALID_PARAMETER_VALUE when keyword is empty', async () => {
         await expect(
-            service.searchPosts(mockToken, '', undefined, undefined, undefined, undefined, '0', '10'),
+            service.searchPosts(
+                mockToken,
+                '',
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                '0',
+                '10',
+            ),
         ).rejects.toMatchObject({ code: ResponseCode.INVALID_PARAMETER_VALUE });
     });
 
@@ -131,7 +167,16 @@ describe('PostsService - searchPosts', () => {
         jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(userA as unknown as User);
 
         await expect(
-            service.searchPosts(mockToken, mockKeyword, undefined, undefined, undefined, undefined, '-1', '10'),
+            service.searchPosts(
+                mockToken,
+                mockKeyword,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                '-1',
+                '10',
+            ),
         ).rejects.toMatchObject({ code: ResponseCode.INVALID_PARAMETER_VALUE });
     });
 
@@ -145,7 +190,16 @@ describe('PostsService - searchPosts', () => {
             .spyOn(prisma.post, 'findMany')
             .mockResolvedValue([mockPost] as unknown as Post[]);
 
-        await service.searchPosts(mockToken, mockKeyword, undefined, undefined, undefined, undefined, '0', '10');
+        await service.searchPosts(
+            mockToken,
+            mockKeyword,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            '0',
+            '10',
+        );
 
         expect(findManySpy).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -186,12 +240,19 @@ describe('PostsService - searchPosts', () => {
 
         jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(userA as unknown as User);
         jest.spyOn(prisma.block, 'findMany').mockResolvedValue(blocks as unknown as Block[]);
-        const findManySpy = jest
-            .spyOn(prisma.post, 'findMany')
-            .mockResolvedValue([]);
+        const findManySpy = jest.spyOn(prisma.post, 'findMany').mockResolvedValue([]);
 
         await expect(
-            service.searchPosts(mockToken, 'NestJS', undefined, undefined, undefined, undefined, '0', '10'),
+            service.searchPosts(
+                mockToken,
+                'NestJS',
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                '0',
+                '10',
+            ),
         ).rejects.toMatchObject({ code: ResponseCode.NO_DATA });
 
         expect(findManySpy).toHaveBeenCalledWith(
@@ -208,12 +269,19 @@ describe('PostsService - searchPosts', () => {
 
         jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(userA as unknown as User);
         jest.spyOn(prisma.block, 'findMany').mockResolvedValue(blocks as unknown as Block[]);
-        const findManySpy = jest
-            .spyOn(prisma.post, 'findMany')
-            .mockResolvedValue([]);
+        const findManySpy = jest.spyOn(prisma.post, 'findMany').mockResolvedValue([]);
 
         await expect(
-            service.searchPosts(mockToken, 'NestJS', undefined, undefined, undefined, undefined, '0', '10'),
+            service.searchPosts(
+                mockToken,
+                'NestJS',
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                '0',
+                '10',
+            ),
         ).rejects.toMatchObject({ code: ResponseCode.NO_DATA });
 
         expect(findManySpy).toHaveBeenCalledWith(
