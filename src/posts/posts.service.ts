@@ -594,13 +594,16 @@ export class PostsService implements IPostQuery, IPostCommand {
         const skipTotal = nIndex * nCount;
         const takeTotal = nCount;
 
-        let finalPosts: (Post & { owner: User })[] = [];
+        const postInclude = { owner: true, _count: { select: { comments: true } } } as const;
+        type PostWithCount = Post & { owner: User; _count: { comments: number } };
+
+        let finalPosts: PostWithCount[] = [];
 
         if (user_id) {
             // When filtering by a specific user, skip teacher-priority logic entirely
             finalPosts = await this.prisma.post.findMany({
                 where,
-                include: { owner: true },
+                include: postInclude,
                 orderBy: { createdAt: 'desc' },
                 skip: skipTotal,
                 take: takeTotal,
@@ -624,7 +627,7 @@ export class PostsService implements IPostQuery, IPostCommand {
                 // Fetch from teachers first
                 const tPosts = await this.prisma.post.findMany({
                     where: teacherWhere,
-                    include: { owner: true },
+                    include: postInclude,
                     orderBy: { createdAt: 'desc' },
                     skip: skipTotal,
                     take: takeTotal,
@@ -636,7 +639,7 @@ export class PostsService implements IPostQuery, IPostCommand {
                     const remaining = takeTotal - finalPosts.length;
                     const oPosts = await this.prisma.post.findMany({
                         where: othersWhere,
-                        include: { owner: true },
+                        include: postInclude,
                         orderBy: { createdAt: 'desc' },
                         skip: 0,
                         take: remaining,
@@ -648,7 +651,7 @@ export class PostsService implements IPostQuery, IPostCommand {
                 const othersSkip = skipTotal - totalTeacherPosts;
                 const oPosts = await this.prisma.post.findMany({
                     where: othersWhere,
-                    include: { owner: true },
+                    include: postInclude,
                     orderBy: { createdAt: 'desc' },
                     skip: othersSkip,
                     take: takeTotal,
@@ -657,7 +660,7 @@ export class PostsService implements IPostQuery, IPostCommand {
             }
         }
 
-        const posts: (Post & { owner: User })[] = finalPosts;
+        const posts: PostWithCount[] = finalPosts;
 
         if (posts.length === 0 && nIndex === 0) {
             throw new ApiException(ResponseCode.NO_DATA, 'No data');
@@ -721,7 +724,7 @@ export class PostsService implements IPostQuery, IPostCommand {
                         }),
                         created: (post.createdAt.getTime() / 1000).toString(),
                         like: (post.likeIds?.length || 0).toString(),
-                        comment: (post.commentIds?.length || 0).toString(),
+                        comment: post._count.comments.toString(),
                         is_liked: isLiked ? '1' : '0',
                         is_blocked: isBlocked ? '1' : '0',
                         can_comment: canComment ? '1' : '0',
@@ -861,7 +864,7 @@ export class PostsService implements IPostQuery, IPostCommand {
 
         const posts = await this.prisma.post.findMany({
             where,
-            include: { owner: true },
+            include: { owner: true, _count: { select: { comments: true } } },
             orderBy: { createdAt: 'desc' },
             skip,
             take: nCount,
@@ -918,7 +921,7 @@ export class PostsService implements IPostQuery, IPostCommand {
                         }),
                         created: post.createdAt.toISOString(),
                         like: (post.likeIds?.length || 0).toString(),
-                        comment: (post.commentIds?.length || 0).toString(),
+                        comment: post._count.comments.toString(),
                         is_liked: isLiked ? '1' : '0',
                         is_blocked: isBlocked ? '1' : '0',
                         can_comment: canComment ? '1' : '0',
