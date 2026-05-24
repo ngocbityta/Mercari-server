@@ -594,59 +594,73 @@ export class PostsService implements IPostQuery, IPostCommand {
         const skipTotal = nIndex * nCount;
         const takeTotal = nCount;
 
-        let finalPosts: (Post & { owner: User })[] = [];
+        const postInclude = { owner: true, _count: { select: { comments: true } } } as const;
+        type PostWithCount = Post & { owner: User; _count: { comments: number } };
 
-        // 1. Prepare teacher filter
-        const teacherWhere: Prisma.PostWhereInput = {
-            ...where,
-            ownerId: { in: teacherIds },
-        };
-        const totalTeacherPosts =
-            teacherIds.length > 0 ? await this.prisma.post.count({ where: teacherWhere }) : 0;
+        let finalPosts: PostWithCount[] = [];
 
-        // 2. Prepare others filter
-        const othersWhere: Prisma.PostWhereInput = {
-            ...where,
-            ownerId: { notIn: [...blockedIds, ...teacherIds] },
-        };
-
-        if (skipTotal < totalTeacherPosts) {
-            // Fetch from teachers first
-            const tPosts = await this.prisma.post.findMany({
-                where: teacherWhere,
-                include: { owner: true },
+        if (user_id) {
+            // When filtering by a specific user, skip teacher-priority logic entirely
+            finalPosts = await this.prisma.post.findMany({
+                where,
+                include: postInclude,
                 orderBy: { createdAt: 'desc' },
                 skip: skipTotal,
                 take: takeTotal,
             });
-            finalPosts = [...tPosts];
+        } else {
+            // 1. Prepare teacher filter — no user_id constraint, safe to override ownerId
+            const teacherWhere: Prisma.PostWhereInput = {
+                ...where,
+                ownerId: { in: teacherIds },
+            };
+            const totalTeacherPosts =
+                teacherIds.length > 0 ? await this.prisma.post.count({ where: teacherWhere }) : 0;
 
-            if (finalPosts.length < takeTotal) {
-                // Need more from others to fill the page
-                const remaining = takeTotal - finalPosts.length;
+            // 2. Prepare others filter
+            const othersWhere: Prisma.PostWhereInput = {
+                ...where,
+                ownerId: { notIn: [...blockedIds, ...teacherIds] },
+            };
+
+            if (skipTotal < totalTeacherPosts) {
+                // Fetch from teachers first
+                const tPosts = await this.prisma.post.findMany({
+                    where: teacherWhere,
+                    include: postInclude,
+                    orderBy: { createdAt: 'desc' },
+                    skip: skipTotal,
+                    take: takeTotal,
+                });
+                finalPosts = [...tPosts];
+
+                if (finalPosts.length < takeTotal) {
+                    // Need more from others to fill the page
+                    const remaining = takeTotal - finalPosts.length;
+                    const oPosts = await this.prisma.post.findMany({
+                        where: othersWhere,
+                        include: postInclude,
+                        orderBy: { createdAt: 'desc' },
+                        skip: 0,
+                        take: remaining,
+                    });
+                    finalPosts = [...finalPosts, ...oPosts];
+                }
+            } else {
+                // Skip past teacher posts, fetch only from others
+                const othersSkip = skipTotal - totalTeacherPosts;
                 const oPosts = await this.prisma.post.findMany({
                     where: othersWhere,
-                    include: { owner: true },
+                    include: postInclude,
                     orderBy: { createdAt: 'desc' },
-                    skip: 0,
-                    take: remaining,
+                    skip: othersSkip,
+                    take: takeTotal,
                 });
-                finalPosts = [...finalPosts, ...oPosts];
+                finalPosts = [...oPosts];
             }
-        } else {
-            // Skip past teacher posts, fetch only from others
-            const othersSkip = skipTotal - totalTeacherPosts;
-            const oPosts = await this.prisma.post.findMany({
-                where: othersWhere,
-                include: { owner: true },
-                orderBy: { createdAt: 'desc' },
-                skip: othersSkip,
-                take: takeTotal,
-            });
-            finalPosts = [...oPosts];
         }
 
-        const posts: (Post & { owner: User })[] = finalPosts;
+        const posts: PostWithCount[] = finalPosts;
 
         if (posts.length === 0 && nIndex === 0) {
             throw new ApiException(ResponseCode.NO_DATA, 'No data');
@@ -710,7 +724,7 @@ export class PostsService implements IPostQuery, IPostCommand {
                         }),
                         created: (post.createdAt.getTime() / 1000).toString(),
                         like: (post.likeIds?.length || 0).toString(),
-                        comment: (post.commentIds?.length || 0).toString(),
+                        comment: post._count.comments.toString(),
                         is_liked: isLiked ? '1' : '0',
                         is_blocked: isBlocked ? '1' : '0',
                         can_comment: canComment ? '1' : '0',
@@ -850,7 +864,7 @@ export class PostsService implements IPostQuery, IPostCommand {
 
         const posts = await this.prisma.post.findMany({
             where,
-            include: { owner: true },
+            include: { owner: true, _count: { select: { comments: true } } },
             orderBy: { createdAt: 'desc' },
             skip,
             take: nCount,
@@ -907,7 +921,7 @@ export class PostsService implements IPostQuery, IPostCommand {
                         }),
                         created: post.createdAt.toISOString(),
                         like: (post.likeIds?.length || 0).toString(),
-                        comment: (post.commentIds?.length || 0).toString(),
+                        comment: post._count.comments.toString(),
                         is_liked: isLiked ? '1' : '0',
                         is_blocked: isBlocked ? '1' : '0',
                         can_comment: canComment ? '1' : '0',
