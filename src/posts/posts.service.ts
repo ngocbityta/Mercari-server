@@ -596,54 +596,65 @@ export class PostsService implements IPostQuery, IPostCommand {
 
         let finalPosts: (Post & { owner: User })[] = [];
 
-        // 1. Prepare teacher filter
-        const teacherWhere: Prisma.PostWhereInput = {
-            ...where,
-            ownerId: { in: teacherIds },
-        };
-        const totalTeacherPosts =
-            teacherIds.length > 0 ? await this.prisma.post.count({ where: teacherWhere }) : 0;
-
-        // 2. Prepare others filter
-        const othersWhere: Prisma.PostWhereInput = {
-            ...where,
-            ownerId: { notIn: [...blockedIds, ...teacherIds] },
-        };
-
-        if (skipTotal < totalTeacherPosts) {
-            // Fetch from teachers first
-            const tPosts = await this.prisma.post.findMany({
-                where: teacherWhere,
+        if (user_id) {
+            // When filtering by a specific user, skip teacher-priority logic entirely
+            finalPosts = await this.prisma.post.findMany({
+                where,
                 include: { owner: true },
                 orderBy: { createdAt: 'desc' },
                 skip: skipTotal,
                 take: takeTotal,
             });
-            finalPosts = [...tPosts];
+        } else {
+            // 1. Prepare teacher filter — no user_id constraint, safe to override ownerId
+            const teacherWhere: Prisma.PostWhereInput = {
+                ...where,
+                ownerId: { in: teacherIds },
+            };
+            const totalTeacherPosts =
+                teacherIds.length > 0 ? await this.prisma.post.count({ where: teacherWhere }) : 0;
 
-            if (finalPosts.length < takeTotal) {
-                // Need more from others to fill the page
-                const remaining = takeTotal - finalPosts.length;
+            // 2. Prepare others filter
+            const othersWhere: Prisma.PostWhereInput = {
+                ...where,
+                ownerId: { notIn: [...blockedIds, ...teacherIds] },
+            };
+
+            if (skipTotal < totalTeacherPosts) {
+                // Fetch from teachers first
+                const tPosts = await this.prisma.post.findMany({
+                    where: teacherWhere,
+                    include: { owner: true },
+                    orderBy: { createdAt: 'desc' },
+                    skip: skipTotal,
+                    take: takeTotal,
+                });
+                finalPosts = [...tPosts];
+
+                if (finalPosts.length < takeTotal) {
+                    // Need more from others to fill the page
+                    const remaining = takeTotal - finalPosts.length;
+                    const oPosts = await this.prisma.post.findMany({
+                        where: othersWhere,
+                        include: { owner: true },
+                        orderBy: { createdAt: 'desc' },
+                        skip: 0,
+                        take: remaining,
+                    });
+                    finalPosts = [...finalPosts, ...oPosts];
+                }
+            } else {
+                // Skip past teacher posts, fetch only from others
+                const othersSkip = skipTotal - totalTeacherPosts;
                 const oPosts = await this.prisma.post.findMany({
                     where: othersWhere,
                     include: { owner: true },
                     orderBy: { createdAt: 'desc' },
-                    skip: 0,
-                    take: remaining,
+                    skip: othersSkip,
+                    take: takeTotal,
                 });
-                finalPosts = [...finalPosts, ...oPosts];
+                finalPosts = [...oPosts];
             }
-        } else {
-            // Skip past teacher posts, fetch only from others
-            const othersSkip = skipTotal - totalTeacherPosts;
-            const oPosts = await this.prisma.post.findMany({
-                where: othersWhere,
-                include: { owner: true },
-                orderBy: { createdAt: 'desc' },
-                skip: othersSkip,
-                take: takeTotal,
-            });
-            finalPosts = [...oPosts];
         }
 
         const posts: (Post & { owner: User })[] = finalPosts;
