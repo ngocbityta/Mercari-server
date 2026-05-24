@@ -849,10 +849,6 @@ export class PostsService implements IPostQuery, IPostCommand {
         }
 
         if (user_id) {
-            const targetUser = await this.prisma.user.findUnique({ where: { id: user_id } });
-            if (!targetUser) {
-                throw new ApiException(ResponseCode.INVALID_PARAMETER_VALUE, 'User not found');
-            }
             if (blockedUserIds.includes(user_id)) {
                 where.ownerId = 'non_existent_id';
             } else {
