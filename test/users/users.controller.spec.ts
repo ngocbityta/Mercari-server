@@ -4,6 +4,7 @@ import { UsersService } from '../../src/users/users.service.ts';
 import { ProfileService } from '../../src/users/profile.service.ts';
 import { AccountService } from '../../src/users/account.service.ts';
 import { BlockService } from '../../src/users/block.service.ts';
+import { MediaService } from '../../src/posts/media.service.ts';
 import { CreateUserDto, GetUserInfoDto } from '../../src/users/users.dto.ts';
 import { UserRole, UserStatus } from '../../src/enums/users.enum.ts';
 import { TokenGuard } from '../../src/common/guards/token.guard.ts';
@@ -99,6 +100,12 @@ describe('UserInfoController', () => {
                         getListBlocks: jest.fn(),
                     },
                 },
+                {
+                    provide: MediaService,
+                    useValue: {
+                        uploadImage: jest.fn().mockResolvedValue('http://example.com/image.jpg'),
+                    },
+                },
             ],
         })
             .overrideGuard(TokenGuard)
@@ -115,7 +122,7 @@ describe('UserInfoController', () => {
 
     describe('getUserInfo', () => {
         it('should return wrapped profile info', async () => {
-            const dto: GetUserInfoDto = { userId: 'user-1' };
+            const dto: GetUserInfoDto = { token: 'mock-token', userId: 'user-1' };
             const result = await controller.getUserInfo(dto, mockUser);
             expect(result).toEqual({
                 code: '1000',
