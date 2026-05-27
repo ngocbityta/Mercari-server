@@ -10,11 +10,16 @@ import {
     HttpCode,
     HttpStatus,
     UseGuards,
+    UseInterceptors,
+    UploadedFiles,
 } from '@nestjs/common';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import 'multer';
 import { UsersService } from './users.service.ts';
 import { ProfileService } from './profile.service.ts';
 import { AccountService } from './account.service.ts';
 import { BlockService } from './block.service.ts';
+import { MediaService } from '../posts/media.service.ts';
 import {
     CreateUserDto,
     UpdateUserDto,
@@ -75,6 +80,7 @@ export class UserInfoController {
         private readonly profileService: ProfileService,
         private readonly accountService: AccountService,
         private readonly blockService: BlockService,
+        private readonly mediaService: MediaService,
     ) {}
 
     @Post('get_user_info')
@@ -88,11 +94,35 @@ export class UserInfoController {
     @Post('set_user_info')
     @HttpCode(HttpStatus.OK)
     @UseGuards(TokenGuard)
-    async setUserInfo(@Body() dto: SetUserInfoDto, @CurrentUser() user: User) {
+    @UseInterceptors(
+        FileFieldsInterceptor([
+            { name: 'avatar', maxCount: 1 },
+            { name: 'coverImage', maxCount: 1 },
+        ]),
+    )
+    async setUserInfo(
+        @Body() dto: SetUserInfoDto,
+        @CurrentUser() user: User,
+        @UploadedFiles()
+        files: {
+            avatar?: Express.Multer.File[];
+            coverImage?: Express.Multer.File[];
+        },
+    ) {
+        let avatarUrl: string | undefined = dto.avatar;
+        if (files?.avatar?.[0]) {
+            avatarUrl = await this.mediaService.uploadImage(files.avatar[0]);
+        }
+
+        let coverImageUrl: string | undefined = dto.coverImage;
+        if (files?.coverImage?.[0]) {
+            coverImageUrl = await this.mediaService.uploadImage(files.coverImage[0]);
+        }
+
         const result = await this.profileService.setUserInfo(user, {
             username: dto.username,
-            avatar: dto.avatar,
-            coverImage: dto.coverImage,
+            avatar: avatarUrl,
+            coverImage: coverImageUrl,
             description: dto.description,
         });
         return ApiResponse.success(result);

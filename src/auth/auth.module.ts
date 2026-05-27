@@ -5,9 +5,11 @@ import { PrismaModule } from '../prisma/prisma.module.ts';
 import { TokenService } from './token.service.ts';
 import { VerificationService } from './verification.service.ts';
 import { UsersModule } from '../users/users.module.ts';
+import { PostsModule } from '../posts/posts.module.ts';
+import { ConfigModule } from '@nestjs/config';
 
 @Module({
-    imports: [PrismaModule, UsersModule],
+    imports: [PrismaModule, UsersModule, PostsModule, ConfigModule],
     controllers: [AuthController],
     providers: [AuthService, TokenService, VerificationService],
     exports: [AuthService],

@@ -124,6 +124,51 @@ export class MediaService {
         return `${this.serverUrl}/${this.it4788Prefix}/videos/${videoId}/stream`;
     }
 
+    /**
+     * Upload ảnh (avatar, coverImage...).
+     * - Nếu Cloudinary được bật: upload thẳng lên Cloudinary (hỗ trợ image natively).
+     * - Nếu không: wrap buffer ảnh vào mock file dạng video/mp4 để media server chấp nhận
+     *   (cùng trick với thumbnail), trả về URL kèm ?is_thumb=true để proxy render đúng content-type.
+     */
+    async uploadImage(file: Express.Multer.File): Promise<string> {
+        // if (this.useCloudinary) {
+        //     return this.uploadToCloudinary(file);
+        // }
+
+        // Wrap ảnh thành mock video file để upload lên media server
+        const mockFile: Express.Multer.File = {
+            ...file,
+            originalname: 'image.mp4',
+            mimetype: 'video/mp4',
+        };
+
+        const formData = new FormData();
+        const blob = new Blob([new Uint8Array(mockFile.buffer)], { type: mockFile.mimetype });
+        formData.append('file', blob, mockFile.originalname);
+
+        const response = await fetch(`${this.baseUrl}/v1/videos/upload`, {
+            method: 'POST',
+            headers: {
+                'X-WHAM-Subject': this.subject,
+                'X-WHAM-Api-Key': this.apiKey,
+            },
+            body: formData,
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(
+                `Failed to upload image to media server: ${response.statusText} - ${errorText}`,
+            );
+        }
+
+        const data = (await response.json()) as { video_id?: string; id?: string };
+        const videoId = data.video_id || data.id;
+
+        // Trả về URL kèm ?is_thumb=true để proxy set Content-Type: image/jpeg
+        return `${this.serverUrl}/${this.it4788Prefix}/videos/${videoId}/stream?is_thumb=true`;
+    }
+
     async getVideoResponse(videoId: string, range?: string): Promise<Response> {
         const headers: Record<string, string> = {
             'X-WHAM-Subject': this.subject,

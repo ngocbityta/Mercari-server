@@ -1,5 +1,16 @@
-import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+    Controller,
+    Post,
+    Body,
+    HttpCode,
+    HttpStatus,
+    UseInterceptors,
+    UploadedFiles,
+} from '@nestjs/common';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import 'multer';
 import { AuthService } from './auth.service.ts';
+import { MediaService } from '../posts/media.service.ts';
 import {
     SignupDto,
     LoginDto,
@@ -12,7 +23,10 @@ import { ApiResponse } from '../common/dto/api-response.dto.ts';
 
 @Controller()
 export class AuthController {
-    constructor(private readonly authService: AuthService) {}
+    constructor(
+        private readonly authService: AuthService,
+        private readonly mediaService: MediaService,
+    ) {}
 
     @Post('signup')
     @HttpCode(HttpStatus.OK)
@@ -51,8 +65,16 @@ export class AuthController {
 
     @Post('change_info_after_signup')
     @HttpCode(HttpStatus.OK)
-    async changeInfoAfterSignup(@Body() dto: ChangeInfoAfterSignupDto) {
-        const result = await this.authService.changeInfoAfterSignup(dto);
+    @UseInterceptors(FileFieldsInterceptor([{ name: 'avatar', maxCount: 1 }]))
+    async changeInfoAfterSignup(
+        @Body() dto: ChangeInfoAfterSignupDto,
+        @UploadedFiles() files: { avatar?: Express.Multer.File[] },
+    ) {
+        let avatarUrl: string | undefined = dto.avatar;
+        if (files?.avatar?.[0]) {
+            avatarUrl = await this.mediaService.uploadImage(files.avatar[0]);
+        }
+        const result = await this.authService.changeInfoAfterSignup(dto, avatarUrl);
         return ApiResponse.success(result);
     }
 }

@@ -145,7 +145,7 @@ export class AuthService implements IAuthActions, IVerificationActions {
         };
     }
 
-    async changeInfoAfterSignup(dto: ChangeInfoAfterSignupDto) {
+    async changeInfoAfterSignup(dto: ChangeInfoAfterSignupDto, avatarUrl?: string) {
         const user = await this.usersService.findByToken(dto.token);
         if (!user) {
             throw new ApiException(ResponseCode.TOKEN_INVALID, 'Token is invalid');
@@ -160,7 +160,7 @@ export class AuthService implements IAuthActions, IVerificationActions {
 
         const updatedUser = await this.usersService.update(user.id, {
             username: dto.username,
-            avatar: dto.avatar,
+            avatar: avatarUrl,
         });
 
         return {
