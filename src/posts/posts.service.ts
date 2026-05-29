@@ -1,4 +1,4 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma, Post, User } from '@prisma/client';
 import { ResponseCode } from '../enums/response-code.enum';
@@ -19,7 +19,7 @@ export class PostsService implements IPostQuery, IPostCommand {
     constructor(
         private prisma: PrismaService,
         private mediaService: MediaService,
-        @Optional() private readonly eventsGateway?: EventsGateway,
+        private eventsGateway: EventsGateway,
     ) {}
 
     async addPost(
@@ -146,6 +146,84 @@ export class PostsService implements IPostQuery, IPostCommand {
                 rightVideoThumb: rightVideoThumbUrl || null,
             },
         });
+
+        if (user.role === 'GV') {
+            try {
+                const enrollments = await this.prisma.enrollment.findMany({
+                    where: { teacherId: user.id },
+                    include: { student: { include: { pushSetting: true } } },
+                });
+
+                const notificationsToCreate: {
+                    userId: string;
+                    type: string;
+                    objectId: string;
+                    title: string;
+                    avatar: string | null;
+                    groupType: number;
+                    isRead: boolean;
+                }[] = [];
+
+                for (const enrollment of enrollments) {
+                    const student = enrollment.student;
+                    let pushSetting = student.pushSetting;
+                    if (!pushSetting) {
+                        // Use upsert to avoid Unique constraint violation on concurrent requests
+                        pushSetting = await this.prisma.pushSetting.upsert({
+                            where: { userId: student.id },
+                            update: {},
+                            create: { userId: student.id },
+                        });
+                    }
+                    const canSend =
+                        pushSetting &&
+                        pushSetting.notificationOn === 1 &&
+                        pushSetting.fromFriends === 1;
+
+                    if (canSend) {
+                        const title = exercise_id
+                            ? `${user.username || 'Giảng viên'} đã đăng bài tập mới`
+                            : `${user.username || 'Giảng viên'} có bài đăng mới`;
+
+                        notificationsToCreate.push({
+                            userId: student.id,
+                            type: 'new_post',
+                            objectId: post.id,
+                            title,
+                            avatar: user.avatar,
+                            groupType: 1,
+                            isRead: false,
+                        });
+                    }
+                }
+
+                if (notificationsToCreate.length > 0) {
+                    Promise.all(
+                        notificationsToCreate.map(async (n) => {
+                            try {
+                                const notification = await this.prisma.notification.create({
+                                    data: n,
+                                });
+                                this.eventsGateway.sendPushNotification(n.userId, {
+                                    type: notification.type,
+                                    object_id: notification.objectId,
+                                    title: notification.title,
+                                    notificationId: notification.id,
+                                    created: notification.createdAt.toISOString(),
+                                    avatar: notification.avatar,
+                                    group: notification.groupType.toString(),
+                                    read: '0',
+                                });
+                            } catch {
+                                // Ignore error for individual notification
+                            }
+                        }),
+                    ).catch(() => {});
+                }
+            } catch (error) {
+                console.error('Lỗi khi xử lý notification cho GV', error);
+            }
+        }
 
         return {
             id: post.id,

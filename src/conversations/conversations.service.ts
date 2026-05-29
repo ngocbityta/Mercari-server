@@ -284,6 +284,47 @@ export class ConversationsService implements IConversationQuery, IConversationCo
             createdAt: savedMessage.createdAt.toISOString(),
         });
 
+        try {
+            let pushSetting = await this.prisma.pushSetting.findUnique({
+                where: { userId: receiverId },
+            });
+            if (!pushSetting) {
+                pushSetting = await this.prisma.pushSetting.upsert({
+                    where: { userId: receiverId },
+                    update: {},
+                    create: { userId: receiverId },
+                });
+            }
+            const canSend = pushSetting && pushSetting.notificationOn === 1;
+
+            if (canSend) {
+                const notification = await this.prisma.notification.create({
+                    data: {
+                        userId: receiverId,
+                        type: 'message',
+                        objectId: savedMessage.conversationId,
+                        title: `${user.username || 'Người dùng'} đã gửi tin nhắn cho bạn`,
+                        avatar: user.avatar,
+                        groupType: 1,
+                        isRead: false,
+                    },
+                });
+
+                this.eventsGateway.sendPushNotification(receiverId, {
+                    type: notification.type,
+                    object_id: notification.objectId,
+                    title: notification.title,
+                    notificationId: notification.id,
+                    created: notification.createdAt.toISOString(),
+                    avatar: notification.avatar,
+                    group: notification.groupType.toString(),
+                    read: '0',
+                });
+            }
+        } catch (error) {
+            console.error('Lỗi khi gửi thông báo tin nhắn', error);
+        }
+
         return {
             messageId: savedMessage.id,
             conversationId: conversation.id,

@@ -3,13 +3,15 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ResponseCode } from '../enums/response-code.enum';
 import { ICourseQuery } from './courses.interfaces';
 import { ApiException } from '../common/exceptions/api.exception.ts';
-import { MediaService } from '../posts/media.service';
+import { MediaService } from '../posts/media.service.ts';
+import { EventsGateway } from '../events/events.gateway.ts';
 
 @Injectable()
 export class CoursesService implements ICourseQuery {
     constructor(
         private prisma: PrismaService,
         private mediaService: MediaService,
+        private eventsGateway: EventsGateway,
     ) {}
 
     async setApproveEnrollment(token: string, user_id: string, is_accept: string) {
@@ -64,6 +66,48 @@ export class CoursesService implements ICourseQuery {
                 });
                 await tx.enrollmentRequest.delete({ where: { id: request.id } });
             });
+
+            try {
+                let pushSetting = await this.prisma.pushSetting.findUnique({
+                    where: { userId: user_id },
+                });
+                if (!pushSetting) {
+                    pushSetting = await this.prisma.pushSetting.upsert({
+                        where: { userId: user_id },
+                        update: {},
+                        create: { userId: user_id },
+                    });
+                }
+                const canSend =
+                    pushSetting &&
+                    pushSetting.notificationOn === 1 &&
+                    pushSetting.suggestedFriend === 1;
+                if (canSend) {
+                    const notification = await this.prisma.notification.create({
+                        data: {
+                            userId: user_id,
+                            type: 'course_accept',
+                            objectId: requester.id,
+                            title: `${requester.username || 'Giảng viên'} đã chấp nhận bạn vào lớp`,
+                            avatar: requester.avatar,
+                            groupType: 1,
+                            isRead: false,
+                        },
+                    });
+                    this.eventsGateway.sendPushNotification(user_id, {
+                        type: notification.type,
+                        object_id: notification.objectId,
+                        title: notification.title,
+                        notificationId: notification.id,
+                        created: notification.createdAt.toISOString(),
+                        avatar: notification.avatar,
+                        group: notification.groupType.toString(),
+                        read: '0',
+                    });
+                }
+            } catch (error) {
+                console.error('Lỗi khi gửi thông báo chấp nhận vào lớp', error);
+            }
         } else {
             await this.prisma.enrollmentRequest.delete({ where: { id: request.id } });
         }
@@ -290,12 +334,55 @@ export class CoursesService implements ICourseQuery {
             );
         }
 
-        await this.prisma.enrollmentRequest.create({
+        const request = await this.prisma.enrollmentRequest.create({
             data: {
                 teacherId: course_id,
                 studentId: user_id,
             },
         });
+
+        try {
+            let pushSetting = await this.prisma.pushSetting.findUnique({
+                where: { userId: course_id },
+            });
+            if (!pushSetting) {
+                pushSetting = await this.prisma.pushSetting.upsert({
+                    where: { userId: course_id },
+                    update: {},
+                    create: { userId: course_id },
+                });
+            }
+            const canSend =
+                pushSetting &&
+                pushSetting.notificationOn === 1 &&
+                pushSetting.requestedFriend === 1;
+            if (canSend) {
+                const notification = await this.prisma.notification.create({
+                    data: {
+                        userId: course_id,
+                        type: 'requestedFriend',
+                        objectId: request.id,
+                        title: `${student.username || 'Học viên'} đã yêu cầu tham gia khóa học của bạn`,
+                        avatar: student.avatar || 'default_avatar.jpg',
+                        groupType: 1,
+                        isRead: false,
+                    },
+                });
+
+                this.eventsGateway.sendPushNotification(course_id, {
+                    type: notification.type,
+                    object_id: notification.objectId,
+                    title: notification.title,
+                    notificationId: notification.id,
+                    created: notification.createdAt.toISOString(),
+                    avatar: notification.avatar,
+                    group: notification.groupType.toString(),
+                    read: '0',
+                });
+            }
+        } catch (error) {
+            console.error('Lỗi khi gửi thông báo xin vào lớp', error);
+        }
 
         return { id: teacher.id };
     }
