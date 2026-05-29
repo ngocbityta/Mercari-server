@@ -40,6 +40,7 @@ const mockLockedUser: User = {
 const mockPrisma = {
     user: {
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
         update: jest.fn(),
     },
     block: {
@@ -153,10 +154,11 @@ describe('ProfileService', () => {
     describe('setUserInfo', () => {
         it('TC1: should update user info successfully', async () => {
             const updatedUser = { ...mockUser, username: 'newname' };
-            prisma.user.findUnique.mockResolvedValue(mockUser);
+            prisma.user.findFirst.mockResolvedValue(mockUser);
             prisma.user.update.mockResolvedValue(updatedUser);
 
-            const result = await service.setUserInfo(mockUser, {
+            const result = await service.setUserInfo({
+                token: mockUser.token ?? undefined,
                 username: 'newname',
             });
 
@@ -165,9 +167,10 @@ describe('ProfileService', () => {
         });
 
         it('TC5a: should throw error when username is empty', async () => {
-            prisma.user.findUnique.mockResolvedValue(mockUser);
+            prisma.user.findFirst.mockResolvedValue(mockUser);
 
-            const call = () => service.setUserInfo(mockUser, { username: '' });
+            const call = () =>
+                service.setUserInfo({ token: mockUser.token ?? undefined, username: '' });
             await expect(call()).rejects.toThrow(ApiException);
             try {
                 await call();
@@ -177,9 +180,10 @@ describe('ProfileService', () => {
         });
 
         it('TC5b: should throw error when username contains numbers', async () => {
-            prisma.user.findUnique.mockResolvedValue(mockUser);
+            prisma.user.findFirst.mockResolvedValue(mockUser);
 
-            const call = () => service.setUserInfo(mockUser, { username: 'test123' });
+            const call = () =>
+                service.setUserInfo({ token: mockUser.token ?? undefined, username: 'test123' });
             await expect(call()).rejects.toThrow(ApiException);
             try {
                 await call();
@@ -189,9 +193,10 @@ describe('ProfileService', () => {
         });
 
         it('TC5c: should throw error when username contains special characters', async () => {
-            prisma.user.findUnique.mockResolvedValue(mockUser);
+            prisma.user.findFirst.mockResolvedValue(mockUser);
 
-            const call = () => service.setUserInfo(mockUser, { username: 'test@user' });
+            const call = () =>
+                service.setUserInfo({ token: mockUser.token ?? undefined, username: 'test@user' });
             await expect(call()).rejects.toThrow(ApiException);
             try {
                 await call();
@@ -201,10 +206,11 @@ describe('ProfileService', () => {
         });
 
         it('TC5d: should throw error when username is too long', async () => {
-            prisma.user.findUnique.mockResolvedValue(mockUser);
+            prisma.user.findFirst.mockResolvedValue(mockUser);
             const longName = 'a'.repeat(51);
 
-            const call = () => service.setUserInfo(mockUser, { username: longName });
+            const call = () =>
+                service.setUserInfo({ token: mockUser.token ?? undefined, username: longName });
             await expect(call()).rejects.toThrow(ApiException);
             try {
                 await call();
@@ -215,10 +221,11 @@ describe('ProfileService', () => {
 
         it('TC6: should trim and normalize username', async () => {
             const updatedUser = { ...mockUser, username: 'testname' };
-            prisma.user.findUnique.mockResolvedValue(mockUser);
+            prisma.user.findFirst.mockResolvedValue(mockUser);
             prisma.user.update.mockResolvedValue(updatedUser);
 
-            await service.setUserInfo(mockUser, {
+            await service.setUserInfo({
+                token: mockUser.token ?? undefined,
                 username: '  testname  ',
             });
 
@@ -229,9 +236,10 @@ describe('ProfileService', () => {
         });
 
         it('TC8: should throw error for banned username', async () => {
-            prisma.user.findUnique.mockResolvedValue(mockUser);
+            prisma.user.findFirst.mockResolvedValue(mockUser);
 
-            const call = () => service.setUserInfo(mockUser, { username: 'hitier' });
+            const call = () =>
+                service.setUserInfo({ token: mockUser.token ?? undefined, username: 'hitier' });
             await expect(call()).rejects.toThrow(ApiException);
             try {
                 await call();
@@ -241,9 +249,10 @@ describe('ProfileService', () => {
         });
 
         it('TC8b: should throw error for banned username (case insensitive)', async () => {
-            prisma.user.findUnique.mockResolvedValue(mockUser);
+            prisma.user.findFirst.mockResolvedValue(mockUser);
 
-            const call = () => service.setUserInfo(mockUser, { username: 'Admin' });
+            const call = () =>
+                service.setUserInfo({ token: mockUser.token ?? undefined, username: 'Admin' });
             await expect(call()).rejects.toThrow(ApiException);
             try {
                 await call();
@@ -258,10 +267,11 @@ describe('ProfileService', () => {
                 avatar: 'new-avatar',
                 coverImage: 'new-cover',
             };
-            prisma.user.findUnique.mockResolvedValue(mockUser);
+            prisma.user.findFirst.mockResolvedValue(mockUser);
             prisma.user.update.mockResolvedValue(updatedUser);
 
-            const result = await service.setUserInfo(mockUser, {
+            const result = await service.setUserInfo({
+                token: mockUser.token ?? undefined,
                 avatar: 'new-avatar',
                 coverImage: 'new-cover',
             });
@@ -272,10 +282,11 @@ describe('ProfileService', () => {
 
         it('should update description', async () => {
             const updatedUser = { ...mockUser, description: 'New bio' };
-            prisma.user.findUnique.mockResolvedValue(mockUser);
+            prisma.user.findFirst.mockResolvedValue(mockUser);
             prisma.user.update.mockResolvedValue(updatedUser);
 
-            const result = await service.setUserInfo(mockUser, {
+            const result = await service.setUserInfo({
+                token: mockUser.token ?? undefined,
                 description: 'New bio',
             });
 
@@ -283,9 +294,10 @@ describe('ProfileService', () => {
         });
 
         it('should throw error if user not found', async () => {
-            prisma.user.findUnique.mockResolvedValue(null);
+            prisma.user.findFirst.mockResolvedValue(null);
 
-            const call = () => service.setUserInfo(mockUser, { username: 'newname' });
+            const call = () =>
+                service.setUserInfo({ token: mockUser.token ?? undefined, username: 'newname' });
             await expect(call()).rejects.toThrow(ApiException);
             try {
                 await call();
@@ -296,10 +308,11 @@ describe('ProfileService', () => {
 
         it('TC5e: should accept username with underscores', async () => {
             const updatedUser = { ...mockUser, username: 'test_user' };
-            prisma.user.findUnique.mockResolvedValue(mockUser);
+            prisma.user.findFirst.mockResolvedValue(mockUser);
             prisma.user.update.mockResolvedValue(updatedUser);
 
-            const result = await service.setUserInfo(mockUser, {
+            const result = await service.setUserInfo({
+                token: mockUser.token ?? undefined,
                 username: 'test_user',
             });
 

@@ -41,6 +41,7 @@ describe('PostsService - searchPosts', () => {
                         user: {
                             findFirst: jest.fn(),
                             findUnique: jest.fn(),
+                            findMany: jest.fn(),
                         },
                         post: {
                             findMany: jest.fn(),
@@ -72,6 +73,7 @@ describe('PostsService - searchPosts', () => {
         jest.spyOn(prisma.block, 'findMany').mockResolvedValue([]);
         jest.spyOn(prisma.block, 'findFirst').mockResolvedValue(null);
         jest.spyOn(prisma.searchHistory, 'create').mockResolvedValue({} as any);
+        jest.spyOn(prisma.user, 'findMany').mockResolvedValue([]);
     });
 
     it('[TC1] should return posts when parameters are valid', async () => {
@@ -231,7 +233,7 @@ describe('PostsService - searchPosts', () => {
         );
 
         expect(result.posts).toHaveLength(1);
-        expect(result.posts[0].author.id).toBe(userB.id);
+        expect(result.posts[0]!.author.id).toBe(userB.id);
     });
 
     it('[TC_SEARCH_2] user A cannot find posts of user B when A blocked B', async () => {
