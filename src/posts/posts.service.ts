@@ -1402,6 +1402,55 @@ export class PostsService implements IPostQuery, IPostCommand {
             data: { postId, userId: user.id, subject, details },
         });
 
+        // Send notification to post owner about the report
+        if (post.ownerId !== user.id) {
+            try {
+                let ownerPushSetting = await this.prisma.pushSetting.findUnique({
+                    where: { userId: post.ownerId },
+                });
+                if (!ownerPushSetting) {
+                    ownerPushSetting = await this.prisma.pushSetting.upsert({
+                        where: { userId: post.ownerId },
+                        update: {},
+                        create: { userId: post.ownerId },
+                    });
+                }
+
+                if (
+                    ownerPushSetting &&
+                    ownerPushSetting.notificationOn === 1 &&
+                    ownerPushSetting.report === 1
+                ) {
+                    const notif = await this.prisma.notification.create({
+                        data: {
+                            userId: post.ownerId,
+                            type: 'report',
+                            objectId: post.id,
+                            title: `Bài viết của bạn đã bị báo cáo vi phạm`,
+                            avatar: user.avatar || 'default_avatar.jpg',
+                            groupType: 1,
+                            isRead: false,
+                        },
+                    });
+
+                    if (this.eventsGateway) {
+                        this.eventsGateway.sendPushNotification(post.ownerId, {
+                            type: notif.type ?? 'home',
+                            objectId: notif.objectId ?? '0',
+                            title: notif.title,
+                            notificationId: notif.id,
+                            created: notif.createdAt.toISOString(),
+                            avatar: notif.avatar ?? 'app_icon',
+                            group: notif.groupType === 0 ? '0' : '1',
+                            read: '0',
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error('Lỗi khi gửi thông báo report bài viết', error);
+            }
+        }
+
         return {};
     }
 }
