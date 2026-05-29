@@ -866,7 +866,23 @@ export class PostsService implements IPostQuery, IPostCommand {
             take: nCount,
         });
 
-        if (posts.length === 0 && nIndex === 0) {
+        // Search for users whose username contains the keyword
+        const users = await this.prisma.user.findMany({
+            where: {
+                username: { contains: keyword, mode: 'insensitive' },
+                id: { notIn: [...blockedUserIds, requester.id] },
+                status: 'ACTIVE',
+            },
+            select: {
+                id: true,
+                username: true,
+                avatar: true,
+                role: true,
+            },
+            take: nCount,
+        });
+
+        if (posts.length === 0 && users.length === 0 && nIndex === 0) {
             throw new ApiException(ResponseCode.NO_DATA, 'No data');
         }
 
@@ -940,7 +956,15 @@ export class PostsService implements IPostQuery, IPostCommand {
             throw new ApiException(ResponseCode.NO_DATA, 'No data');
         }
 
-        return { posts: mappedPosts };
+        return {
+            posts: mappedPosts,
+            users: users.map((u) => ({
+                id: u.id,
+                username: u.username || '',
+                avatar: u.avatar || '',
+                role: u.role,
+            })),
+        };
     }
 
     async getComment(

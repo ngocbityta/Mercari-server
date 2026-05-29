@@ -37,12 +37,15 @@ export class ProfileService {
         return this.formatUserInfo(targetUser);
     }
 
-    async setUserInfo(
-        currentUser: User,
-        data: { username?: string; avatar?: string; coverImage?: string; description?: string },
-    ) {
-        const user = await this.prisma.user.findUnique({
-            where: { id: currentUser.id },
+    async setUserInfo(data: {
+        token?: string;
+        username?: string;
+        avatar?: string;
+        coverImage?: string;
+        description?: string;
+    }) {
+        const user = await this.prisma.user.findFirst({
+            where: { token: data.token },
         });
 
         if (!user) {
@@ -98,7 +101,7 @@ export class ProfileService {
         }
 
         const savedUser = await this.prisma.user.update({
-            where: { id: currentUser.id },
+            where: { id: user.id },
             data: updateData,
         });
 

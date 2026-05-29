@@ -93,7 +93,6 @@ export class UserInfoController {
 
     @Post('set_user_info')
     @HttpCode(HttpStatus.OK)
-    @UseGuards(TokenGuard)
     @UseInterceptors(
         FileFieldsInterceptor([
             { name: 'avatar', maxCount: 1 },
@@ -102,7 +101,6 @@ export class UserInfoController {
     )
     async setUserInfo(
         @Body() dto: SetUserInfoDto,
-        @CurrentUser() user: User,
         @UploadedFiles()
         files: {
             avatar?: Express.Multer.File[];
@@ -119,7 +117,8 @@ export class UserInfoController {
             coverImageUrl = await this.mediaService.uploadImage(files.coverImage[0]);
         }
 
-        const result = await this.profileService.setUserInfo(user, {
+        const result = await this.profileService.setUserInfo({
+            token: dto.token,
             username: dto.username,
             avatar: avatarUrl,
             coverImage: coverImageUrl,
