@@ -97,6 +97,7 @@ export class CoursesService implements ICourseQuery {
                     this.eventsGateway.sendPushNotification(user_id, {
                         type: notification.type,
                         object_id: notification.objectId,
+                        objectId: notification.objectId,
                         title: notification.title,
                         notificationId: notification.id,
                         created: notification.createdAt.toISOString(),

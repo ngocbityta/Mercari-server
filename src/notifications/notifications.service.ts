@@ -37,7 +37,7 @@ export class NotificationsService implements INotificationQuery, INotificationCo
             if (group === 0) {
                 whereClause.groupType = { in: [0, 1, 2] };
             } else if (group === 1) {
-                whereClause.groupType = { notIn: [0, 1, 2] };
+                whereClause.groupType = { not: 0 };
             }
         }
 
