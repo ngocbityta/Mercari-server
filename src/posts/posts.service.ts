@@ -178,7 +178,7 @@ export class PostsService implements IPostQuery, IPostCommand {
                     const canSend =
                         pushSetting &&
                         pushSetting.notificationOn === 1 &&
-                        pushSetting.fromFriends === 1;
+                        pushSetting.video === 1;
 
                     if (canSend) {
                         const title = exercise_id
@@ -440,25 +440,38 @@ export class PostsService implements IPostQuery, IPostCommand {
             if (requester.role !== 'GV') {
                 throw new ApiException(ResponseCode.NOT_ACCESS, 'Not access');
             }
-            const targetUser = await this.prisma.user.findUnique({
-                where: { id: user_id },
-            });
-            if (!targetUser) {
+            try {
+                const targetUser = await this.prisma.user.findUnique({
+                    where: { id: user_id },
+                });
+                if (!targetUser) {
+                    throw new ApiException(
+                        ResponseCode.INVALID_PARAMETER_VALUE,
+                        'Invalid parameter value',
+                    );
+                }
+                viewer = targetUser;
+            } catch (err) {
+                if (err instanceof ApiException) throw err;
                 throw new ApiException(
                     ResponseCode.INVALID_PARAMETER_VALUE,
                     'Invalid parameter value',
                 );
             }
-            viewer = targetUser;
         }
 
         // Get the post
-        const post = await this.prisma.post.findUnique({
-            where: { id: postId },
-            include: {
-                owner: true,
-            },
-        });
+        let post;
+        try {
+            post = await this.prisma.post.findUnique({
+                where: { id: postId },
+                include: {
+                    owner: true,
+                },
+            });
+        } catch (err) {
+            throw new ApiException(ResponseCode.POST_NOT_FOUND, 'Post not found');
+        }
 
         if (!post) {
             throw new ApiException(ResponseCode.POST_NOT_FOUND, 'Post not found');
@@ -494,15 +507,19 @@ export class PostsService implements IPostQuery, IPostCommand {
         let lecturer: { id: string; name: string; avatar: string } | undefined;
         // Add lecturer info if exercise_id exists and author != lecturer
         if (post.exerciseId && post.ownerId !== post.courseId && post.courseId) {
-            const lecturerUser = await this.prisma.user.findFirst({
-                where: { id: post.courseId },
-            });
-            if (lecturerUser) {
-                lecturer = {
-                    id: lecturerUser.id,
-                    name: lecturerUser.username || 'Giảng viên',
-                    avatar: lecturerUser.avatar || 'default_lecturer_avatar.jpg',
-                };
+            try {
+                const lecturerUser = await this.prisma.user.findFirst({
+                    where: { id: post.courseId },
+                });
+                if (lecturerUser) {
+                    lecturer = {
+                        id: lecturerUser.id,
+                        name: lecturerUser.username || 'Giảng viên',
+                        avatar: lecturerUser.avatar || 'default_lecturer_avatar.jpg',
+                    };
+                }
+            } catch {
+                // Ignore: courseId may not be a valid UUID
             }
         }
 
@@ -1229,7 +1246,7 @@ export class PostsService implements IPostQuery, IPostCommand {
                 if (this.eventsGateway) {
                     this.eventsGateway.sendPushNotification(post.ownerId, {
                         type: notif.type ?? 'home',
-                        objectId: notif.objectId ?? '0',
+                        object_id: notif.objectId ?? '0',
                         title: notif.title,
                         notificationId: notif.id,
                         created: notif.createdAt.toISOString(),
@@ -1348,7 +1365,7 @@ export class PostsService implements IPostQuery, IPostCommand {
                 if (this.eventsGateway) {
                     this.eventsGateway.sendPushNotification(post.ownerId, {
                         type: notif.type ?? 'home',
-                        objectId: notif.objectId ?? '0',
+                        object_id: notif.objectId ?? '0',
                         title: notif.title,
                         notificationId: notif.id,
                         created: notif.createdAt.toISOString(),
@@ -1436,7 +1453,7 @@ export class PostsService implements IPostQuery, IPostCommand {
                     if (this.eventsGateway) {
                         this.eventsGateway.sendPushNotification(post.ownerId, {
                             type: notif.type ?? 'home',
-                            objectId: notif.objectId ?? '0',
+                            object_id: notif.objectId ?? '0',
                             title: notif.title,
                             notificationId: notif.id,
                             created: notif.createdAt.toISOString(),
