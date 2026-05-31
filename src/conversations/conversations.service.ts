@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.ts';
 import { User, Conversation } from '@prisma/client';
 import { EventsGateway } from '../events/events.gateway.ts';
@@ -11,6 +11,7 @@ import { ResponseCode } from '../enums/response-code.enum.ts';
 export class ConversationsService implements IConversationQuery, IConversationCommand {
     constructor(
         private readonly prisma: PrismaService,
+        @Inject(forwardRef(() => EventsGateway))
         private readonly eventsGateway: EventsGateway,
     ) {}
 
@@ -209,6 +210,25 @@ export class ConversationsService implements IConversationQuery, IConversationCo
             data: { isDeleted: true, content: '' },
         });
 
+        const receiverId = message.senderId === user.id ? message.receiverId : message.senderId;
+        const receiver = await this.prisma.user.findUnique({ where: { id: receiverId } });
+
+        this.eventsGateway.emitDeleteMessage(receiverId, {
+            sender: {
+                id: user.id,
+                name: user.username ?? '',
+                avatar: user.avatar ?? '',
+            },
+            receiver: {
+                id: receiver?.id ?? receiverId,
+                name: receiver?.username ?? '',
+                avatar: receiver?.avatar ?? '',
+            },
+            message_id: messageId,
+            content: '',
+            created: message.createdAt.toISOString(),
+        });
+
         return {};
     }
 
@@ -276,12 +296,22 @@ export class ConversationsService implements IConversationQuery, IConversationCo
             },
         });
 
+        const receiver = await this.prisma.user.findUnique({ where: { id: receiverId } });
+
         this.eventsGateway.sendNewMessage(receiverId, {
-            conversationId: conversation.id,
-            messageId: savedMessage.id,
-            message: savedMessage.content ?? '',
-            senderId: user.id,
-            createdAt: savedMessage.createdAt.toISOString(),
+            sender: {
+                id: user.id,
+                name: user.username ?? '',
+                avatar: user.avatar ?? '',
+            },
+            receiver: {
+                id: receiver?.id ?? receiverId,
+                name: receiver?.username ?? '',
+                avatar: receiver?.avatar ?? '',
+            },
+            message_id: savedMessage.id,
+            content: savedMessage.content ?? '',
+            created: savedMessage.createdAt.toISOString(),
         });
 
         try {
