@@ -273,12 +273,28 @@ export class ConversationsService implements IConversationQuery, IConversationCo
                 throw new ApiException(ResponseCode.NOT_ACCESS, 'Cannot send message to this user');
             }
 
-            conversation = await this.prisma.conversation.create({
-                data: {
-                    partnerAId: user.id,
-                    partnerBId: partner.id,
+            const existingConversation = await this.prisma.conversation.findFirst({
+                where: {
+                    OR: [
+                        { partnerAId: user.id, partnerBId: partner.id },
+                        { partnerAId: partner.id, partnerBId: user.id },
+                    ],
                 },
             });
+
+            if (existingConversation) {
+                conversation = await this.prisma.conversation.update({
+                    where: { id: existingConversation.id },
+                    data: { isDeleted: false },
+                });
+            } else {
+                conversation = await this.prisma.conversation.create({
+                    data: {
+                        partnerAId: user.id,
+                        partnerBId: partner.id,
+                    },
+                });
+            }
         } else if (!conversation) {
             throw new ApiException(ResponseCode.NO_DATA, 'Conversation not found');
         }
