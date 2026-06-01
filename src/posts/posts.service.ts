@@ -129,13 +129,16 @@ export class PostsService implements IPostQuery, IPostCommand {
             media.push(rightVideoUrl);
         }
 
+        const extractedHashtags = described ? (described.match(/#[^\s#]+/g) || []).map(t => t.toLowerCase()) : [];
+        const uniqueHashtags = Array.from(new Set(extractedHashtags));
+
         // Create the post
         const post = await this.prisma.post.create({
             data: {
                 ownerId: user.id,
                 content: described || '',
                 media,
-                hashtags: [],
+                hashtags: uniqueHashtags,
                 courseId: course_id || null,
                 exerciseId: exercise_id || null,
                 deviceMaster: device_master || null,
@@ -387,11 +390,18 @@ export class PostsService implements IPostQuery, IPostCommand {
             );
         }
 
+        let uniqueHashtags = post.hashtags || [];
+        if (described !== undefined) {
+            const extractedHashtags = (described.match(/#[^\s#]+/g) || []).map(t => t.toLowerCase());
+            uniqueHashtags = Array.from(new Set(extractedHashtags));
+        }
+
         // 10. Update the post
         const updatedPost = await this.prisma.post.update({
             where: { id: postId },
             data: {
                 content: described !== undefined ? described : post.content,
+                hashtags: uniqueHashtags,
                 media: newMedia,
                 leftVideo: hasLeftVideoToAdd
                     ? post.leftVideo
@@ -935,9 +945,19 @@ export class PostsService implements IPostQuery, IPostCommand {
             .flatMap((b) => [b.blockerId, b.blockedId])
             .filter((id) => id !== requester.id);
 
-        const where: Prisma.PostWhereInput = {
-            content: { contains: keyword, mode: 'insensitive' },
-        };
+        let where: Prisma.PostWhereInput;
+        const searchTags = standardizedKeyword.split(' ').filter(w => w !== '');
+        const isHashtagSearch = searchTags.length > 0 && searchTags.every(w => w.startsWith('#'));
+        
+        if (isHashtagSearch) {
+            where = {
+                hashtags: { hasEvery: searchTags }
+            };
+        } else {
+            where = {
+                content: { contains: keyword, mode: 'insensitive' },
+            };
+        }
 
         if (blockedUserIds.length > 0) {
             where.ownerId = { notIn: blockedUserIds };

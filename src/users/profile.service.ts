@@ -105,6 +105,17 @@ export class ProfileService {
             data: updateData,
         });
 
+        if (data.avatar !== undefined && user.avatar && user.avatar !== 'default_avatar.jpg' && user.avatar !== data.avatar) {
+            try {
+                await this.prisma.notification.updateMany({
+                    where: { avatar: user.avatar },
+                    data: { avatar: data.avatar },
+                });
+            } catch (error) {
+                console.error('Lỗi khi cập nhật avatar trong notification', error);
+            }
+        }
+
         return this.formatUserInfo(savedUser);
     }
 
