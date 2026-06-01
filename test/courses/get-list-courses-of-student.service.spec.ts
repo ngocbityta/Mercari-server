@@ -1,3 +1,4 @@
+import { EventsGateway } from '../../src/events/events.gateway.ts';
 import { Test, TestingModule } from '@nestjs/testing';
 import { CoursesService } from '../../src/courses/courses.service.ts';
 import { PrismaService } from '../../src/prisma/prisma.service.ts';
@@ -62,6 +63,7 @@ describe('CoursesService - getListCoursesOfStudent', () => {
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 CoursesService,
+                { provide: EventsGateway, useValue: { emitNotification: jest.fn() } },
                 { provide: PrismaService, useValue: mockPrisma },
                 {
                     provide: MediaService,

@@ -1,3 +1,4 @@
+import { EventsGateway } from '../../src/events/events.gateway.ts';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PostsService } from '../../src/posts/posts.service.ts';
 import { PrismaService } from '../../src/prisma/prisma.service.ts';
@@ -47,6 +48,7 @@ describe('PostsService - getPost', () => {
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 PostsService,
+                { provide: EventsGateway, useValue: { emitNotification: jest.fn() } },
                 {
                     provide: PrismaService,
                     useValue: {

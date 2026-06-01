@@ -74,6 +74,7 @@ const mockEventsGateway = {
     sendNewMessage: jest.fn(),
     sendPushNotification: jest.fn(),
     sendToUser: jest.fn(),
+    emitDeleteMessage: jest.fn(),
 };
 
 const mockPrisma = {
@@ -100,6 +101,10 @@ const mockPrisma = {
     },
     block: {
         findFirst: jest.fn(),
+    },
+    pushSetting: {
+        findUnique: jest.fn(),
+        upsert: jest.fn(),
     },
 };
 
