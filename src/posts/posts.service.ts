@@ -129,7 +129,7 @@ export class PostsService implements IPostQuery, IPostCommand {
             media.push(rightVideoUrl);
         }
 
-        const extractedHashtags = described ? (described.match(/#[^\s#]+/g) || []).map(t => t.toLowerCase()) : [];
+        const extractedHashtags = described ? (described.match(/#[\p{L}\p{N}_]+/gu) || []).map(t => t.toLowerCase()) : [];
         const uniqueHashtags = Array.from(new Set(extractedHashtags));
 
         // Create the post
@@ -325,33 +325,15 @@ export class PostsService implements IPostQuery, IPostCommand {
         }
 
         // 9. Build the updated media array
-        const currentMedia = post.media || [];
-        const newMedia: string[] = [];
-
-        if (currentMedia.length > 0) {
-            for (let i = 0; i < currentMedia.length; i++) {
-                const mediaItem = currentMedia[i];
-                const isLeftVideo = mediaItem === post.leftVideo;
-                const isRightVideo = mediaItem === post.rightVideo;
-
-                if (isLeftVideo && hasLeftVideoToDelete) {
-                    continue;
-                }
-                if (isRightVideo && hasRightVideoToDelete) {
-                    continue;
-                }
-
-                newMedia.push(mediaItem);
-            }
-        }
+        let finalLeftVideo = post.leftVideo;
+        let finalRightVideo = post.rightVideo;
 
         let leftVideoThumbUrl = (post as unknown as PostWithThumbs).leftVideoThumb;
         let rightVideoThumbUrl = (post as unknown as PostWithThumbs).rightVideoThumb;
 
         if (hasLeftVideoToAdd) {
             const url = await this.mediaService.uploadFile(left_video);
-            newMedia.push(url);
-            post.leftVideo = url; // Update temp object for DB update below
+            finalLeftVideo = url;
             try {
                 leftVideoThumbUrl = await this.mediaService.generateAndUploadThumbnail(
                     left_video,
@@ -362,13 +344,13 @@ export class PostsService implements IPostQuery, IPostCommand {
                 leftVideoThumbUrl = null;
             }
         } else if (hasLeftVideoToDelete) {
+            finalLeftVideo = null;
             leftVideoThumbUrl = null;
         }
 
         if (hasRightVideoToAdd) {
             const url = await this.mediaService.uploadFile(right_video);
-            newMedia.push(url);
-            post.rightVideo = url; // Update temp object for DB update below
+            finalRightVideo = url;
             try {
                 rightVideoThumbUrl = await this.mediaService.generateAndUploadThumbnail(
                     right_video,
@@ -379,8 +361,13 @@ export class PostsService implements IPostQuery, IPostCommand {
                 rightVideoThumbUrl = null;
             }
         } else if (hasRightVideoToDelete) {
+            finalRightVideo = null;
             rightVideoThumbUrl = null;
         }
+
+        const newMedia: string[] = [];
+        if (finalLeftVideo) newMedia.push(finalLeftVideo);
+        if (finalRightVideo) newMedia.push(finalRightVideo);
 
         // Ensure at least one video exists
         if (newMedia.length === 0 && (post.leftVideo || post.rightVideo)) {
@@ -392,7 +379,7 @@ export class PostsService implements IPostQuery, IPostCommand {
 
         let uniqueHashtags = post.hashtags || [];
         if (described !== undefined) {
-            const extractedHashtags = (described.match(/#[^\s#]+/g) || []).map(t => t.toLowerCase());
+            const extractedHashtags = (described.match(/#[\p{L}\p{N}_]+/gu) || []).map(t => t.toLowerCase());
             uniqueHashtags = Array.from(new Set(extractedHashtags));
         }
 
@@ -403,16 +390,8 @@ export class PostsService implements IPostQuery, IPostCommand {
                 content: described !== undefined ? described : post.content,
                 hashtags: uniqueHashtags,
                 media: newMedia,
-                leftVideo: hasLeftVideoToAdd
-                    ? post.leftVideo
-                    : hasLeftVideoToDelete
-                      ? null
-                      : post.leftVideo,
-                rightVideo: hasRightVideoToAdd
-                    ? post.rightVideo
-                    : hasRightVideoToDelete
-                      ? null
-                      : post.rightVideo,
+                leftVideo: finalLeftVideo,
+                rightVideo: finalRightVideo,
                 leftVideoThumb: leftVideoThumbUrl,
                 rightVideoThumb: rightVideoThumbUrl,
             },
