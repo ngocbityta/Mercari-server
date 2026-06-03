@@ -33,7 +33,7 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
 
     constructor(
         private prisma: PrismaService,
-        private moduleRef: ModuleRef
+        private moduleRef: ModuleRef,
     ) {}
 
     private get conversationsService(): ConversationsService {
@@ -44,10 +44,10 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
         this.logger.log('EventsGateway initialized');
     }
 
-    async handleConnection(client: Socket, ..._args: any[]) {
+    handleConnection(client: Socket, ..._args: any[]) {
         this.logger.log(`Client connected: ${client.id}`);
         const userId = client.handshake.query.userId as string;
-        
+
         if (userId) {
             this.connectedUsers.set(userId, client.id);
             this.socketToUserId.set(client.id, userId);
@@ -67,12 +67,12 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
     handleDisconnect(client: Socket) {
         this.logger.log(`Client disconnected: ${client.id}`);
         const userId = this.socketToUserId.get(client.id);
-        
+
         if (userId) {
             this.connectedUsers.delete(userId);
             this.socketToUserId.delete(client.id);
         }
-        
+
         const timeout = this.socketTimeouts.get(client.id);
         if (timeout) {
             clearTimeout(timeout);
@@ -100,7 +100,7 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
         }
         const conversationId = data?.conversationId || data?.data?.conversationId;
         if (conversationId) {
-            client.join(`room_${conversationId}`);
+            void client.join(`room_${conversationId}`);
         }
     }
 
@@ -117,7 +117,9 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
         try {
             const user = await this.prisma.user.findUnique({ where: { id: userId } });
             console.log('--- handleSend user found:', user?.id);
-            if (!user) return;
+            if (!user) {
+                return;
+            }
 
             const res = await this.conversationsService.setSendMessage(
                 user,
@@ -135,14 +137,20 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
     @SubscribeMessage('deletemessage')
     async handleDeleteMessage(@MessageBody() data: any, @ConnectedSocket() client: Socket) {
         const userId = this.socketToUserId.get(client.id);
-        if (!userId) return;
-        
+        if (!userId) {
+            return;
+        }
+
         const messageId = data?.messageId || data?.data?.messageId;
-        if (!messageId) return;
+        if (!messageId) {
+            return;
+        }
 
         try {
             const user = await this.prisma.user.findUnique({ where: { id: userId } });
-            if (!user) return;
+            if (!user) {
+                return;
+            }
             await this.conversationsService.deleteMessage(user, messageId);
         } catch (error: any) {
             client.emit('connection_error', { message: error.message || 'Cannot delete message' });
@@ -153,15 +161,18 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
     handleReconnecting(@MessageBody() data: any, @ConnectedSocket() client: Socket) {
         const token = data?.token;
         if (token) {
-            this.prisma.user.findFirst({ where: { token } }).then(user => {
-                if (!user || user.status === UserStatus.LOCKED) {
+            this.prisma.user
+                .findFirst({ where: { token } })
+                .then((user) => {
+                    if (!user || user.status === UserStatus.LOCKED) {
+                        client.emit('reconnect_attempt');
+                    } else {
+                        this.socketLastActive.set(client.id, Date.now());
+                    }
+                })
+                .catch(() => {
                     client.emit('reconnect_attempt');
-                } else {
-                    this.socketLastActive.set(client.id, Date.now());
-                }
-            }).catch(() => {
-                client.emit('reconnect_attempt');
-            });
+                });
         }
     }
 

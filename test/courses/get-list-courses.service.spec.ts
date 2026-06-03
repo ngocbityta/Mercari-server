@@ -103,7 +103,9 @@ describe('CoursesService - getListCourses', () => {
             username: 'Giang Vien A',
             avatar: 'teacher-a-avatar.jpg',
             left_video: 'proxied_left-video-1.mp4',
+            left_video_thumb: '',
             right_video: 'proxied_right-video-1.mp4',
+            right_video_thumb: '',
             is_enrolled: '1',
             is_requested: '0',
         });
@@ -114,7 +116,9 @@ describe('CoursesService - getListCourses', () => {
             username: 'Giang Vien B',
             avatar: 'teacher-b-avatar.jpg',
             left_video: 'proxied_left-video-2.mp4',
+            left_video_thumb: '',
             right_video: '',
+            right_video_thumb: '',
             is_enrolled: '0',
             is_requested: '0',
         });

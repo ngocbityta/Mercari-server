@@ -105,7 +105,12 @@ export class ProfileService {
             data: updateData,
         });
 
-        if (data.avatar !== undefined && user.avatar && user.avatar !== 'default_avatar.jpg' && user.avatar !== data.avatar) {
+        if (
+            data.avatar !== undefined &&
+            user.avatar &&
+            user.avatar !== 'default_avatar.jpg' &&
+            user.avatar !== data.avatar
+        ) {
             try {
                 await this.prisma.notification.updateMany({
                     where: { avatar: user.avatar },

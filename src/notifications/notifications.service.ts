@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.ts';
-import { User } from '@prisma/client';
+import { User, Prisma } from '@prisma/client';
 import { EventsGateway } from '../events/events.gateway.ts';
 import { INotificationQuery, INotificationCommand } from './notifications.interfaces.ts';
 import { ApiException } from '../common/exceptions/api.exception.ts';
@@ -32,7 +32,7 @@ export class NotificationsService implements INotificationQuery, INotificationCo
             targetUser = target;
         }
 
-        const whereClause: any = { userId: targetUser.id };
+        const whereClause: Prisma.NotificationWhereInput = { userId: targetUser.id };
         if (group !== undefined) {
             if (group === 0) {
                 whereClause.groupType = { in: [0, 1, 2] };
@@ -71,7 +71,7 @@ export class NotificationsService implements INotificationQuery, INotificationCo
 
                     return true;
                 })
-                .map((n: any) => ({
+                .map((n) => ({
                     // Requirement 8: Default values for type, avatar, group, read, objectId
                     type: n.type ?? 'home',
                     objectId: n.objectId ?? '0',

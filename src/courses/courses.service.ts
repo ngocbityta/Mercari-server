@@ -464,6 +464,12 @@ export class CoursesService implements ICourseQuery {
             const rightVideoProxied = post.rightVideo
                 ? this.mediaService.getProxiedUrl(post.rightVideo)
                 : '';
+            const leftVideoThumbProxied = post.leftVideoThumb
+                ? this.mediaService.getProxiedUrl(post.leftVideoThumb)
+                : '';
+            const rightVideoThumbProxied = post.rightVideoThumb
+                ? this.mediaService.getProxiedUrl(post.rightVideoThumb)
+                : '';
 
             return {
                 course_id: post.owner.id,
@@ -472,6 +478,8 @@ export class CoursesService implements ICourseQuery {
                 avatar: post.owner.avatar || '',
                 left_video: leftVideoProxied,
                 right_video: rightVideoProxied,
+                left_video_thumb: leftVideoThumbProxied,
+                right_video_thumb: rightVideoThumbProxied,
                 is_enrolled: enrolledTeacherIds.has(post.owner.id) ? '1' : '0',
                 is_requested: requestedTeacherIds.has(post.owner.id) ? '1' : '0',
             };

@@ -129,7 +129,9 @@ export class PostsService implements IPostQuery, IPostCommand {
             media.push(rightVideoUrl);
         }
 
-        const extractedHashtags = described ? (described.match(/#[\p{L}\p{N}_]+/gu) || []).map(t => t.toLowerCase()) : [];
+        const extractedHashtags = described
+            ? (described.match(/#[\p{L}\p{N}_]+/gu) || []).map((t) => t.toLowerCase())
+            : [];
         const uniqueHashtags = Array.from(new Set(extractedHashtags));
 
         // Create the post
@@ -180,9 +182,7 @@ export class PostsService implements IPostQuery, IPostCommand {
                         });
                     }
                     const canSend =
-                        pushSetting &&
-                        pushSetting.notificationOn === 1 &&
-                        pushSetting.video === 1;
+                        pushSetting && pushSetting.notificationOn === 1 && pushSetting.video === 1;
 
                     if (canSend) {
                         const title = exercise_id
@@ -368,8 +368,12 @@ export class PostsService implements IPostQuery, IPostCommand {
         }
 
         const newMedia: string[] = [];
-        if (finalLeftVideo) newMedia.push(finalLeftVideo);
-        if (finalRightVideo) newMedia.push(finalRightVideo);
+        if (finalLeftVideo) {
+            newMedia.push(finalLeftVideo);
+        }
+        if (finalRightVideo) {
+            newMedia.push(finalRightVideo);
+        }
 
         // Ensure at least one video exists
         if (newMedia.length === 0 && (post.leftVideo || post.rightVideo)) {
@@ -381,7 +385,9 @@ export class PostsService implements IPostQuery, IPostCommand {
 
         let uniqueHashtags = post.hashtags || [];
         if (described !== undefined) {
-            const extractedHashtags = (described.match(/#[\p{L}\p{N}_]+/gu) || []).map(t => t.toLowerCase());
+            const extractedHashtags = (described.match(/#[\p{L}\p{N}_]+/gu) || []).map((t) =>
+                t.toLowerCase(),
+            );
             uniqueHashtags = Array.from(new Set(extractedHashtags));
         }
 
@@ -443,7 +449,9 @@ export class PostsService implements IPostQuery, IPostCommand {
                 }
                 viewer = targetUser;
             } catch (err) {
-                if (err instanceof ApiException) throw err;
+                if (err instanceof ApiException) {
+                    throw err;
+                }
                 throw new ApiException(
                     ResponseCode.INVALID_PARAMETER_VALUE,
                     'Invalid parameter value',
@@ -460,7 +468,7 @@ export class PostsService implements IPostQuery, IPostCommand {
                     owner: true,
                 },
             });
-        } catch (err) {
+        } catch {
             throw new ApiException(ResponseCode.POST_NOT_FOUND, 'Post not found');
         }
 
@@ -927,12 +935,12 @@ export class PostsService implements IPostQuery, IPostCommand {
             .filter((id) => id !== requester.id);
 
         let where: Prisma.PostWhereInput;
-        const searchTags = standardizedKeyword.split(' ').filter(w => w !== '');
-        const isHashtagSearch = searchTags.length > 0 && searchTags.every(w => w.startsWith('#'));
-        
+        const searchTags = standardizedKeyword.split(' ').filter((w) => w !== '');
+        const isHashtagSearch = searchTags.length > 0 && searchTags.every((w) => w.startsWith('#'));
+
         if (isHashtagSearch) {
             where = {
-                hashtags: { hasEvery: searchTags }
+                hashtags: { hasEvery: searchTags },
             };
         } else {
             where = {
