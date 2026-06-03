@@ -1,5 +1,6 @@
 services:
   group1-backend:
+    image: ghcr.io/ngocbityta/mercari-server:${IMAGE_TAG}
     restart: unless-stopped
     env_file:
       - .env.prod
