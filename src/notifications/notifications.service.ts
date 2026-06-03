@@ -46,6 +46,7 @@ export class NotificationsService implements INotificationQuery, INotificationCo
             orderBy: { createdAt: 'desc' },
             skip: index,
             take: count,
+            include: { actor: true },
         });
 
         const badge = await this.prisma.notification.count({
@@ -70,14 +71,14 @@ export class NotificationsService implements INotificationQuery, INotificationCo
 
                     return true;
                 })
-                .map((n) => ({
+                .map((n: any) => ({
                     // Requirement 8: Default values for type, avatar, group, read, objectId
                     type: n.type ?? 'home',
                     objectId: n.objectId ?? '0',
                     title: n.title,
                     notificationId: n.id,
                     created: n.createdAt.toISOString(),
-                    avatar: n.avatar ?? 'app_icon',
+                    avatar: n.actor?.avatar ?? n.avatar ?? 'app_icon',
                     group: n.groupType === 0 ? '0' : '1',
                     read: n.isRead ? '1' : '0',
                 })),

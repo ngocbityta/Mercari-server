@@ -86,6 +86,7 @@ export class CoursesService implements ICourseQuery {
                     const notification = await this.prisma.notification.create({
                         data: {
                             userId: user_id,
+                            actorId: requester.id,
                             type: 'course_accept',
                             objectId: requester.id,
                             title: `${requester.username || 'Giảng viên'} đã chấp nhận bạn vào lớp`,
@@ -361,6 +362,7 @@ export class CoursesService implements ICourseQuery {
                 const notification = await this.prisma.notification.create({
                     data: {
                         userId: course_id,
+                        actorId: student.id,
                         type: 'requestedFriend',
                         objectId: request.id,
                         title: `${student.username || 'Học viên'} đã yêu cầu tham gia khóa học của bạn`,

@@ -159,6 +159,7 @@ export class PostsService implements IPostQuery, IPostCommand {
 
                 const notificationsToCreate: {
                     userId: string;
+                    actorId: string;
                     type: string;
                     objectId: string;
                     title: string;
@@ -190,6 +191,7 @@ export class PostsService implements IPostQuery, IPostCommand {
 
                         notificationsToCreate.push({
                             userId: student.id,
+                            actorId: user.id,
                             type: 'new_post',
                             objectId: post.id,
                             title,
@@ -1233,6 +1235,7 @@ export class PostsService implements IPostQuery, IPostCommand {
                 const notif = await this.prisma.notification.create({
                     data: {
                         userId: post.ownerId,
+                        actorId: user.id,
                         type: 'comment',
                         objectId: post.id,
                         title: `${user.username || 'Người dùng'} đã bình luận về bài viết của bạn`,
@@ -1352,6 +1355,7 @@ export class PostsService implements IPostQuery, IPostCommand {
                 const notif = await this.prisma.notification.create({
                     data: {
                         userId: post.ownerId,
+                        actorId: user.id,
                         type: 'like',
                         objectId: post.id,
                         title: `${user.username || 'Người dùng'} đã thích bài viết của bạn`,
@@ -1440,6 +1444,7 @@ export class PostsService implements IPostQuery, IPostCommand {
                     const notif = await this.prisma.notification.create({
                         data: {
                             userId: post.ownerId,
+                            actorId: user.id,
                             type: 'report',
                             objectId: post.id,
                             title: `Bài viết của bạn đã bị báo cáo vi phạm`,

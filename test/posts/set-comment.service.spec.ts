@@ -442,6 +442,7 @@ describe('PostsService - setComment', () => {
         expect(mockPrisma.notification.create).toHaveBeenCalledWith({
             data: {
                 userId: 'owner-1',
+                actorId: 'user-1',
                 type: 'comment',
                 objectId: 'post-1',
                 title: 'TestUser đã bình luận về bài viết của bạn',

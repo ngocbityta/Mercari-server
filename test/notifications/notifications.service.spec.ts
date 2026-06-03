@@ -27,6 +27,7 @@ const mockUser: User = {
 const mockNotification: Notification = {
     id: 'notif-1',
     userId: mockUser.id,
+    actorId: null,
     type: 'new_message',
     objectId: 'obj-1',
     title: 'New message',
@@ -118,6 +119,7 @@ describe('NotificationsService', () => {
                 orderBy: { createdAt: 'desc' },
                 skip: 2,
                 take: 1,
+                include: { actor: true },
             });
             expect(result.badge).toBe('5');
         });

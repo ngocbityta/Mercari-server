@@ -264,6 +264,7 @@ describe('PostsService - likePost', () => {
         expect(mockPrisma.notification.create).toHaveBeenCalledWith({
             data: {
                 userId: 'owner-1',
+                actorId: 'user-1',
                 type: 'like',
                 objectId: 'post-1',
                 title: 'TestUser đã thích bài viết của bạn',

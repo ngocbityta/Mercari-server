@@ -347,6 +347,7 @@ export class ConversationsService implements IConversationQuery, IConversationCo
                 const notification = await this.prisma.notification.create({
                     data: {
                         userId: receiverId,
+                        actorId: user.id,
                         type: 'message',
                         objectId: savedMessage.conversationId,
                         title: `${user.username || 'Người dùng'} đã gửi tin nhắn cho bạn`,
