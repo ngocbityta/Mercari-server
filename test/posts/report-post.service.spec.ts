@@ -69,7 +69,15 @@ describe('PostsService - reportPost', () => {
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 PostsService,
-                { provide: EventsGateway, useValue: { emitNotification: jest.fn() } }, { provide: SearchService, useValue: { indexPost: jest.fn(), removePost: jest.fn(), searchPosts: jest.fn() } },
+                { provide: EventsGateway, useValue: { emitNotification: jest.fn() } },
+                {
+                    provide: SearchService,
+                    useValue: {
+                        indexPost: jest.fn(),
+                        removePost: jest.fn(),
+                        searchPosts: jest.fn(),
+                    },
+                },
                 { provide: PrismaService, useValue: mockPrisma },
                 { provide: MediaService, useValue: { uploadFile: jest.fn() } },
             ],

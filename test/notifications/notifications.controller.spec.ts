@@ -55,10 +55,13 @@ describe('NotificationsController', () => {
 
     describe('getNotification', () => {
         it('should return wrapped list of notifications', async () => {
-            const mockData = { data: [], badge: '0', last_update: '' };
+            const mockData = { data: [], badge: '0', lastUpdate: '' };
             service.getNotifications.mockResolvedValue(mockData);
 
-            const result = await controller.getNotification({ index: '0', count: '10' }, mockUser);
+            const result = await controller.getNotification(
+                { token: 'tok', index: '0', count: '10' },
+                mockUser,
+            );
 
             expect(result).toEqual({
                 code: '1000',
@@ -69,14 +72,14 @@ describe('NotificationsController', () => {
 
         it('should throw ApiException for invalid parameters', async () => {
             await expect(
-                controller.getNotification({ index: '-1', count: '10' }, mockUser),
+                controller.getNotification({ token: 'tok', index: '-1', count: '10' }, mockUser),
             ).rejects.toThrow(ApiException);
         });
     });
 
     describe('setReadNotification', () => {
         it('should mark as read and return wrapped result', async () => {
-            const mockResult = { badge: '0', last_update: '' };
+            const mockResult = { badge: '0', lastUpdate: '' };
             service.setReadNotification.mockResolvedValue(mockResult);
 
             const result = await controller.setReadNotification(

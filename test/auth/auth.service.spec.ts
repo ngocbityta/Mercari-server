@@ -73,6 +73,7 @@ describe('AuthService', () => {
                     phonenumber: '0901234567',
                     password: '0901234567',
                     role: UserRole.HV,
+                    uuid: 'uuid-123',
                 });
             await expect(call()).rejects.toThrow(ApiException);
             try {
@@ -89,6 +90,7 @@ describe('AuthService', () => {
                     phonenumber: '0901234567',
                     password: 'password123',
                     role: UserRole.HV,
+                    uuid: 'uuid-123',
                 });
             await expect(call()).rejects.toThrow(ApiException);
             try {
@@ -105,6 +107,7 @@ describe('AuthService', () => {
                 phonenumber: '0901234567',
                 password: 'password123',
                 role: UserRole.HV,
+                uuid: 'uuid-123',
             });
             expect(result).toEqual({ verifyCode: '123456' });
             // eslint-disable-next-line @typescript-eslint/unbound-method
@@ -116,7 +119,11 @@ describe('AuthService', () => {
         it('should throw USER_NOT_VALIDATED if user not found', async () => {
             usersService.findByPhonenumber.mockResolvedValue(null);
             const call = () =>
-                service.login({ phonenumber: '0901234567', password: 'password123' });
+                service.login({
+                    phonenumber: '0901234567',
+                    password: 'password123',
+                    devtoken: 'dev-tok',
+                });
             await expect(call()).rejects.toThrow(ApiException);
             try {
                 await call();
@@ -131,7 +138,11 @@ describe('AuthService', () => {
                 status: UserStatus.LOCKED,
             });
             const call = () =>
-                service.login({ phonenumber: '0901234567', password: 'password123' });
+                service.login({
+                    phonenumber: '0901234567',
+                    password: 'password123',
+                    devtoken: 'dev-tok',
+                });
             await expect(call()).rejects.toThrow(ApiException);
             try {
                 await call();
@@ -142,7 +153,12 @@ describe('AuthService', () => {
 
         it('should throw INVALID_PARAMETER_VALUE if password incorrect', async () => {
             usersService.findByPhonenumber.mockResolvedValue(mockUser);
-            const call = () => service.login({ phonenumber: '0901234567', password: 'wrong' });
+            const call = () =>
+                service.login({
+                    phonenumber: '0901234567',
+                    password: 'wrong',
+                    devtoken: 'dev-tok',
+                });
             await expect(call()).rejects.toThrow(ApiException);
             try {
                 await call();
@@ -156,6 +172,7 @@ describe('AuthService', () => {
             const result = await service.login({
                 phonenumber: '0901234567',
                 password: 'password123',
+                devtoken: 'dev-tok',
             });
             expect(result).toEqual({
                 id: mockUser.id,

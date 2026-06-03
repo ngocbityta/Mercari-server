@@ -56,7 +56,6 @@ export class PostsService implements IPostQuery, IPostCommand {
             );
         }
 
-        // Logic for Student (HV) vs Teacher (GV)
         if (user.role === 'HV') {
             // If student is posting, exercise_id and course_id are mandatory (NN: X)
             if (!exercise_id || !course_id) {
@@ -76,7 +75,6 @@ export class PostsService implements IPostQuery, IPostCommand {
                 throw new ApiException(ResponseCode.POST_NOT_FOUND, 'Exercise post not found');
             }
 
-            // Requirement states: exercise owner must be a teacher
             if (exercisePost.owner.role !== 'GV') {
                 throw new ApiException(
                     ResponseCode.INVALID_PARAMETER_VALUE,
@@ -132,7 +130,7 @@ export class PostsService implements IPostQuery, IPostCommand {
         }
 
         const extractedHashtags = described
-            ? (described.match(/#[\p{L}\p{N}_]+/gu) || []).map((t) => t.toLowerCase())
+            ? (described.match(/#[\p{L}\p{N}_]+/gu) || []).map((t: string) => t.toLowerCase())
             : [];
         const uniqueHashtags = Array.from(new Set(extractedHashtags));
 
@@ -389,8 +387,8 @@ export class PostsService implements IPostQuery, IPostCommand {
 
         let uniqueHashtags = post.hashtags || [];
         if (described !== undefined) {
-            const extractedHashtags = (described.match(/#[\p{L}\p{N}_]+/gu) || []).map((t) =>
-                t.toLowerCase(),
+            const extractedHashtags = (described.match(/#[\p{L}\p{N}_]+/gu) || []).map(
+                (t: string) => t.toLowerCase(),
             );
             uniqueHashtags = Array.from(new Set(extractedHashtags));
         }
@@ -423,7 +421,6 @@ export class PostsService implements IPostQuery, IPostCommand {
     }
 
     async getPost(token: string, postId: string, user_id?: string) {
-        // Validate token - get viewer user (requester)
         const requester = await this.prisma.user.findFirst({
             where: { token },
         });
@@ -464,8 +461,7 @@ export class PostsService implements IPostQuery, IPostCommand {
             }
         }
 
-        // Get the post
-        let post;
+        let post: (Post & { owner: User }) | null = null;
         try {
             post = await this.prisma.post.findUnique({
                 where: { id: postId },
@@ -949,7 +945,7 @@ export class PostsService implements IPostQuery, IPostCommand {
                 isHashtagSearch ? '' : keyword,
                 isHashtagSearch ? searchTags : [],
             );
-            esPostIds = esResults.map((res: any) => res.id);
+            esPostIds = esResults.map((res: any) => String(res.id));
         } catch (e) {
             console.error('ES search failed, fallback to DB', e);
         }

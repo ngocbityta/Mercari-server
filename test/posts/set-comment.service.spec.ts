@@ -107,7 +107,15 @@ describe('PostsService - setComment', () => {
                 PostsService,
                 { provide: PrismaService, useValue: mockPrisma },
                 { provide: MediaService, useValue: { uploadFile: jest.fn() } },
-                { provide: EventsGateway, useValue: mockEventsGateway }, { provide: SearchService, useValue: { indexPost: jest.fn(), removePost: jest.fn(), searchPosts: jest.fn() } },
+                { provide: EventsGateway, useValue: mockEventsGateway },
+                {
+                    provide: SearchService,
+                    useValue: {
+                        indexPost: jest.fn(),
+                        removePost: jest.fn(),
+                        searchPosts: jest.fn(),
+                    },
+                },
             ],
         }).compile();
 

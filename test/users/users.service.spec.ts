@@ -70,8 +70,13 @@ describe('UsersService', () => {
                 },
                 {
                     provide: SearchService,
-                    useValue: { searchUsers: jest.fn(), indexUser: jest.fn(), removeUser: jest.fn(), updateUser: jest.fn() }
-                }
+                    useValue: {
+                        searchUsers: jest.fn(),
+                        indexUser: jest.fn(),
+                        removeUser: jest.fn(),
+                        updateUser: jest.fn(),
+                    },
+                },
             ],
         }).compile();
 
