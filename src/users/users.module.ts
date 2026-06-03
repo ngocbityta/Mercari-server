@@ -7,9 +7,10 @@ import { BlockService } from './block.service.ts';
 import { PrismaModule } from '../prisma/prisma.module.ts';
 import { PostsModule } from '../posts/posts.module.ts';
 import { ConfigModule } from '@nestjs/config';
+import { SearchModule } from '../search/search.module.ts';
 
 @Module({
-    imports: [PrismaModule, PostsModule, ConfigModule],
+    imports: [PrismaModule, PostsModule, ConfigModule, SearchModule],
     controllers: [UsersController, UserInfoController],
     providers: [UsersService, ProfileService, AccountService, BlockService],
     exports: [UsersService, ProfileService, AccountService, BlockService],

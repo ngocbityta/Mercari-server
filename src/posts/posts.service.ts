@@ -7,6 +7,7 @@ import { ApiException } from '../common/exceptions/api.exception.ts';
 
 import { MediaService } from './media.service';
 import { EventsGateway } from '../events/events.gateway.ts';
+import { SearchService } from '../search/search.service.ts';
 import 'multer';
 
 interface PostWithThumbs {
@@ -20,6 +21,7 @@ export class PostsService implements IPostQuery, IPostCommand {
         private prisma: PrismaService,
         private mediaService: MediaService,
         private eventsGateway: EventsGateway,
+        private searchService: SearchService,
     ) {}
 
     async addPost(
@@ -151,6 +153,8 @@ export class PostsService implements IPostQuery, IPostCommand {
                 rightVideoThumb: rightVideoThumbUrl || null,
             },
         });
+
+        await this.searchService.indexPost(post);
 
         if (user.role === 'GV') {
             try {
@@ -414,6 +418,7 @@ export class PostsService implements IPostQuery, IPostCommand {
         await this.prisma.post.delete({
             where: { id: postId },
         });
+        await this.searchService.removePost(postId);
         return { message: 'Post deleted successfully' };
     }
 
@@ -938,14 +943,29 @@ export class PostsService implements IPostQuery, IPostCommand {
         const searchTags = standardizedKeyword.split(' ').filter((w) => w !== '');
         const isHashtagSearch = searchTags.length > 0 && searchTags.every((w) => w.startsWith('#'));
 
-        if (isHashtagSearch) {
-            where = {
-                hashtags: { hasEvery: searchTags },
-            };
+        let esPostIds: string[] = [];
+        try {
+            const esResults = await this.searchService.searchPosts(
+                isHashtagSearch ? '' : keyword,
+                isHashtagSearch ? searchTags : [],
+            );
+            esPostIds = esResults.map((res: any) => res.id);
+        } catch (e) {
+            console.error('ES search failed, fallback to DB', e);
+        }
+
+        if (esPostIds.length > 0) {
+            where = { id: { in: esPostIds } };
         } else {
-            where = {
-                content: { contains: keyword, mode: 'insensitive' },
-            };
+            if (isHashtagSearch) {
+                where = {
+                    hashtags: { hasEvery: searchTags },
+                };
+            } else {
+                where = {
+                    content: { contains: keyword, mode: 'insensitive' },
+                };
+            }
         }
 
         if (blockedUserIds.length > 0) {

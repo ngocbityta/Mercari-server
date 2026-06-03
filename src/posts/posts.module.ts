@@ -6,9 +6,10 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { MediaService } from './media.service';
 import { MediaController } from './media.controller';
 import { ConfigModule } from '@nestjs/config';
+import { SearchModule } from '../search/search.module.ts';
 
 @Module({
-    imports: [PrismaModule, ConfigModule],
+    imports: [PrismaModule, ConfigModule, SearchModule],
     controllers: [PostsController, MediaController],
     providers: [PostsService, SearchHistoryService, MediaService],
     exports: [PostsService, SearchHistoryService, MediaService],

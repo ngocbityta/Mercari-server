@@ -6,6 +6,7 @@ import { UserRole, UserStatus } from '../../src/enums/users.enum.ts';
 import { User } from '@prisma/client';
 import { ApiException } from '../../src/common/exceptions/api.exception.ts';
 import { ResponseCode } from '../../src/enums/response-code.enum.ts';
+import { SearchService } from '../../src/search/search.service.ts';
 
 // Mock user data
 const mockUser: User = {
@@ -67,6 +68,10 @@ describe('UsersService', () => {
                     provide: PrismaService,
                     useValue: mockPrisma,
                 },
+                {
+                    provide: SearchService,
+                    useValue: { searchUsers: jest.fn(), indexUser: jest.fn(), removeUser: jest.fn(), updateUser: jest.fn() }
+                }
             ],
         }).compile();
 

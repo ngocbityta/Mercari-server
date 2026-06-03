@@ -1,4 +1,5 @@
 import { EventsGateway } from '../../src/events/events.gateway.ts';
+import { SearchService } from '../../src/search/search.service.ts';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PostsService } from '../../src/posts/posts.service.ts';
 import { PrismaService } from '../../src/prisma/prisma.service.ts';
@@ -15,7 +16,7 @@ describe('PostsService - getListPosts', () => {
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 PostsService,
-                { provide: EventsGateway, useValue: { emitNotification: jest.fn() } },
+                { provide: EventsGateway, useValue: { emitNotification: jest.fn() } }, { provide: SearchService, useValue: { indexPost: jest.fn(), removePost: jest.fn(), searchPosts: jest.fn() } },
                 {
                     provide: PrismaService,
                     useValue: {

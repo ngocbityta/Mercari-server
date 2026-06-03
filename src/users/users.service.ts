@@ -5,10 +5,14 @@ import { User } from '@prisma/client';
 import { IUserQuery, IUserCommand } from './users.interfaces.ts';
 import { ApiException } from '../common/exceptions/api.exception.ts';
 import { ResponseCode } from '../enums/response-code.enum.ts';
+import { SearchService } from '../search/search.service.ts';
 
 @Injectable()
 export class UsersService implements IUserQuery, IUserCommand {
-    constructor(private readonly prisma: PrismaService) {}
+    constructor(
+        private readonly prisma: PrismaService,
+        private readonly searchService: SearchService,
+    ) {}
 
     async create(createUserDto: CreateUserDto): Promise<User> {
         const existingUser = await this.prisma.user.findUnique({
@@ -19,7 +23,7 @@ export class UsersService implements IUserQuery, IUserCommand {
             throw new ApiException(ResponseCode.USER_EXISTED, 'Số điện thoại đã được đăng ký');
         }
 
-        return this.prisma.user.create({
+        const newUser = await this.prisma.user.create({
             data: {
                 phonenumber: createUserDto.phonenumber,
                 password: createUserDto.password,
@@ -30,6 +34,9 @@ export class UsersService implements IUserQuery, IUserCommand {
                 description: createUserDto.description,
             },
         });
+
+        await this.searchService.indexUser(newUser);
+        return newUser;
     }
 
     async findAll(): Promise<User[]> {
@@ -89,7 +96,7 @@ export class UsersService implements IUserQuery, IUserCommand {
             }
         }
 
-        return this.prisma.user.update({
+        const updatedUser = await this.prisma.user.update({
             where: { id },
             data: {
                 phonenumber: updateUserDto.phonenumber,
@@ -103,6 +110,9 @@ export class UsersService implements IUserQuery, IUserCommand {
                 online: updateUserDto.online,
             },
         });
+
+        await this.searchService.updateUser(updatedUser);
+        return updatedUser;
     }
 
     async remove(id: string): Promise<void> {
@@ -110,6 +120,7 @@ export class UsersService implements IUserQuery, IUserCommand {
         await this.prisma.user.delete({
             where: { id },
         });
+        await this.searchService.removeUser(id);
     }
 
     async updateToken(userId: string, token: string | null, online?: boolean): Promise<void> {

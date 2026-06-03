@@ -5,6 +5,7 @@ import { ApiException } from '../../src/common/exceptions/api.exception.ts';
 import { ResponseCode } from '../../src/enums/response-code.enum.ts';
 import { MediaService } from '../../src/posts/media.service';
 import { EventsGateway } from '../../src/events/events.gateway.ts';
+import { SearchService } from '../../src/search/search.service.ts';
 
 // --- Mock data ---
 const mockActiveUser = {
@@ -68,7 +69,7 @@ describe('PostsService - likePost', () => {
                 PostsService,
                 { provide: PrismaService, useValue: mockPrisma },
                 { provide: MediaService, useValue: { uploadFile: jest.fn() } },
-                { provide: EventsGateway, useValue: mockEventsGateway },
+                { provide: EventsGateway, useValue: mockEventsGateway }, { provide: SearchService, useValue: { indexPost: jest.fn(), removePost: jest.fn(), searchPosts: jest.fn() } },
             ],
         }).compile();
 

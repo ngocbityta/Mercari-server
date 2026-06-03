@@ -10,9 +10,11 @@ import { PostsModule } from './posts/posts.module.ts';
 import { AuthModule } from './auth/auth.module.ts';
 import { SettingsModule } from './settings/settings.module.ts';
 import { CoursesModule } from './courses/courses.module.ts';
+import { SearchModule } from './search/search.module.ts';
 
 @Module({
     imports: [
+        SearchModule,
         ConfigModule.forRoot({
             isGlobal: true,
             envFilePath: '.env',
