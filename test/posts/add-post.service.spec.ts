@@ -8,6 +8,8 @@ import { UserRole, UserStatus } from '@prisma/client';
 import { ApiException } from '../../src/common/exceptions/api.exception.ts';
 import { MediaService } from '../../src/posts/media.service';
 
+const SYSTEM_BOT_USER_ID = '00000000-0000-0000-0000-000000000001';
+
 describe('PostsService - addPost', () => {
     let service: PostsService;
 
@@ -282,5 +284,108 @@ describe('PostsService - addPost', () => {
         } catch (e) {
             expect((e as ApiException).code).toBe(ResponseCode.MISSING_PARAMETER);
         }
+    });
+
+    describe('triggerPoseGrading', () => {
+        let originalFetch: typeof global.fetch;
+
+        beforeAll(() => {
+            originalFetch = global.fetch;
+        });
+
+        afterAll(() => {
+            global.fetch = originalFetch;
+        });
+
+        it('should trigger pose grading for left/right videos, calculate average, and create comment authored by student', async () => {
+            const studentPostMock = {
+                id: 'student-post-id',
+                exerciseId: 'teacher-exercise-id',
+                leftVideo: 'http://localhost:3000/it4788/videos/vid_student_left/stream',
+                rightVideo: 'http://localhost:3000/it4788/videos/vid_student_right/stream',
+                ownerId: 'student-id',
+            };
+            const teacherPostMock = {
+                id: 'teacher-exercise-id',
+                leftVideo: 'http://localhost:3000/it4788/videos/vid_teacher_left/stream',
+                rightVideo: 'http://localhost:3000/it4788/videos/vid_teacher_right/stream',
+                ownerId: 'teacher-id',
+            };
+
+            mockPrisma.post.findUnique
+                .mockResolvedValueOnce(studentPostMock)
+                .mockResolvedValueOnce(teacherPostMock);
+
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+            (mockPrisma as any).comment = {
+                create: jest.fn().mockResolvedValue({ id: 'comment-id' }),
+            };
+
+            const mockFetch = jest.fn();
+            mockFetch.mockResolvedValueOnce({
+                ok: true,
+                json: () => Promise.resolve({ job_id: 'job-left', status: 'queued' }),
+            } as Response);
+            mockFetch.mockResolvedValueOnce({
+                ok: true,
+                json: () => Promise.resolve({ job_id: 'job-right', status: 'queued' }),
+            } as Response);
+            mockFetch.mockResolvedValueOnce({
+                ok: true,
+                json: () =>
+                    Promise.resolve({
+                        status: 'success',
+                        job_output: { score: 8.0, raw_distance: 0.2 },
+                    }),
+            } as Response);
+            mockFetch.mockResolvedValueOnce({
+                ok: true,
+                json: () =>
+                    Promise.resolve({
+                        status: 'success',
+                        job_output: { score: 9.0, raw_distance: 0.1 },
+                    }),
+            } as Response);
+
+            global.fetch = mockFetch;
+
+            await service.triggerPoseGrading('student-post-id');
+
+            expect(mockFetch).toHaveBeenCalledTimes(4);
+
+            expect(mockFetch).toHaveBeenNthCalledWith(
+                1,
+                expect.stringContaining('/v1/pose-grade/jobs'),
+                expect.objectContaining({
+                    method: 'POST',
+                    body: JSON.stringify({
+                        source_video_id_a: 'vid_teacher_left',
+                        source_video_id_b: 'vid_student_left',
+                    }),
+                }),
+            );
+
+            expect(mockFetch).toHaveBeenNthCalledWith(
+                2,
+                expect.stringContaining('/v1/pose-grade/jobs'),
+                expect.objectContaining({
+                    method: 'POST',
+                    body: JSON.stringify({
+                        source_video_id_a: 'vid_teacher_right',
+                        source_video_id_b: 'vid_student_right',
+                    }),
+                }),
+            );
+
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+            expect((mockPrisma as any).comment.create).toHaveBeenCalledWith({
+                data: {
+                    postId: 'student-post-id',
+                    authorId: SYSTEM_BOT_USER_ID,
+                    score: '8.5',
+                    detailMistakes: 'Left video raw distance: 0.2. Right video raw distance: 0.1.',
+                },
+            });
+        });
     });
 });

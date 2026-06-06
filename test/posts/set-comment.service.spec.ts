@@ -8,6 +8,9 @@ import { MediaService } from '../../src/posts/media.service';
 import { EventsGateway } from '../../src/events/events.gateway.ts';
 import { SearchService } from '../../src/search/search.service.ts';
 
+// Must match the constant in posts.service.ts
+const SYSTEM_BOT_USER_ID = '00000000-0000-0000-0000-000000000001';
+
 // --- Mock data ---
 const mockActiveUser = {
     id: 'user-1',
@@ -73,16 +76,16 @@ const mockOtherComment = {
     author: { id: 'user-2', username: 'OtherUser', avatar: 'avatar2.jpg' },
 };
 
-// Comment score (chấm điểm AI)
+// Comment score (chấm điểm AI) — author là system bot, không phải người đăng bài
 const mockScoreComment = {
     id: 'comment-score',
     postId: 'post-1',
-    authorId: 'user-1',
+    authorId: SYSTEM_BOT_USER_ID,
     content: null,
     score: '85',
     detailMistakes: '<table><tr><td>Lỗi tư thế</td></tr></table>',
     createdAt: new Date('2024-01-02T11:00:00Z'),
-    author: { id: 'user-1', username: 'TestUser', avatar: 'avatar.jpg' },
+    author: { id: SYSTEM_BOT_USER_ID, username: 'Hệ thống', avatar: 'system_avatar.jpg' },
 };
 
 const mockPrisma = {
@@ -182,7 +185,7 @@ describe('PostsService - setComment', () => {
         mockPrisma.block.findMany.mockResolvedValue([]);
         mockPrisma.comment.findMany.mockResolvedValue([mockScoreComment]);
 
-        await service.setComment(
+        const result = await service.setComment(
             'valid-token',
             'post-1',
             0,
@@ -195,9 +198,21 @@ describe('PostsService - setComment', () => {
         expect(mockPrisma.comment.create).toHaveBeenCalledWith({
             // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             data: expect.objectContaining({
+                authorId: SYSTEM_BOT_USER_ID,
                 score: '85',
                 detailMistakes: '<table><tr><td>Lỗi tư thế</td></tr></table>',
             }),
+        });
+
+        // Response shape contains poster info — verify the comment is attributed
+        // to the system bot, not the original requester.
+        expect(result.data[0]).toMatchObject({
+            id: 'comment-score',
+            poster: {
+                id: SYSTEM_BOT_USER_ID,
+                name: 'Hệ thống',
+                avatar: 'system_avatar.jpg',
+            },
         });
     });
 

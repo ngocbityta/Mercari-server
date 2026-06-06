@@ -220,4 +220,52 @@ describe('PostsService - editPost', () => {
             }),
         );
     });
+
+    it('should successfully update left video when numeric index 0 is passed', async () => {
+        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as User);
+        jest.spyOn(prisma.post, 'findUnique').mockResolvedValue(mockPost as Post);
+        jest.spyOn(prisma.post, 'count').mockResolvedValue(0);
+        const updateSpy = jest
+            .spyOn(prisma.post, 'update')
+            .mockResolvedValue({ id: mockPostId } as Post);
+
+        await service.editPost(mockToken, mockPostId, undefined, '0', mockFile);
+
+        expect(updateSpy).toHaveBeenCalledWith(
+            expect.objectContaining({
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+                data: expect.objectContaining({
+                    leftVideo: 'http://download-url.com/new-video',
+                }),
+            }),
+        );
+    });
+
+    it('should successfully update right video when numeric index 1 is passed', async () => {
+        const mockPostBoth: Partial<Post> = {
+            id: mockPostId,
+            ownerId: 'gv1',
+            content: 'Old content',
+            media: ['v1.mp4', 'v2.mp4'],
+            leftVideo: 'v1.mp4',
+            rightVideo: 'v2.mp4',
+        };
+        jest.spyOn(prisma.user, 'findFirst').mockResolvedValue(mockUser as User);
+        jest.spyOn(prisma.post, 'findUnique').mockResolvedValue(mockPostBoth as Post);
+        jest.spyOn(prisma.post, 'count').mockResolvedValue(0);
+        const updateSpy = jest
+            .spyOn(prisma.post, 'update')
+            .mockResolvedValue({ id: mockPostId } as Post);
+
+        await service.editPost(mockToken, mockPostId, undefined, '1', undefined, mockFile);
+
+        expect(updateSpy).toHaveBeenCalledWith(
+            expect.objectContaining({
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+                data: expect.objectContaining({
+                    rightVideo: 'http://download-url.com/new-video',
+                }),
+            }),
+        );
+    });
 });

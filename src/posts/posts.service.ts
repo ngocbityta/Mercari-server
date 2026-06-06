@@ -1,14 +1,19 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma, Post, User } from '@prisma/client';
 import { ResponseCode } from '../enums/response-code.enum';
 import { IPostQuery, IPostCommand, PostResponse } from './posts.interfaces.ts';
 import { ApiException } from '../common/exceptions/api.exception.ts';
+import { ConfigService } from '@nestjs/config';
 
 import { MediaService } from './media.service';
 import { EventsGateway } from '../events/events.gateway.ts';
 import { SearchService } from '../search/search.service.ts';
 import 'multer';
+
+// Fixed UUID of the system bot user seeded via migration.
+// This account is the author of all auto-generated score comments.
+const SYSTEM_BOT_USER_ID = '00000000-0000-0000-0000-000000000001';
 
 interface PostWithThumbs {
     leftVideoThumb?: string | null;
@@ -22,6 +27,7 @@ export class PostsService implements IPostQuery, IPostCommand {
         private mediaService: MediaService,
         private eventsGateway: EventsGateway,
         private searchService: SearchService,
+        @Optional() private readonly configService?: ConfigService,
     ) {}
 
     async addPost(
@@ -153,6 +159,13 @@ export class PostsService implements IPostQuery, IPostCommand {
         });
 
         await this.searchService.indexPost(post);
+
+        // Trigger pose grading in background if this is a student's submission to a teacher's exercise
+        if (user.role === 'HV' && post.exerciseId) {
+            this.triggerPoseGrading(post.id).catch((err) => {
+                console.error('[PoseGrade] Background grading initialization failed:', err);
+            });
+        }
 
         if (user.role === 'GV') {
             try {
@@ -304,6 +317,16 @@ export class PostsService implements IPostQuery, IPostCommand {
                 } else if (index === 'all' || index === 'lr') {
                     videosToDelete.push('left');
                     videosToDelete.push('right');
+                } else if (index === '0' || index === '1') {
+                    const idx = parseInt(index, 10);
+                    if (post.media && post.media[idx]) {
+                        const url = post.media[idx];
+                        if (url === post.leftVideo) {
+                            videosToDelete.push('left');
+                        } else if (url === post.rightVideo) {
+                            videosToDelete.push('right');
+                        }
+                    }
                 }
             }
         }
@@ -1231,10 +1254,14 @@ export class PostsService implements IPostQuery, IPostCommand {
             },
         });
 
+        // Score comments are attributed to the system bot, not the requester,
+        // so they appear as posted by "Hệ thống" instead of the post author.
+        const commentAuthorId = hasScore ? SYSTEM_BOT_USER_ID : user.id;
+
         await this.prisma.comment.create({
             data: {
                 postId,
-                authorId: user.id,
+                authorId: commentAuthorId,
                 ...(hasComment
                     ? { content: comment }
                     : { score, detailMistakes: detail_mistakes ?? null }),
@@ -1497,5 +1524,195 @@ export class PostsService implements IPostQuery, IPostCommand {
         }
 
         return {};
+    }
+
+    private extractVideoId(url: string | null | undefined): string | null {
+        if (!url) {
+            return null;
+        }
+        const match = url.match(/\/videos\/([^/]+)/);
+        return match ? match[1] : null;
+    }
+
+    private async runGradingJob(
+        baseUrl: string,
+        apiKey: string,
+        subject: string,
+        teacherVideoId: string,
+        studentVideoId: string,
+    ): Promise<{ score: number; rawDistance: number }> {
+        const response = await fetch(`${baseUrl}/v1/pose-grade/jobs`, {
+            method: 'POST',
+            headers: {
+                accept: 'application/json',
+                'Content-Type': 'application/json',
+                'X-WHAM-Subject': subject,
+                'X-WHAM-Api-Key': apiKey,
+            },
+            body: JSON.stringify({
+                source_video_id_a: teacherVideoId,
+                source_video_id_b: studentVideoId,
+            }),
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Pose grading API error: ${response.statusText} - ${errorText}`);
+        }
+
+        const jobData = (await response.json()) as { job_id: string; status: string };
+        const jobId = jobData.job_id;
+
+        let attempts = 0;
+        const maxAttempts = 3;
+        let success = false;
+        let score = 0;
+        let rawDistance = 0;
+
+        while (attempts < maxAttempts) {
+            attempts++;
+            await new Promise((resolve) => setTimeout(resolve, 3000));
+
+            const checkResponse = await fetch(`${baseUrl}/v1/jobs/${jobId}`, {
+                method: 'GET',
+                headers: {
+                    accept: 'application/json',
+                    'X-WHAM-Subject': subject,
+                    'X-WHAM-Api-Key': apiKey,
+                },
+            });
+
+            if (!checkResponse.ok) {
+                console.error(`[PoseGrade] Error checking job status: ${checkResponse.statusText}`);
+                continue;
+            }
+
+            const checkData = (await checkResponse.json()) as {
+                status: string;
+                job_output?: { score?: number; raw_distance?: number };
+            };
+
+            // eslint-disable-next-line no-console
+            console.log(
+                `[PoseGrade] Checking job ${jobId} status, attempt ${attempts}/${maxAttempts}: ${checkData.status}`,
+            );
+
+            if (checkData.status === 'success') {
+                success = true;
+                score = checkData.job_output?.score ?? 0;
+                rawDistance = checkData.job_output?.raw_distance ?? 0;
+                break;
+            } else if (checkData.status === 'failed') {
+                console.error(`[PoseGrade] Job ${jobId} failed on server.`);
+                break;
+            }
+        }
+
+        if (!success) {
+            throw new Error(`Job ${jobId} did not complete successfully.`);
+        }
+
+        return { score, rawDistance };
+    }
+
+    async triggerPoseGrading(studentPostId: string): Promise<void> {
+        const studentPost = await this.prisma.post.findUnique({
+            where: { id: studentPostId },
+        });
+
+        if (!studentPost || !studentPost.exerciseId) {
+            // eslint-disable-next-line no-console
+            console.log(
+                `[PoseGrade] Post ${studentPostId} is not a student submission or not found.`,
+            );
+            return;
+        }
+
+        const exercisePost = await this.prisma.post.findUnique({
+            where: { id: studentPost.exerciseId },
+        });
+
+        if (!exercisePost) {
+            // eslint-disable-next-line no-console
+            console.log(`[PoseGrade] Exercise post ${studentPost.exerciseId} not found.`);
+            return;
+        }
+
+        const studentLeftVideoId = this.extractVideoId(studentPost.leftVideo);
+        const studentRightVideoId = this.extractVideoId(studentPost.rightVideo);
+        const teacherLeftVideoId = this.extractVideoId(exercisePost.leftVideo);
+        const teacherRightVideoId = this.extractVideoId(exercisePost.rightVideo);
+
+        if (
+            !studentLeftVideoId ||
+            !studentRightVideoId ||
+            !teacherLeftVideoId ||
+            !teacherRightVideoId
+        ) {
+            // eslint-disable-next-line no-console
+            console.log(
+                `[PoseGrade] Could not extract all required video IDs for student post ${studentPostId}`,
+            );
+            return;
+        }
+
+        const baseUrl =
+            this.configService?.get<string>('MEDIA_BASE_URL') ||
+            process.env.MEDIA_BASE_URL ||
+            'http://localhost:8000';
+        const apiKey =
+            this.configService?.get<string>('MEDIA_API_KEY') ||
+            process.env.MEDIA_API_KEY ||
+            'default_key';
+        const subject =
+            this.configService?.get<string>('MEDIA_API_SUBJECT') ||
+            process.env.MEDIA_API_SUBJECT ||
+            'default_subject';
+
+        try {
+            // eslint-disable-next-line no-console
+            console.log(`[PoseGrade] Submitting parallel jobs for student post ${studentPostId}`);
+
+            // Run both grading jobs in parallel
+            const [leftResult, rightResult] = await Promise.all([
+                this.runGradingJob(
+                    baseUrl,
+                    apiKey,
+                    subject,
+                    teacherLeftVideoId,
+                    studentLeftVideoId,
+                ),
+                this.runGradingJob(
+                    baseUrl,
+                    apiKey,
+                    subject,
+                    teacherRightVideoId,
+                    studentRightVideoId,
+                ),
+            ]);
+
+            const averageScore = (leftResult.score + rightResult.score) / 2;
+            // eslint-disable-next-line no-console
+            console.log(
+                `[PoseGrade] Both jobs successful! Left Score: ${leftResult.score}, Right Score: ${rightResult.score}, Avg: ${averageScore}`,
+            );
+
+            // Create the comment on the student's post authored by the system bot user
+            await this.prisma.comment.create({
+                data: {
+                    postId: studentPostId,
+                    authorId: SYSTEM_BOT_USER_ID,
+                    score: averageScore.toString(),
+                    detailMistakes: `Left video raw distance: ${leftResult.rawDistance}. Right video raw distance: ${rightResult.rawDistance}.`,
+                },
+            });
+
+            // eslint-disable-next-line no-console
+            console.log(
+                `[PoseGrade] Successfully saved AI grading comment for post ${studentPostId}`,
+            );
+        } catch (error) {
+            console.error('[PoseGrade] Failed to complete pose grading:', error);
+        }
     }
 }
