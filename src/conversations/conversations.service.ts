@@ -70,7 +70,7 @@ export class ConversationsService implements IConversationQuery, IConversationCo
                         ? {
                               message: lastMessage.content ?? '',
                               created: lastMessage.createdAt.toISOString(),
-                              unread: unreadCount > 0 ? '1' : '0',
+                              unread: lastMessage.isRead ? '0' : '1',
                           }
                         : null,
                     created: conv.createdAt.toISOString(),
@@ -241,6 +241,11 @@ export class ConversationsService implements IConversationQuery, IConversationCo
 
         await this.prisma.conversation.update({
             where: { id: conversation.id },
+            data: { isDeleted: true },
+        });
+
+        await this.prisma.message.updateMany({
+            where: { conversationId: conversation.id },
             data: { isDeleted: true },
         });
 
