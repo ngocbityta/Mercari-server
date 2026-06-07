@@ -53,6 +53,9 @@ const mockPrisma = {
         findUnique: jest.fn(),
         count: jest.fn(),
     },
+    notification: {
+        updateMany: jest.fn(),
+    },
 };
 
 describe('ProfileService', () => {
