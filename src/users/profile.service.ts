@@ -9,8 +9,23 @@ export class ProfileService {
     constructor(private readonly prisma: PrismaService) {}
 
     async getUserInfo(currentUser: User, targetUserId?: string) {
-        if (!targetUserId || targetUserId === currentUser.id) {
-            return this.formatUserInfo(currentUser);
+        const isOwnProfile = !targetUserId || targetUserId === currentUser.id;
+
+        if (isOwnProfile) {
+            const [listing, followed] = await Promise.all([
+                this.prisma.post.count({ where: { ownerId: currentUser.id } }),
+                currentUser.role === 'GV'
+                    ? this.prisma.enrollment.count({ where: { teacherId: currentUser.id } })
+                    : this.prisma.enrollment.count({ where: { studentId: currentUser.id } }),
+            ]);
+
+            return this.formatUserInfo(currentUser, {
+                showPhone: true,
+                isRelated: false,
+                isBlocked: false,
+                listing,
+                followed,
+            });
         }
 
         const targetUser = await this.prisma.user.findUnique({
@@ -21,7 +36,8 @@ export class ProfileService {
             throw new ApiException(ResponseCode.NO_DATA, 'User not found');
         }
 
-        const isBlocked = await this.prisma.block.findUnique({
+        // Kiểm tra targetUser có block currentUser không
+        const blockedByTarget = await this.prisma.block.findUnique({
             where: {
                 blockerId_blockedId: {
                     blockerId: targetUserId,
@@ -30,11 +46,41 @@ export class ProfileService {
             },
         });
 
-        if (isBlocked) {
+        if (blockedByTarget) {
             throw new ApiException(ResponseCode.NO_DATA, 'User not found');
         }
 
-        return this.formatUserInfo(targetUser);
+        // Kiểm tra currentUser có block targetUser không
+        const hasBlockedTarget = await this.prisma.block.findUnique({
+            where: {
+                blockerId_blockedId: {
+                    blockerId: currentUser.id,
+                    blockedId: targetUserId,
+                },
+            },
+        });
+
+        // Kiểm tra quan hệ GV-HV (isRelated)
+        const enrollmentWhere =
+            currentUser.role === 'HV'
+                ? { studentId_teacherId: { studentId: currentUser.id, teacherId: targetUserId } }
+                : { studentId_teacherId: { studentId: targetUserId, teacherId: currentUser.id } };
+
+        const [enrollment, listing, followed] = await Promise.all([
+            this.prisma.enrollment.findUnique({ where: enrollmentWhere }),
+            this.prisma.post.count({ where: { ownerId: targetUserId } }),
+            targetUser.role === 'GV'
+                ? this.prisma.enrollment.count({ where: { teacherId: targetUserId } })
+                : this.prisma.enrollment.count({ where: { studentId: targetUserId } }),
+        ]);
+
+        return this.formatUserInfo(targetUser, {
+            showPhone: false,
+            isRelated: !!enrollment,
+            isBlocked: !!hasBlockedTarget,
+            listing,
+            followed,
+        });
     }
 
     async setUserInfo(data: {
@@ -121,18 +167,41 @@ export class ProfileService {
             }
         }
 
-        return this.formatUserInfo(savedUser);
+        return this.formatUserInfo(savedUser, { showPhone: true });
     }
 
-    formatUserInfo(user: User) {
+    formatUserInfo(
+        user: User,
+        extras: {
+            showPhone?: boolean;
+            isRelated?: boolean;
+            isBlocked?: boolean;
+            listing?: number;
+            followed?: number;
+        } = {},
+    ) {
+        const {
+            showPhone = false,
+            isRelated = false,
+            isBlocked = false,
+            listing = 0,
+            followed = 0,
+        } = extras;
+
         return {
             id: user.id,
             username: user.username ?? '',
+            ...(showPhone && { phonenumber: user.phonenumber }),
             avatar: user.avatar ?? '',
             coverImage: user.coverImage ?? '',
             description: user.description ?? '',
+            role: user.role,
             online: user.online ? '1' : '0',
             created: user.createdAt?.toISOString() ?? '',
+            isRelated: isRelated ? '1' : '0',
+            listing: String(listing),
+            followed: String(followed),
+            isBlocked: isBlocked ? '1' : '0',
         };
     }
 }
