@@ -46,6 +46,13 @@ const mockPrisma = {
     block: {
         findUnique: jest.fn(),
     },
+    post: {
+        count: jest.fn(),
+    },
+    enrollment: {
+        findUnique: jest.fn(),
+        count: jest.fn(),
+    },
 };
 
 describe('ProfileService', () => {
@@ -54,6 +61,12 @@ describe('ProfileService', () => {
 
     beforeEach(async () => {
         jest.clearAllMocks();
+        // Default mocks cho các query đếm (own profile)
+        mockPrisma.post.count.mockResolvedValue(0);
+        mockPrisma.enrollment.count.mockResolvedValue(0);
+        mockPrisma.enrollment.findUnique.mockResolvedValue(null);
+        mockPrisma.block.findUnique.mockResolvedValue(null);
+
         const module: TestingModule = await Test.createTestingModule({
             providers: [ProfileService, { provide: PrismaService, useValue: mockPrisma }],
         }).compile();
@@ -64,16 +77,25 @@ describe('ProfileService', () => {
 
     describe('getUserInfo', () => {
         it('TC1: should return own user info when no userId provided', async () => {
+            mockPrisma.post.count.mockResolvedValue(5);
+            mockPrisma.enrollment.count.mockResolvedValue(3);
+
             const result = await service.getUserInfo(mockUser);
 
             expect(result).toEqual({
                 id: mockUser.id,
                 username: 'testuser',
+                phonenumber: '0123456789',
                 avatar: 'avatar-url',
                 coverImage: 'cover-url',
                 description: 'A description',
+                role: UserRole.HV,
                 online: '1',
                 created: mockUser.createdAt.toISOString(),
+                isRelated: '0',
+                listing: '5',
+                followed: '3',
+                isBlocked: '0',
             });
         });
 
@@ -81,16 +103,55 @@ describe('ProfileService', () => {
             const result = await service.getUserInfo(mockUser, mockUser.id);
 
             expect(result.id).toBe(mockUser.id);
+            expect(result.phonenumber).toBe('0123456789');
+            expect(result.role).toBe(UserRole.HV);
+            expect(result.isBlocked).toBe('0');
         });
 
         it('TC2: should return other user info when valid userId provided', async () => {
             prisma.user.findUnique.mockResolvedValue(mockOtherUser);
             prisma.block.findUnique.mockResolvedValue(null);
+            mockPrisma.enrollment.findUnique.mockResolvedValue(null);
+            mockPrisma.post.count.mockResolvedValue(10);
+            mockPrisma.enrollment.count.mockResolvedValue(2);
 
             const result = await service.getUserInfo(mockUser, mockOtherUser.id);
 
             expect(result.id).toBe(mockOtherUser.id);
             expect(result.username).toBe('otheruser');
+            expect((result as any).phonenumber).toBeUndefined();
+            expect(result.role).toBe(UserRole.HV);
+            expect(result.isRelated).toBe('0');
+            expect(result.listing).toBe('10');
+            expect(result.followed).toBe('2');
+            expect(result.isBlocked).toBe('0');
+        });
+
+        it('TC2b: should return isRelated=1 when enrollment exists between users', async () => {
+            prisma.user.findUnique.mockResolvedValue(mockOtherUser);
+            prisma.block.findUnique.mockResolvedValue(null);
+            mockPrisma.enrollment.findUnique.mockResolvedValue({ id: 'enroll-1' });
+            mockPrisma.post.count.mockResolvedValue(0);
+            mockPrisma.enrollment.count.mockResolvedValue(0);
+
+            const result = await service.getUserInfo(mockUser, mockOtherUser.id);
+
+            expect(result.isRelated).toBe('1');
+        });
+
+        it('TC2c: should return isBlocked=1 when current user has blocked target', async () => {
+            prisma.user.findUnique.mockResolvedValue(mockOtherUser);
+            // 1st call: blockedByTarget = null, 2nd call: hasBlockedTarget = exists
+            prisma.block.findUnique
+                .mockResolvedValueOnce(null)
+                .mockResolvedValueOnce({ blockerId: mockUser.id, blockedId: mockOtherUser.id });
+            mockPrisma.enrollment.findUnique.mockResolvedValue(null);
+            mockPrisma.post.count.mockResolvedValue(0);
+            mockPrisma.enrollment.count.mockResolvedValue(0);
+
+            const result = await service.getUserInfo(mockUser, mockOtherUser.id);
+
+            expect(result.isBlocked).toBe('1');
         });
 
         it('TC5: should throw ApiException (NO_DATA) when target user does not exist', async () => {
@@ -148,6 +209,9 @@ describe('ProfileService', () => {
             expect(result.avatar).toBe('');
             expect(result.coverImage).toBe('');
             expect(result.description).toBe('');
+            expect(result.role).toBe(UserRole.HV);
+            expect(result.listing).toBe('0');
+            expect(result.followed).toBe('0');
         });
     });
 
