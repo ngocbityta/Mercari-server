@@ -15,7 +15,7 @@ export class SearchService {
 
     async indexPost(post: any) {
         try {
-            await this.elasticsearchService.index({
+            await (this.elasticsearchService as any).index({
                 index: 'posts',
                 id: post.id,
                 document: {
@@ -34,7 +34,7 @@ export class SearchService {
 
     async updatePost(post: any) {
         try {
-            await this.elasticsearchService.update({
+            await (this.elasticsearchService as any).update({
                 index: 'posts',
                 id: post.id,
                 doc: {
@@ -51,7 +51,7 @@ export class SearchService {
 
     async removePost(postId: string) {
         try {
-            await this.elasticsearchService.delete({
+            await (this.elasticsearchService as any).delete({
                 index: 'posts',
                 id: postId,
             });
@@ -86,7 +86,7 @@ export class SearchService {
         }
 
         try {
-            const result = await this.elasticsearchService.search({
+            const result = await (this.elasticsearchService as any).search({
                 index: 'posts',
                 query: {
                     bool: {
@@ -109,7 +109,7 @@ export class SearchService {
 
     async indexUser(user: any) {
         try {
-            await this.elasticsearchService.index({
+            await (this.elasticsearchService as any).index({
                 index: 'users',
                 id: user.id,
                 document: {
@@ -127,7 +127,7 @@ export class SearchService {
 
     async updateUser(user: any) {
         try {
-            await this.elasticsearchService.update({
+            await (this.elasticsearchService as any).update({
                 index: 'users',
                 id: user.id,
                 doc: {
@@ -144,7 +144,7 @@ export class SearchService {
 
     async removeUser(userId: string) {
         try {
-            await this.elasticsearchService.delete({
+            await (this.elasticsearchService as any).delete({
                 index: 'users',
                 id: userId,
             });
@@ -158,7 +158,7 @@ export class SearchService {
 
     async searchUsers(text: string) {
         try {
-            const result = await this.elasticsearchService.search({
+            const result = await (this.elasticsearchService as any).search({
                 index: 'users',
                 query: {
                     multi_match: {

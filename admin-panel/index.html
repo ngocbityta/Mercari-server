@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mercari Admin Portal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css?v=2.0">
+</head>
+<body>
+    <div id="app">
+        <!-- SPA content will be injected here -->
+    </div>
+
+    <!-- Toast container -->
+    <div id="toast-container"></div>
+
+    <!-- Modals container -->
+    <div id="modal-container"></div>
+    <div id="error-log" style="position:fixed; bottom:0; left:0; right:0; background:rgba(255,0,0,0.8); color:white; padding:10px; z-index:9999; font-family:monospace; display:none;"></div>
+
+    <script>
+        window.addEventListener('error', function(e) {
+            const errDiv = document.getElementById('error-log');
+            errDiv.style.display = 'block';
+            errDiv.innerHTML += e.message + '<br>' + e.filename + ':' + e.lineno + '<br>';
+        });
+        window.addEventListener('unhandledrejection', function(e) {
+            const errDiv = document.getElementById('error-log');
+            errDiv.style.display = 'block';
+            errDiv.innerHTML += 'Promise Error: ' + e.reason + '<br>';
+        });
+    </script>
+    
+    <!-- Scripts -->
+    <script src="js/app.js" type="module"></script>
+</body>
+</html>

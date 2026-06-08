@@ -70,7 +70,7 @@ export class ConversationsService implements IConversationQuery, IConversationCo
                         ? {
                               message: lastMessage.content ?? '',
                               created: lastMessage.createdAt.toISOString(),
-                              unread: lastMessage.isRead ? '0' : '1',
+                              unread: unreadCount.toString(),
                           }
                         : null,
                     created: conv.createdAt.toISOString(),
