@@ -1193,6 +1193,8 @@ export class PostsService implements IPostQuery, IPostCommand {
         const data = comments.map((c) => ({
             id: c.id,
             comment: c.content,
+            score: c.score,
+            detail_mistakes: c.detailMistakes,
             created: c.createdAt.toISOString(),
             poster: {
                 id: c.author.id,
@@ -1557,7 +1559,20 @@ export class PostsService implements IPostQuery, IPostCommand {
 
         if (!response.ok) {
             const errorText = await response.text();
-            throw new Error(`Pose grading API error: ${response.statusText} - ${errorText}`);
+            let parsedError = errorText;
+            try {
+                const parsed = JSON.parse(errorText) as unknown;
+                if (parsed && typeof parsed === 'object') {
+                    const parsedRecord = parsed as Record<string, unknown>;
+                    parsedError =
+                        (typeof parsedRecord.error === 'string' ? parsedRecord.error : null) ||
+                        (typeof parsedRecord.message === 'string' ? parsedRecord.message : null) ||
+                        errorText;
+                }
+            } catch {
+                // Keep original text
+            }
+            throw new Error(parsedError);
         }
 
         const jobData = (await response.json()) as { job_id: string; status: string };
@@ -1590,6 +1605,7 @@ export class PostsService implements IPostQuery, IPostCommand {
             const checkData = (await checkResponse.json()) as {
                 status: string;
                 job_output?: { score?: number; raw_distance?: number };
+                error_summary?: string;
             };
 
             // eslint-disable-next-line no-console
@@ -1604,7 +1620,16 @@ export class PostsService implements IPostQuery, IPostCommand {
                 break;
             } else if (checkData.status === 'failed') {
                 console.error(`[PoseGrade] Job ${jobId} failed on server.`);
-                break;
+                let errMsg = checkData.error_summary || 'Job failed on server';
+                try {
+                    const parsed = JSON.parse(errMsg) as Record<string, unknown>;
+                    if (parsed && typeof parsed.error === 'string') {
+                        errMsg = parsed.error;
+                    }
+                } catch {
+                    // Keep original
+                }
+                throw new Error(errMsg);
             }
         }
 
@@ -1713,6 +1738,65 @@ export class PostsService implements IPostQuery, IPostCommand {
             );
         } catch (error) {
             console.error('[PoseGrade] Failed to complete pose grading:', error);
+
+            const commentContent =
+                'There are no longer any instances available with the requested specifications. Please refresh and try again.';
+
+            try {
+                await this.prisma.comment.create({
+                    data: {
+                        postId: studentPostId,
+                        authorId: SYSTEM_BOT_USER_ID,
+                        content: commentContent,
+                    },
+                });
+                // eslint-disable-next-line no-console
+                console.log(`[PoseGrade] Saved error comment for post ${studentPostId}`);
+            } catch (commentError) {
+                console.error('[PoseGrade] Failed to save error comment:', commentError);
+            }
         }
+    }
+
+    async regradePost(token: string, postId: string) {
+        const user = await this.prisma.user.findFirst({ where: { token } });
+        if (!user) {
+            throw new ApiException(ResponseCode.TOKEN_INVALID, 'Token is invalid');
+        }
+
+        if (user.status === 'LOCKED') {
+            throw new ApiException(ResponseCode.ACCOUNT_LOCKED, 'Account is locked');
+        }
+
+        if (user.role !== 'GV') {
+            throw new ApiException(ResponseCode.NOT_ACCESS, 'Only teachers can regrade posts');
+        }
+
+        const post = await this.prisma.post.findUnique({ where: { id: postId } });
+        if (!post) {
+            throw new ApiException(ResponseCode.POST_NOT_FOUND, 'Post not found');
+        }
+
+        if (!post.exerciseId) {
+            throw new ApiException(
+                ResponseCode.INVALID_PARAMETER_VALUE,
+                'Post is not a student submission',
+            );
+        }
+
+        // Delete all existing system bot comments on this post
+        await this.prisma.comment.deleteMany({
+            where: {
+                postId,
+                authorId: SYSTEM_BOT_USER_ID,
+            },
+        });
+
+        // Re-trigger grading in background
+        this.triggerPoseGrading(postId).catch((err) => {
+            console.error('[PoseGrade] Background regrade failed:', err);
+        });
+
+        return {};
     }
 }

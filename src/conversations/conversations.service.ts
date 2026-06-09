@@ -50,14 +50,14 @@ export class ConversationsService implements IConversationQuery, IConversationCo
                     orderBy: { createdAt: 'desc' },
                 });
 
-                const unreadCount = await this.prisma.message.count({
-                    where: {
-                        conversationId: conv.id,
-                        receiverId: user.id,
-                        isRead: false,
-                        isDeleted: false,
-                    },
-                });
+                // const unreadCount = await this.prisma.message.count({
+                //     where: {
+                //         conversationId: conv.id,
+                //         receiverId: user.id,
+                //         isRead: false,
+                //         isDeleted: false,
+                //     },
+                // });
 
                 return {
                     id: conv.id,

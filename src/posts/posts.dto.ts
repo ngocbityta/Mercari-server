@@ -238,3 +238,13 @@ export class DelSavedSearchDto {
     @IsString()
     all?: string; // "1" for all, "0" for single
 }
+
+export class RegradePostDto {
+    @IsString()
+    @IsNotEmpty()
+    token: string;
+
+    @IsString()
+    @IsNotEmpty()
+    id: string;
+}
