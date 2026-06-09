@@ -17,11 +17,36 @@ export class SearchService implements OnModuleInit {
 
     async onModuleInit() {
         try {
+            await this.waitForElasticsearch();
             await this.syncAll();
             this.logger.log('Initial sync to Elasticsearch completed');
         } catch (error) {
             this.logger.error(`Error during initial sync to Elasticsearch: ${error.message}`);
         }
+    }
+
+    private async waitForElasticsearch() {
+        const maxAttempts = 30;
+        const delayMs = 2000;
+
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                const health = await this.elasticsearchService.cluster.health({
+                    wait_for_status: 'yellow',
+                    timeout: '5s',
+                });
+
+                this.logger.log(`Elasticsearch ready (${health.status})`);
+
+                return;
+            } catch (error) {
+                this.logger.warn(`Waiting for Elasticsearch (${attempt}/${maxAttempts})`);
+
+                await new Promise((resolve) => setTimeout(resolve, delayMs));
+            }
+        }
+
+        throw new Error('Elasticsearch failed to become ready');
     }
 
     // ---- POSTS ----
