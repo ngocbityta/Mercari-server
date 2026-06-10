@@ -1764,24 +1764,9 @@ export class PostsService implements IPostQuery, IPostCommand {
             throw new ApiException(ResponseCode.TOKEN_INVALID, 'Token is invalid');
         }
 
-        if (user.status === 'LOCKED') {
-            throw new ApiException(ResponseCode.ACCOUNT_LOCKED, 'Account is locked');
-        }
-
-        if (user.role !== 'GV') {
-            throw new ApiException(ResponseCode.NOT_ACCESS, 'Only teachers can regrade posts');
-        }
-
         const post = await this.prisma.post.findUnique({ where: { id: postId } });
         if (!post) {
             throw new ApiException(ResponseCode.POST_NOT_FOUND, 'Post not found');
-        }
-
-        if (!post.exerciseId) {
-            throw new ApiException(
-                ResponseCode.INVALID_PARAMETER_VALUE,
-                'Post is not a student submission',
-            );
         }
 
         // Delete all existing system bot comments on this post
