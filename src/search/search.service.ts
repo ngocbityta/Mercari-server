@@ -53,7 +53,7 @@ export class SearchService implements OnModuleInit {
 
     async indexPost(post: any) {
         try {
-            await (this.elasticsearchService as any).index({
+            await this.elasticsearchService.index({
                 index: this.POSTS_INDEX,
                 id: post.id,
                 document: this.mapPostToDocument(post),
@@ -78,7 +78,7 @@ export class SearchService implements OnModuleInit {
 
     async updatePost(post: any) {
         try {
-            await (this.elasticsearchService as any).update({
+            await this.elasticsearchService.update({
                 index: 'posts',
                 id: post.id,
                 doc: {
@@ -95,7 +95,7 @@ export class SearchService implements OnModuleInit {
 
     async removePost(postId: string) {
         try {
-            await (this.elasticsearchService as any).delete({
+            await this.elasticsearchService.delete({
                 index: 'posts',
                 id: postId,
             });
@@ -130,7 +130,7 @@ export class SearchService implements OnModuleInit {
         }
 
         try {
-            const result = await (this.elasticsearchService as any).search({
+            const result = await this.elasticsearchService.search({
                 index: 'posts',
                 query: {
                     bool: {
@@ -153,7 +153,7 @@ export class SearchService implements OnModuleInit {
 
     async indexUser(user: any) {
         try {
-            await (this.elasticsearchService as any).index({
+            await this.elasticsearchService.index({
                 index: this.USERS_INDEX,
                 id: user.id,
                 document: this.mapUserToDocument(user),
@@ -177,7 +177,7 @@ export class SearchService implements OnModuleInit {
 
     async updateUser(user: any) {
         try {
-            await (this.elasticsearchService as any).update({
+            await this.elasticsearchService.update({
                 index: 'users',
                 id: user.id,
                 doc: {
@@ -194,7 +194,7 @@ export class SearchService implements OnModuleInit {
 
     async removeUser(userId: string) {
         try {
-            await (this.elasticsearchService as any).delete({
+            await this.elasticsearchService.delete({
                 index: 'users',
                 id: userId,
             });
@@ -208,7 +208,7 @@ export class SearchService implements OnModuleInit {
 
     async searchUsers(text: string) {
         try {
-            const result = await (this.elasticsearchService as any).search({
+            const result = await this.elasticsearchService.search({
                 index: 'users',
                 query: {
                     multi_match: {
