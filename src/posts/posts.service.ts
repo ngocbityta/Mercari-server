@@ -1696,25 +1696,23 @@ export class PostsService implements IPostQuery, IPostCommand {
 
         try {
             // eslint-disable-next-line no-console
-            console.log(`[PoseGrade] Submitting parallel jobs for student post ${studentPostId}`);
+            console.log(`[PoseGrade] Submitting sequential jobs for student post ${studentPostId}`);
 
-            // Run both grading jobs in parallel
-            const [leftResult, rightResult] = await Promise.all([
-                this.runGradingJob(
-                    baseUrl,
-                    apiKey,
-                    subject,
-                    teacherLeftVideoId,
-                    studentLeftVideoId,
-                ),
-                this.runGradingJob(
-                    baseUrl,
-                    apiKey,
-                    subject,
-                    teacherRightVideoId,
-                    studentRightVideoId,
-                ),
-            ]);
+            // Run grading jobs sequentially to prevent server / GPU overload
+            const leftResult = await this.runGradingJob(
+                baseUrl,
+                apiKey,
+                subject,
+                teacherLeftVideoId,
+                studentLeftVideoId,
+            );
+            const rightResult = await this.runGradingJob(
+                baseUrl,
+                apiKey,
+                subject,
+                teacherRightVideoId,
+                studentRightVideoId,
+            );
 
             const averageScore = (leftResult.score + rightResult.score) / 2;
             // eslint-disable-next-line no-console
