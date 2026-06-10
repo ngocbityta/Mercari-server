@@ -1799,4 +1799,49 @@ export class PostsService implements IPostQuery, IPostCommand {
 
         return {};
     }
+
+    async getListReports(token: string, indexStr: string, countStr: string) {
+        const adminUser = await this.prisma.user.findFirst({ where: { token } });
+        if (!adminUser || adminUser.role !== 'GV') {
+            throw new ApiException(ResponseCode.NOT_ACCESS, 'Permission denied');
+        }
+
+        const index = parseInt(indexStr, 10);
+        const count = parseInt(countStr, 10);
+
+        if (isNaN(index) || isNaN(count) || index < 0 || count <= 0) {
+            throw new ApiException(ResponseCode.INVALID_PARAMETER_VALUE, 'Invalid parameters');
+        }
+
+        const reports = await this.prisma.report.findMany({
+            skip: index,
+            take: count,
+            orderBy: { createdAt: 'desc' },
+            include: {
+                user: { select: { id: true, username: true, avatar: true } },
+                post: { select: { id: true, content: true, media: true } }
+            }
+        });
+
+        if (reports.length === 0) {
+            throw new ApiException(ResponseCode.NO_DATA, 'No data');
+        }
+
+        return reports.map(r => ({
+            id: r.id,
+            subject: r.subject,
+            details: r.details,
+            created: r.createdAt.toISOString(),
+            reporter: {
+                id: r.user.id,
+                username: r.user.username,
+                avatar: r.user.avatar
+            },
+            post: {
+                id: r.post.id,
+                content: r.post.content,
+                media: r.post.media.map(url => this.mediaService.getProxiedUrl(url))
+            }
+        }));
+    }
 }

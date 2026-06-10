@@ -28,6 +28,7 @@ import {
     ReportPostDto,
     SetCommentDto,
     RegradePostDto,
+    GetListReportsDto,
 } from './posts.dto.ts';
 import { ApiResponse } from '../common/dto/api-response.dto.ts';
 
@@ -226,6 +227,17 @@ export class PostsController {
     @HttpCode(HttpStatus.OK)
     async regradePost(@Body() body: RegradePostDto) {
         const result = await this.postsService.regradePost(body.token, body.id);
+        return ApiResponse.success(result);
+    }
+
+    @Post('get_list_reports')
+    @HttpCode(HttpStatus.OK)
+    async getListReports(@Body() body: GetListReportsDto) {
+        const result = await this.postsService.getListReports(
+            body.token,
+            body.index,
+            body.count
+        );
         return ApiResponse.success(result);
     }
 }

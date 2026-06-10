@@ -248,3 +248,17 @@ export class RegradePostDto {
     @IsNotEmpty()
     id: string;
 }
+
+export class GetListReportsDto {
+    @IsString()
+    @IsNotEmpty()
+    token: string;
+
+    @IsString()
+    @IsNotEmpty()
+    index: string;
+
+    @IsString()
+    @IsNotEmpty()
+    count: string;
+}
