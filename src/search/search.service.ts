@@ -39,7 +39,7 @@ export class SearchService implements OnModuleInit {
                 this.logger.log(`Elasticsearch ready (${health.status})`);
 
                 return;
-            } catch (error) {
+            } catch {
                 this.logger.warn(`Waiting for Elasticsearch (${attempt}/${maxAttempts})`);
 
                 await new Promise((resolve) => setTimeout(resolve, delayMs));
