@@ -1,35 +1,79 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ElasticsearchService } from '@nestjs/elasticsearch';
 import { PrismaService } from '../prisma/prisma.service.ts';
 
 @Injectable()
-export class SearchService {
+export class SearchService implements OnModuleInit {
     private readonly logger = new Logger(SearchService.name);
+
+    private readonly POSTS_INDEX = 'posts';
+
+    private readonly USERS_INDEX = 'users';
 
     constructor(
         private readonly elasticsearchService: ElasticsearchService,
         private readonly prisma: PrismaService,
     ) {}
 
+    async onModuleInit() {
+        try {
+            await this.waitForElasticsearch();
+            await this.syncAll();
+            this.logger.log('Initial sync to Elasticsearch completed');
+        } catch (error) {
+            this.logger.error(`Error during initial sync to Elasticsearch: ${error.message}`);
+        }
+    }
+
+    private async waitForElasticsearch() {
+        const maxAttempts = 30;
+        const delayMs = 2000;
+
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                const health = await this.elasticsearchService.cluster.health({
+                    wait_for_status: 'yellow',
+                    timeout: '5s',
+                });
+
+                this.logger.log(`Elasticsearch ready (${health.status})`);
+
+                return;
+            } catch (error) {
+                this.logger.warn(`Waiting for Elasticsearch (${attempt}/${maxAttempts})`);
+
+                await new Promise((resolve) => setTimeout(resolve, delayMs));
+            }
+        }
+
+        throw new Error('Elasticsearch failed to become ready');
+    }
+
     // ---- POSTS ----
 
     async indexPost(post: any) {
         try {
             await (this.elasticsearchService as any).index({
-                index: 'posts',
+                index: this.POSTS_INDEX,
                 id: post.id,
-                document: {
-                    content: post.content,
-                    hashtags: post.hashtags,
-                    ownerId: post.ownerId,
-                    createdAt: post.createdAt,
-                    updatedAt: post.updatedAt,
-                },
+                document: this.mapPostToDocument(post),
             });
             this.logger.log(`Indexed post ${post.id}`);
         } catch (error) {
             this.logger.error(`Error indexing post ${post.id}: ${error.message}`);
         }
+    }
+
+    private mapPostToDocument(
+        post: any,
+    ): { content: any; hashtags: any; ownerId: any; createdAt: any; updatedAt: any } | undefined {
+        return {
+            content: post.content,
+            hashtags: post.hashtags,
+            ownerId: post.ownerId,
+            createdAt: post.createdAt,
+            updatedAt: post.updatedAt,
+        };
     }
 
     async updatePost(post: any) {
@@ -110,19 +154,25 @@ export class SearchService {
     async indexUser(user: any) {
         try {
             await (this.elasticsearchService as any).index({
-                index: 'users',
+                index: this.USERS_INDEX,
                 id: user.id,
-                document: {
-                    username: user.username,
-                    description: user.description,
-                    role: user.role,
-                    createdAt: user.createdAt,
-                },
+                document: this.mapUserToDocument(user),
             });
             this.logger.log(`Indexed user ${user.id}`);
         } catch (error) {
             this.logger.error(`Error indexing user ${user.id}: ${error.message}`);
         }
+    }
+
+    private mapUserToDocument(
+        user: any,
+    ): { username: any; description: any; role: any; createdAt: any } | undefined {
+        return {
+            username: user.username,
+            description: user.description,
+            role: user.role,
+            createdAt: user.createdAt,
+        };
     }
 
     async updateUser(user: any) {
@@ -177,24 +227,112 @@ export class SearchService {
         }
     }
 
+    private readonly BATCH_SIZE = 1000;
+
     async syncAll() {
         this.logger.log('Starting sync all data to Elasticsearch...');
 
-        let postsCount = 0;
-        const posts = await this.prisma.post.findMany();
-        for (const post of posts) {
-            await this.indexPost(post);
-            postsCount++;
-        }
-
-        let usersCount = 0;
-        const users = await this.prisma.user.findMany();
-        for (const user of users) {
-            await this.indexUser(user);
-            usersCount++;
-        }
+        const postsCount = await this.syncPosts();
+        const usersCount = await this.syncUsers();
 
         this.logger.log(`Sync completed. Indexed ${postsCount} posts and ${usersCount} users.`);
-        return { message: 'Sync completed', postsCount, usersCount };
+
+        return {
+            message: 'Sync completed',
+            postsCount,
+            usersCount,
+        };
+    }
+
+    private async syncPosts(): Promise<number> {
+        let total = 0;
+        let cursor: string | undefined;
+
+        while (true) {
+            const posts = await this.prisma.post.findMany({
+                take: this.BATCH_SIZE,
+                ...(cursor && {
+                    skip: 1,
+                    cursor: { id: cursor },
+                }),
+                orderBy: { id: 'asc' },
+            });
+
+            if (posts.length === 0) {
+                break;
+            }
+
+            const operations = posts.flatMap((post) => [
+                {
+                    index: {
+                        _index: this.POSTS_INDEX,
+                        _id: post.id,
+                    },
+                },
+                this.mapPostToDocument(post),
+            ]);
+
+            const response = await this.elasticsearchService.bulk({
+                refresh: false,
+                operations,
+            });
+
+            if (response.errors) {
+                this.logger.error('Bulk post indexing contained errors');
+            }
+
+            total += posts.length;
+            cursor = posts[posts.length - 1].id;
+
+            this.logger.log(`Indexed ${total} posts`);
+        }
+
+        return total;
+    }
+
+    private async syncUsers(): Promise<number> {
+        let total = 0;
+        let cursor: string | undefined;
+
+        while (true) {
+            const users = await this.prisma.user.findMany({
+                take: this.BATCH_SIZE,
+                ...(cursor && {
+                    skip: 1,
+                    cursor: { id: cursor },
+                }),
+                orderBy: { id: 'asc' },
+            });
+
+            if (users.length === 0) {
+                break;
+            }
+
+            const operations = users.flatMap((user) => [
+                {
+                    index: {
+                        _index: this.USERS_INDEX,
+                        _id: user.id,
+                    },
+                },
+                this.mapUserToDocument(user),
+            ]);
+
+            const response = await this.elasticsearchService.bulk({
+                refresh: false,
+                operations,
+            });
+
+            if (response.errors) {
+                this.logger.error('Bulk user indexing contained errors');
+            }
+
+            total += users.length;
+            cursor = users[users.length - 1].id;
+
+            this.logger.log(`Indexed ${total} users`);
+        }
+
+        return total;
     }
 }

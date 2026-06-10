@@ -27,6 +27,7 @@ import {
     LikePostDto,
     ReportPostDto,
     SetCommentDto,
+    RegradePostDto,
 } from './posts.dto.ts';
 import { ApiResponse } from '../common/dto/api-response.dto.ts';
 
@@ -218,6 +219,13 @@ export class PostsController {
             body.score,
             body.detail_mistakes,
         );
+        return ApiResponse.success(result);
+    }
+
+    @Post('regrade_post')
+    @HttpCode(HttpStatus.OK)
+    async regradePost(@Body() body: RegradePostDto) {
+        const result = await this.postsService.regradePost(body.token, body.id);
         return ApiResponse.success(result);
     }
 }

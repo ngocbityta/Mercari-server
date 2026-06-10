@@ -8,6 +8,8 @@ services:
     depends_on:
       group1-db:
         condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.group1-backend.rule=Host(`group1.it4788.sukkaito.id.vn`)"
@@ -40,7 +42,7 @@ services:
       retries: 5
 
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.10.2
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.4.2
     container_name: elasticsearch
     environment:
       - discovery.type=single-node
@@ -50,6 +52,16 @@ services:
       - "9200:9200"
     networks:
       - proxy-net
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fs 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=5s' || exit 1"
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
     deploy:
       resources:
         limits:
