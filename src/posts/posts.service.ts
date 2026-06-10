@@ -1819,15 +1819,15 @@ export class PostsService implements IPostQuery, IPostCommand {
             orderBy: { createdAt: 'desc' },
             include: {
                 user: { select: { id: true, username: true, avatar: true } },
-                post: { select: { id: true, content: true, media: true } }
-            }
+                post: { select: { id: true, content: true, media: true } },
+            },
         });
 
         if (reports.length === 0) {
             throw new ApiException(ResponseCode.NO_DATA, 'No data');
         }
 
-        return reports.map(r => ({
+        return reports.map((r) => ({
             id: r.id,
             subject: r.subject,
             details: r.details,
@@ -1835,13 +1835,13 @@ export class PostsService implements IPostQuery, IPostCommand {
             reporter: {
                 id: r.user.id,
                 username: r.user.username,
-                avatar: r.user.avatar
+                avatar: r.user.avatar,
             },
             post: {
                 id: r.post.id,
                 content: r.post.content,
-                media: r.post.media.map(url => this.mediaService.getProxiedUrl(url))
-            }
+                media: r.post.media.map((url) => this.mediaService.getProxiedUrl(url)),
+            },
         }));
     }
 }

@@ -233,11 +233,7 @@ export class PostsController {
     @Post('get_list_reports')
     @HttpCode(HttpStatus.OK)
     async getListReports(@Body() body: GetListReportsDto) {
-        const result = await this.postsService.getListReports(
-            body.token,
-            body.index,
-            body.count
-        );
+        const result = await this.postsService.getListReports(body.token, body.index, body.count);
         return ApiResponse.success(result);
     }
 }
