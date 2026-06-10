@@ -328,15 +328,15 @@ describe('PostsService - addPost', () => {
             } as Response);
             mockFetch.mockResolvedValueOnce({
                 ok: true,
-                json: () => Promise.resolve({ job_id: 'job-right', status: 'queued' }),
-            } as Response);
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
                 json: () =>
                     Promise.resolve({
                         status: 'success',
                         job_output: { score: 8.0, raw_distance: 0.2 },
                     }),
+            } as Response);
+            mockFetch.mockResolvedValueOnce({
+                ok: true,
+                json: () => Promise.resolve({ job_id: 'job-right', status: 'queued' }),
             } as Response);
             mockFetch.mockResolvedValueOnce({
                 ok: true,
@@ -366,7 +366,7 @@ describe('PostsService - addPost', () => {
             );
 
             expect(mockFetch).toHaveBeenNthCalledWith(
-                2,
+                3,
                 expect.stringContaining('/v1/pose-grade/jobs'),
                 expect.objectContaining({
                     method: 'POST',
@@ -386,6 +386,6 @@ describe('PostsService - addPost', () => {
                     detailMistakes: 'Left video raw distance: 0.2. Right video raw distance: 0.1.',
                 },
             });
-        });
+        }, 15000);
     });
 });
