@@ -96,27 +96,19 @@ export class UsersService implements IUserQuery, IUserCommand {
             }
         }
 
-        const dataToUpdate: any = {
-            phonenumber: updateUserDto.phonenumber,
-            password: updateUserDto.password,
-            role: updateUserDto.role,
-            username: updateUserDto.username,
-            avatar: updateUserDto.avatar,
-            coverImage: updateUserDto.coverImage,
-            description: updateUserDto.description,
-            status: updateUserDto.status,
-            online: updateUserDto.online,
-        };
-
-        // If locking user, force them offline and clear their session token
-        if (updateUserDto.status === 'LOCKED') {
-            dataToUpdate.online = false;
-            dataToUpdate.token = null;
-        }
-
         const updatedUser = await this.prisma.user.update({
             where: { id },
-            data: dataToUpdate,
+            data: {
+                phonenumber: updateUserDto.phonenumber,
+                password: updateUserDto.password,
+                role: updateUserDto.role,
+                username: updateUserDto.username,
+                avatar: updateUserDto.avatar,
+                coverImage: updateUserDto.coverImage,
+                description: updateUserDto.description,
+                status: updateUserDto.status,
+                online: updateUserDto.online,
+            },
         });
 
         await this.searchService.updateUser(updatedUser);
