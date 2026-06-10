@@ -78,6 +78,10 @@ async function router() {
         if (path === '#/users/:id') routeFunc = renderUserDetail;
         else if (path === '#/posts') routeFunc = renderPosts;
         else if (path === '#/posts/:id') routeFunc = renderPostDetail;
+        else if (path === '#/courses') {
+            const { renderCourses } = await import('./pages/courses.js');
+            routeFunc = renderCourses;
+        }
 
         if (routeFunc) {
             await routeFunc(contentContainer, param);

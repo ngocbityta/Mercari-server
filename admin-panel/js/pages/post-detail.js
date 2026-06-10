@@ -19,7 +19,13 @@ export async function renderPostDetail(container, postId) {
                 <div class="glass-panel" style="padding: 1.25rem; flex: 1; display: flex; flex-direction: column; max-height: calc(100vh - 200px);">
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border-color);">
                         <h3 style="font-size: 0.9375rem;">💬 Bình luận & Chấm điểm</h3>
-                        <span id="comment-count-badge" style="font-size: 0.75rem; color: var(--text-muted);"></span>
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <button id="btn-grade-post" class="btn btn-primary" style="padding: 0.375rem 0.75rem; font-size: 0.75rem; display: none;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                                Chấm điểm
+                            </button>
+                            <span id="comment-count-badge" style="font-size: 0.75rem; color: var(--text-muted);"></span>
+                        </div>
                     </div>
                     <div id="comments-container" style="flex: 1; overflow-y: auto; padding-right: 0.25rem;">
                         <div class="skeleton skeleton-text" style="height: 60px; margin-bottom: 0.75rem;"></div>
@@ -142,11 +148,70 @@ export async function renderPostDetail(container, postId) {
 async function loadComments(postId) {
     const container = document.getElementById('comments-container');
     const countBadge = document.getElementById('comment-count-badge');
+    const btnGrade = document.getElementById('btn-grade-post');
     try {
         const res = await api.getComments(postId, '0', '100');
         const comments = Array.isArray(res) ? res : (res?.data || []);
 
         if (countBadge) countBadge.textContent = `${comments.length} bình luận`;
+
+        // Check if there is already a score
+        const hasScore = comments.some(c => c.score !== undefined && c.score !== null);
+        if (btnGrade) {
+            btnGrade.style.display = hasScore ? 'none' : 'flex';
+            
+            // Remove old listener to avoid duplicates if re-rendering
+            const newBtn = btnGrade.cloneNode(true);
+            btnGrade.parentNode.replaceChild(newBtn, btnGrade);
+            
+            newBtn.addEventListener('click', () => {
+                modal.custom(`
+                    <div style="padding: 1.5rem;">
+                        <h3 style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="color: var(--warning);">⭐</span> Chấm điểm bài tập
+                        </h3>
+                        <div class="form-group">
+                            <label class="form-label">Điểm số (VD: 8.5, 10)</label>
+                            <input type="number" id="grade-score" class="form-control" step="0.5" min="0" max="10" placeholder="Nhập điểm...">
+                        </div>
+                        <div class="form-group" style="margin-top: 1rem;">
+                            <label class="form-label">Chi tiết lỗi sai / Nhận xét</label>
+                            <textarea id="grade-details" class="form-control" rows="4" placeholder="Nhập chi tiết nhận xét để học viên cải thiện..."></textarea>
+                        </div>
+                        <div style="display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1.5rem;">
+                            <button id="btn-cancel-grade" class="btn btn-secondary">Hủy</button>
+                            <button id="btn-submit-grade" class="btn btn-primary">Xác nhận</button>
+                        </div>
+                    </div>
+                `);
+
+                document.getElementById('btn-cancel-grade').addEventListener('click', () => modal.close());
+                document.getElementById('btn-submit-grade').addEventListener('click', async () => {
+                    const score = document.getElementById('grade-score').value.trim();
+                    const details = document.getElementById('grade-details').value.trim();
+                    
+                    if (!score) {
+                        toast.error('Lỗi', 'Vui lòng nhập điểm số');
+                        return;
+                    }
+
+                    try {
+                        document.getElementById('btn-submit-grade').disabled = true;
+                        document.getElementById('btn-submit-grade').textContent = 'Đang xử lý...';
+                        
+                        await api.setComment(postId, '0', '1', '', score, details);
+                        
+                        modal.close();
+                        toast.success('Thành công', 'Đã chấm điểm bài đăng!');
+                        loadComments(postId); // Reload comments to show the grade
+                    } catch (error) {
+                        toast.error('Lỗi chấm điểm', error.message);
+                        document.getElementById('btn-submit-grade').disabled = false;
+                        document.getElementById('btn-submit-grade').textContent = 'Xác nhận';
+                    }
+                });
+            });
+        }
 
         if (comments.length === 0) {
             container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">💬</div><div class="empty-state-text">Chưa có bình luận nào</div></div>`;

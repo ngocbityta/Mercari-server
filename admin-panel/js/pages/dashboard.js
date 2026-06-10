@@ -6,7 +6,7 @@ export async function renderDashboard(container) {
     
     const now = new Date();
     const hour = now.getHours();
-    const greeting = hour < 12 ? 'Chào buổi sáng' : hour < 18 ? 'Chào buổi chiều' : 'Chào buổi tối';
+    const greeting = hour < 12 ? 'Xin chào' : hour < 18 ? 'Xin chào' : 'Xin chào';
     const userJson = localStorage.getItem('admin_user');
     const currentUser = userJson ? JSON.parse(userJson) : { username: 'Admin' };
 

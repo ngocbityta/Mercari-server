@@ -1,5 +1,8 @@
-// Cấu hình Base URL
-const BASE_URL = 'http://localhost:3000/it4788';
+// Tự động nhận diện môi trường để kết nối đúng Database
+const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const BASE_URL = isLocalhost 
+    ? 'http://localhost:3000/it4788' 
+    : 'https://group1.it4788.sukkaito.id.vn/it4788';
 
 class ApiClient {
     // Helper nội bộ xử lý fetch
@@ -118,7 +121,23 @@ class ApiClient {
         return this.authPost('/get_comment', { id: postId, index: index.toString(), count: count.toString() });
     }
 
-    // ---------------- ENROLLMENTS ----------------
+    async setComment(postId, index = '0', count = '10', comment = '', score = '', detailMistakes = '') {
+        const body = { id: postId, index: index.toString(), count: count.toString() };
+        if (comment) body.comment = comment;
+        if (score) body.score = score;
+        if (detailMistakes) body.detail_mistakes = detailMistakes;
+        return this.authPost('/set_comment', body);
+    }
+
+    // ---------------- ENROLLMENTS & COURSES ----------------
+    async getListCourses(index = '0', count = '100') {
+        return this.authPost('/get_list_courses', { index: index.toString(), count: count.toString() });
+    }
+
+    async setApproveEnrollment(userId, isAccept = '1') {
+        return this.authPost('/set_approve_enrollment', { user_id: userId, is_accept: isAccept.toString() });
+    }
+
     async getListStudents(teacherId, index = '0', count = '100') {
         return this.authPost('/get_list_students', { user_id: teacherId, index: index.toString(), count: count.toString() });
     }
