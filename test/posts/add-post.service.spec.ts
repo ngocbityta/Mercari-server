@@ -7,6 +7,8 @@ import { ResponseCode } from '../../src/enums/response-code.enum.ts';
 import { UserRole, UserStatus } from '@prisma/client';
 import { ApiException } from '../../src/common/exceptions/api.exception.ts';
 import { MediaService } from '../../src/posts/media.service';
+import { existsSync, readFileSync, rmSync } from 'fs';
+import { join } from 'path';
 
 const SYSTEM_BOT_USER_ID = '00000000-0000-0000-0000-000000000001';
 
@@ -297,6 +299,13 @@ describe('PostsService - addPost', () => {
             global.fetch = originalFetch;
         });
 
+        afterEach(() => {
+            rmSync(join(process.cwd(), 'public', 'grading-details'), {
+                recursive: true,
+                force: true,
+            });
+        });
+
         it('should trigger pose grading for left/right videos, calculate average, and create comment authored by student', async () => {
             const studentPostMock = {
                 id: 'student-post-id',
@@ -383,17 +392,33 @@ describe('PostsService - addPost', () => {
                     postId: 'student-post-id',
                     authorId: SYSTEM_BOT_USER_ID,
                     score: '8.5',
-                    detailMistakes: expect.stringContaining('Chi tiết chấm điểm bằng DTW'),
+                    detailMistakes: expect.stringContaining(
+                        '/it4788/static/grading-details/student-post-id.html',
+                    ),
                 },
             });
 
             const createdComment = ((mockPrisma as any).comment.create as jest.Mock).mock
                 .calls[0][0].data.detailMistakes as string;
-            expect(createdComment).toContain('Bên trái');
-            expect(createdComment).toContain('Bên phải');
-            expect(createdComment).toContain('Danh sách lỗi sai');
-            expect(createdComment).toContain('0.2');
-            expect(createdComment).toContain('0.1');
+            expect(createdComment).toContain('<a href=');
+            expect(createdComment).toContain('Xem chi tiết lỗi sai DTW');
+            expect(createdComment).toContain('Điểm trung bình: 8.5');
+
+            const staticDetailPath = join(
+                process.cwd(),
+                'public',
+                'grading-details',
+                'student-post-id.html',
+            );
+            expect(existsSync(staticDetailPath)).toBe(true);
+
+            const staticDetailHtml = readFileSync(staticDetailPath, 'utf8');
+            expect(staticDetailHtml).toContain('Chi tiết chấm điểm bằng DTW');
+            expect(staticDetailHtml).toContain('Bên trái');
+            expect(staticDetailHtml).toContain('Bên phải');
+            expect(staticDetailHtml).toContain('Danh sách lỗi sai');
+            expect(staticDetailHtml).toContain('0.2');
+            expect(staticDetailHtml).toContain('0.1');
         }, 15000);
     });
 });

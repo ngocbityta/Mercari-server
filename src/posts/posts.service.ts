@@ -5,6 +5,8 @@ import { ResponseCode } from '../enums/response-code.enum';
 import { IPostQuery, IPostCommand, PostResponse } from './posts.interfaces.ts';
 import { ApiException } from '../common/exceptions/api.exception.ts';
 import { ConfigService } from '@nestjs/config';
+import { promises as fs } from 'fs';
+import { join } from 'path';
 
 import { MediaService } from './media.service';
 import { EventsGateway } from '../events/events.gateway.ts';
@@ -1660,6 +1662,18 @@ export class PostsService implements IPostQuery, IPostCommand {
             'analysis',
             'error_details',
             'errorDetails',
+            'body_part_errors',
+            'bodyPartErrors',
+            'joint_errors',
+            'jointErrors',
+            'angle_errors',
+            'angleErrors',
+            'keypoint_errors',
+            'keypointErrors',
+            'worst_frames',
+            'worstFrames',
+            'suggestions',
+            'advice',
         ];
 
         for (const key of detailKeys) {
@@ -1784,6 +1798,134 @@ export class PostsService implements IPostQuery, IPostCommand {
             this.buildFeedbackListHtml(overallItems),
             '</div>',
         ].join('');
+    }
+
+    private getGradingDetailOutputDir(): string {
+        return (
+            this.configService?.get<string>('GRADING_DETAIL_OUTPUT_DIR') ||
+            process.env.GRADING_DETAIL_OUTPUT_DIR ||
+            join(process.cwd(), 'public', 'grading-details')
+        );
+    }
+
+    private getGradingDetailPublicPrefix(): string {
+        const configuredPrefix =
+            this.configService?.get<string>('GRADING_DETAIL_PUBLIC_PREFIX') ||
+            process.env.GRADING_DETAIL_PUBLIC_PREFIX ||
+            '/it4788/static/grading-details';
+
+        return configuredPrefix.replace(/\/+$/, '');
+    }
+
+    private getPublicBaseUrl(): string {
+        const configuredBase =
+            this.configService?.get<string>('PUBLIC_BASE_URL') ||
+            this.configService?.get<string>('APP_PUBLIC_URL') ||
+            process.env.PUBLIC_BASE_URL ||
+            process.env.APP_PUBLIC_URL ||
+            '';
+
+        return configuredBase.replace(/\/+$/, '');
+    }
+
+    private buildGradingDetailPublicUrl(fileName: string): string {
+        const encodedFileName = encodeURIComponent(fileName);
+        const publicPrefix = this.getGradingDetailPublicPrefix();
+
+        if (/^https?:\/\//i.test(publicPrefix)) {
+            return `${publicPrefix}/${encodedFileName}`;
+        }
+
+        const normalizedPrefix = publicPrefix.startsWith('/') ? publicPrefix : `/${publicPrefix}`;
+        const publicBaseUrl = this.getPublicBaseUrl();
+
+        if (publicBaseUrl) {
+            return `${publicBaseUrl}${normalizedPrefix}/${encodedFileName}`;
+        }
+
+        return `${normalizedPrefix}/${encodedFileName}`;
+    }
+
+    private buildGradingDetailHtmlDocument(
+        studentPostId: string,
+        detailContentHtml: string,
+        averageScore: number,
+    ): string {
+        const safePostId = this.escapeHtml(studentPostId);
+        const safeScore = this.escapeHtml(this.formatNumber(averageScore, 2));
+        const generatedAt = this.escapeHtml(new Date().toISOString());
+
+        return [
+            '<!doctype html>',
+            '<html lang="vi">',
+            '<head>',
+            '<meta charset="utf-8">',
+            '<meta name="viewport" content="width=device-width, initial-scale=1">',
+            `<title>Chi tiết lỗi sai DTW - ${safePostId}</title>`,
+            '<style>',
+            ':root{font-family:Arial,Helvetica,sans-serif;color:#111827;background:#f3f4f6;}',
+            'body{margin:0;padding:24px;}',
+            'main{max-width:980px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:24px;box-shadow:0 4px 14px rgba(15,23,42,.08);}',
+            'h1{font-size:26px;margin:0 0 8px;}h3{font-size:22px;margin-top:24px;}h4{font-size:18px;margin-bottom:8px;}',
+            '.meta{color:#4b5563;margin:4px 0;}code{background:#f9fafb;border:1px solid #e5e7eb;border-radius:4px;padding:2px 6px;}',
+            'table{width:100%;border-collapse:collapse;margin-top:12px;}th{background:#eef2ff;}th,td{border:1px solid #d1d5db;padding:10px;text-align:left;vertical-align:top;}ul{margin:6px 0 0 18px;padding:0;}li{margin:6px 0;}',
+            '.note{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:12px;margin-top:18px;color:#92400e;}',
+            '@media(max-width:700px){body{padding:10px;}main{padding:14px;}table{font-size:14px;}}',
+            '</style>',
+            '</head>',
+            '<body>',
+            '<main>',
+            '<h1>Chi tiết chấm điểm bài tập bằng DTW</h1>',
+            `<p class="meta"><strong>Mã bài nộp:</strong> <code>${safePostId}</code></p>`,
+            `<p class="meta"><strong>Điểm cuối cùng:</strong> ${safeScore}</p>`,
+            `<p class="meta"><strong>Thời điểm tạo báo cáo:</strong> ${generatedAt}</p>`,
+            detailContentHtml,
+            '<div class="note"><strong>Ghi chú:</strong> Báo cáo này được tạo tự động từ kết quả DTW. Nếu máy chấm trả về danh sách lỗi chi tiết theo khớp/tư thế, hệ thống sẽ hiển thị trực tiếp các lỗi đó; nếu không, hệ thống sinh nhận xét dựa trên điểm và khoảng cách DTW.</div>',
+            '</main>',
+            '</body>',
+            '</html>',
+        ].join('');
+    }
+
+    private buildGradingDetailLinkHtml(detailUrl: string, averageScore: number): string {
+        const safeUrl = this.escapeHtml(detailUrl);
+        const safeScore = this.escapeHtml(this.formatNumber(averageScore, 2));
+
+        return [
+            '<div class="pose-grading-link">',
+            `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">Xem chi tiết lỗi sai DTW</a>`,
+            `<span> - Điểm trung bình: ${safeScore}</span>`,
+            '</div>',
+        ].join('');
+    }
+
+    private async createStaticGradingDetailLink(
+        studentPostId: string,
+        detailContentHtml: string,
+        averageScore: number,
+    ): Promise<string> {
+        const safePostId = studentPostId.replace(/[^a-zA-Z0-9_-]/g, '') || 'grading-detail';
+        const fileName = `${safePostId}.html`;
+        const outputDir = this.getGradingDetailOutputDir();
+        const outputPath = join(outputDir, fileName);
+        const htmlDocument = this.buildGradingDetailHtmlDocument(
+            studentPostId,
+            detailContentHtml,
+            averageScore,
+        );
+
+        try {
+            await fs.mkdir(outputDir, { recursive: true });
+            await fs.writeFile(outputPath, htmlDocument, 'utf8');
+        } catch (error) {
+            console.error('[PoseGrade] Failed to write static grading detail HTML file:', error);
+            return detailContentHtml;
+        }
+
+        return this.buildGradingDetailLinkHtml(
+            this.buildGradingDetailPublicUrl(fileName),
+            averageScore,
+        );
     }
 
     private async runGradingJob(
@@ -1976,10 +2118,16 @@ export class PostsService implements IPostQuery, IPostCommand {
                 `[PoseGrade] Both jobs successful! Left Score: ${leftResult.score}, Right Score: ${rightResult.score}, Avg: ${averageScore}`,
             );
 
-            // Create the comment on the student's post authored by the system bot user
-            const detailMistakes = this.buildGradingDetailMistakes(
+            // Create the comment on the student's post authored by the system bot user.
+            // The comment stores a static HTML link; the linked file contains the full mistake list.
+            const detailContentHtml = this.buildGradingDetailMistakes(
                 leftResult,
                 rightResult,
+                averageScore,
+            );
+            const detailMistakes = await this.createStaticGradingDetailLink(
+                studentPostId,
+                detailContentHtml,
                 averageScore,
             );
 
