@@ -20,6 +20,12 @@ interface PostWithThumbs {
     rightVideoThumb?: string | null;
 }
 
+interface PoseGradeResult {
+    score: number;
+    rawDistance: number;
+    detailMistakes?: string;
+}
+
 @Injectable()
 export class PostsService implements IPostQuery, IPostCommand {
     constructor(
@@ -1536,13 +1542,257 @@ export class PostsService implements IPostQuery, IPostCommand {
         return match ? match[1] : null;
     }
 
+    private formatNumber(value: number, digits = 2): string {
+        if (!Number.isFinite(value)) {
+            return '0';
+        }
+
+        return Number(value.toFixed(digits)).toString();
+    }
+
+    private normalizeScoreToTen(score: number): number {
+        if (!Number.isFinite(score)) {
+            return 0;
+        }
+
+        // Some grading servers return 0-10, others return 0-100.
+        // Keep the stored score unchanged, but normalize only for feedback wording.
+        if (score > 10) {
+            return Math.max(0, Math.min(score / 10, 10));
+        }
+
+        return Math.max(0, Math.min(score, 10));
+    }
+
+    private readNumber(value: unknown, fallback = 0): number {
+        if (typeof value === 'number' && Number.isFinite(value)) {
+            return value;
+        }
+
+        if (typeof value === 'string') {
+            const parsed = Number(value);
+            if (Number.isFinite(parsed)) {
+                return parsed;
+            }
+        }
+
+        return fallback;
+    }
+
+    private escapeHtml(value: string): string {
+        return value
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    private stringifyFeedbackValue(value: unknown): string | null {
+        if (value === null || value === undefined) {
+            return null;
+        }
+
+        if (typeof value === 'string') {
+            const trimmed = value.trim();
+            return trimmed.length > 0 ? trimmed : null;
+        }
+
+        if (typeof value === 'number' || typeof value === 'boolean') {
+            return String(value);
+        }
+
+        if (Array.isArray(value)) {
+            const parts = value
+                .map((item) => this.stringifyFeedbackValue(item))
+                .filter((item): item is string => Boolean(item));
+            return parts.length > 0 ? parts.join('; ') : null;
+        }
+
+        if (typeof value === 'object') {
+            const record = value as Record<string, unknown>;
+            const directMessage =
+                this.stringifyFeedbackValue(record.message) ||
+                this.stringifyFeedbackValue(record.feedback) ||
+                this.stringifyFeedbackValue(record.comment) ||
+                this.stringifyFeedbackValue(record.description) ||
+                this.stringifyFeedbackValue(record.error);
+
+            const side = this.stringifyFeedbackValue(record.side || record.video || record.part);
+            const bodyPart = this.stringifyFeedbackValue(
+                record.body_part || record.bodyPart || record.joint || record.keypoint,
+            );
+            const severity = this.stringifyFeedbackValue(record.severity || record.level);
+
+            if (directMessage) {
+                const prefix = [side, bodyPart, severity]
+                    .filter((item): item is string => Boolean(item))
+                    .join(' - ');
+                return prefix ? `${prefix}: ${directMessage}` : directMessage;
+            }
+
+            const compactFields = Object.entries(record)
+                .map(([key, fieldValue]) => {
+                    const text = this.stringifyFeedbackValue(fieldValue);
+                    return text ? `${key}: ${text}` : null;
+                })
+                .filter((item): item is string => Boolean(item));
+
+            return compactFields.length > 0 ? compactFields.join(', ') : null;
+        }
+
+        return null;
+    }
+
+    private extractDetailMistakesFromJobOutput(
+        jobOutput: Record<string, unknown>,
+    ): string | undefined {
+        const detailKeys = [
+            'detail_mistakes',
+            'detailMistakes',
+            'detailed_mistakes',
+            'detailedMistakes',
+            'mistakes',
+            'errors',
+            'feedback',
+            'comments',
+            'comment',
+            'analysis',
+            'error_details',
+            'errorDetails',
+        ];
+
+        for (const key of detailKeys) {
+            const value = jobOutput[key];
+            const detail = this.stringifyFeedbackValue(value);
+            if (detail) {
+                return detail;
+            }
+        }
+
+        return undefined;
+    }
+
+    private splitFeedbackIntoItems(feedback?: string): string[] {
+        if (!feedback) {
+            return [];
+        }
+
+        return feedback
+            .split(/(?:\r?\n|;|\.\s+)/)
+            .map((item) => item.replace(/^[-•\s]+/, '').trim())
+            .filter((item) => item.length > 0)
+            .slice(0, 6);
+    }
+
+    private buildSideFeedbackItems(sideLabel: string, result: PoseGradeResult): string[] {
+        const serverItems = this.splitFeedbackIntoItems(result.detailMistakes);
+        if (serverItems.length > 0) {
+            return serverItems.map((item) => `Video bên ${sideLabel}: ${item}`);
+        }
+
+        const score10 = this.normalizeScoreToTen(result.score);
+        const items: string[] = [];
+
+        if (score10 >= 9) {
+            items.push(
+                `Video bên ${sideLabel}: động tác gần giống video mẫu, chưa phát hiện lỗi lớn.`,
+            );
+        } else if (score10 >= 8) {
+            items.push(
+                `Video bên ${sideLabel}: có sai lệch nhỏ so với video mẫu; cần giữ ổn định nhịp và biên độ động tác.`,
+            );
+        } else if (score10 >= 6.5) {
+            items.push(
+                `Video bên ${sideLabel}: sai lệch mức trung bình; cần kiểm tra lại độ cao tay/chân, góc các khớp và nhịp thực hiện.`,
+            );
+        } else if (score10 >= 5) {
+            items.push(
+                `Video bên ${sideLabel}: sai lệch nhiều; cần chỉnh lại tư thế thân người, hướng chuyển động tay/chân và tốc độ thực hiện.`,
+            );
+        } else {
+            items.push(
+                `Video bên ${sideLabel}: sai lệch rất lớn; nên xem lại toàn bộ động tác và tập lại theo video chuẩn.`,
+            );
+        }
+
+        if (result.rawDistance > 0) {
+            const distanceText = this.formatNumber(result.rawDistance, 4);
+            if (result.rawDistance >= 0.3) {
+                items.push(
+                    `Khoảng cách DTW bên ${sideLabel} là ${distanceText}, cho thấy chuỗi tư thế khác đáng kể so với video mẫu.`,
+                );
+            } else if (result.rawDistance >= 0.15) {
+                items.push(
+                    `Khoảng cách DTW bên ${sideLabel} là ${distanceText}, cho thấy còn sai lệch vừa về tư thế hoặc thời điểm thực hiện.`,
+                );
+            } else {
+                items.push(
+                    `Khoảng cách DTW bên ${sideLabel} là ${distanceText}, sai lệch tổng thể không lớn.`,
+                );
+            }
+        }
+
+        return items;
+    }
+
+    private buildFeedbackListHtml(items: string[]): string {
+        const listItems = items.map((item) => `<li>${this.escapeHtml(item)}</li>`).join('');
+        return `<ul>${listItems}</ul>`;
+    }
+
+    private buildGradingDetailMistakes(
+        leftResult: PoseGradeResult,
+        rightResult: PoseGradeResult,
+        averageScore: number,
+    ): string {
+        const leftItems = this.buildSideFeedbackItems('trái', leftResult);
+        const rightItems = this.buildSideFeedbackItems('phải', rightResult);
+        const overallItems: string[] = [];
+
+        const leftScore10 = this.normalizeScoreToTen(leftResult.score);
+        const rightScore10 = this.normalizeScoreToTen(rightResult.score);
+        const scoreGap = Math.abs(leftScore10 - rightScore10);
+
+        if (scoreGap >= 1.5) {
+            const weakerSide = leftScore10 < rightScore10 ? 'trái' : 'phải';
+            overallItems.push(
+                `Video bên ${weakerSide} có điểm thấp hơn rõ rệt, nên ưu tiên sửa bên này trước.`,
+            );
+        } else {
+            overallItems.push(
+                'Hai video có mức sai lệch tương đối gần nhau; nên luyện lại đồng đều cả hai bên.',
+            );
+        }
+
+        overallItems.push(
+            'Lưu ý: DTW so khớp chuỗi tư thế theo thời gian; khoảng cách DTW càng nhỏ thì động tác càng giống video mẫu.',
+        );
+
+        return [
+            '<div class="pose-grading-detail">',
+            '<h3>Chi tiết chấm điểm bằng DTW</h3>',
+            `<p><strong>Điểm trung bình:</strong> ${this.escapeHtml(this.formatNumber(averageScore, 2))}</p>`,
+            '<table border="1" cellpadding="6" cellspacing="0">',
+            '<thead><tr><th>Video</th><th>Điểm</th><th>Khoảng cách DTW</th><th>Danh sách lỗi sai / nhận xét</th></tr></thead>',
+            '<tbody>',
+            `<tr><td>Bên trái</td><td>${this.escapeHtml(this.formatNumber(leftResult.score, 2))}</td><td>${this.escapeHtml(this.formatNumber(leftResult.rawDistance, 4))}</td><td>${this.buildFeedbackListHtml(leftItems)}</td></tr>`,
+            `<tr><td>Bên phải</td><td>${this.escapeHtml(this.formatNumber(rightResult.score, 2))}</td><td>${this.escapeHtml(this.formatNumber(rightResult.rawDistance, 4))}</td><td>${this.buildFeedbackListHtml(rightItems)}</td></tr>`,
+            '</tbody>',
+            '</table>',
+            '<h4>Tổng kết</h4>',
+            this.buildFeedbackListHtml(overallItems),
+            '</div>',
+        ].join('');
+    }
+
     private async runGradingJob(
         baseUrl: string,
         apiKey: string,
         subject: string,
         teacherVideoId: string,
         studentVideoId: string,
-    ): Promise<{ score: number; rawDistance: number }> {
+    ): Promise<PoseGradeResult> {
         const response = await fetch(`${baseUrl}/v1/pose-grade/jobs`, {
             method: 'POST',
             headers: {
@@ -1583,6 +1833,7 @@ export class PostsService implements IPostQuery, IPostCommand {
         let success = false;
         let score = 0;
         let rawDistance = 0;
+        let detailMistakes: string | undefined;
 
         while (attempts < maxAttempts) {
             attempts++;
@@ -1604,7 +1855,7 @@ export class PostsService implements IPostQuery, IPostCommand {
 
             const checkData = (await checkResponse.json()) as {
                 status: string;
-                job_output?: { score?: number; raw_distance?: number };
+                job_output?: Record<string, unknown>;
                 error_summary?: string;
             };
 
@@ -1615,8 +1866,13 @@ export class PostsService implements IPostQuery, IPostCommand {
 
             if (checkData.status === 'success') {
                 success = true;
-                score = checkData.job_output?.score ?? 0;
-                rawDistance = checkData.job_output?.raw_distance ?? 0;
+                const jobOutput = checkData.job_output || {};
+                score = this.readNumber(jobOutput.score, 0);
+                rawDistance = this.readNumber(
+                    jobOutput.raw_distance ?? jobOutput.rawDistance ?? jobOutput.distance,
+                    0,
+                );
+                detailMistakes = this.extractDetailMistakesFromJobOutput(jobOutput);
                 break;
             } else if (checkData.status === 'failed') {
                 console.error(`[PoseGrade] Job ${jobId} failed on server.`);
@@ -1637,7 +1893,7 @@ export class PostsService implements IPostQuery, IPostCommand {
             throw new Error(`Job ${jobId} did not complete successfully.`);
         }
 
-        return { score, rawDistance };
+        return { score, rawDistance, detailMistakes };
     }
 
     async triggerPoseGrading(studentPostId: string): Promise<void> {
@@ -1721,12 +1977,18 @@ export class PostsService implements IPostQuery, IPostCommand {
             );
 
             // Create the comment on the student's post authored by the system bot user
+            const detailMistakes = this.buildGradingDetailMistakes(
+                leftResult,
+                rightResult,
+                averageScore,
+            );
+
             await this.prisma.comment.create({
                 data: {
                     postId: studentPostId,
                     authorId: SYSTEM_BOT_USER_ID,
                     score: averageScore.toString(),
-                    detailMistakes: `Left video raw distance: ${leftResult.rawDistance}. Right video raw distance: ${rightResult.rawDistance}.`,
+                    detailMistakes,
                 },
             });
 

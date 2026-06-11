@@ -383,9 +383,17 @@ describe('PostsService - addPost', () => {
                     postId: 'student-post-id',
                     authorId: SYSTEM_BOT_USER_ID,
                     score: '8.5',
-                    detailMistakes: 'Left video raw distance: 0.2. Right video raw distance: 0.1.',
+                    detailMistakes: expect.stringContaining('Chi tiết chấm điểm bằng DTW'),
                 },
             });
+
+            const createdComment = ((mockPrisma as any).comment.create as jest.Mock).mock
+                .calls[0][0].data.detailMistakes as string;
+            expect(createdComment).toContain('Bên trái');
+            expect(createdComment).toContain('Bên phải');
+            expect(createdComment).toContain('Danh sách lỗi sai');
+            expect(createdComment).toContain('0.2');
+            expect(createdComment).toContain('0.1');
         }, 15000);
     });
 });

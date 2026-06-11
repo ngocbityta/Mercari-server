@@ -63,7 +63,7 @@ Lấy danh sách comment của bài viết. Dùng để **kiểm tra kết quả
                 "id": "comment_id",
                 "comment": null,
                 "score": "85",
-                "detail_mistakes": "Left video raw distance: 0.12. Right video raw distance: 0.08.",
+                "detail_mistakes": "<div class=\"pose-grading-detail\"><h3>Chi tiết chấm điểm bằng DTW</h3><p><strong>Điểm trung bình:</strong> 85</p><table border=\"1\" cellpadding=\"6\" cellspacing=\"0\"><thead><tr><th>Video</th><th>Điểm</th><th>Khoảng cách DTW</th><th>Danh sách lỗi sai / nhận xét</th></tr></thead><tbody><tr><td>Bên trái</td><td>82</td><td>0.12</td><td><ul><li>Video bên trái: có sai lệch nhỏ so với video mẫu; cần giữ ổn định nhịp và biên độ động tác.</li></ul></td></tr><tr><td>Bên phải</td><td>88</td><td>0.08</td><td><ul><li>Video bên phải: động tác gần giống video mẫu, chưa phát hiện lỗi lớn.</li></ul></td></tr></tbody></table><h4>Tổng kết</h4><ul><li>Hai video có mức sai lệch tương đối gần nhau; nên luyện lại đồng đều cả hai bên.</li></ul></div>",
                 "created": "2026-06-09T15:14:33.063683Z",
                 "poster": {
                     "id": "00000000-0000-0000-0000-000000000001",
@@ -111,6 +111,11 @@ Comment do hệ thống tạo có `poster.id = "00000000-0000-0000-0000-00000000
 | ✅ Chấm thành công | `score` có giá trị điểm (VD: `"85"`), `comment` thường là `null` | Hiển thị điểm |
 | ❌ Chấm thất bại | `score` = `null`, `comment` chứa nội dung thông báo lỗi cố định | Hiển thị lỗi từ trường `comment` + nút **"Chấm lại"** (chỉ GV) |
 | ⏳ Đang xử lý | Chưa có comment của SystemBot | Đợi thêm khoảng 10-15s, thử lại sau |
+
+> [!NOTE]
+> Trường `detail_mistakes` hiện trả về một đoạn HTML tĩnh để client có thể hiển thị bảng/lists lỗi sai.
+> Nếu GradingServer trả thêm dữ liệu chi tiết như `mistakes`, `feedback`, `analysis` hoặc `detail_mistakes` trong `job_output`, Mercari-server sẽ ưu tiên đưa dữ liệu đó vào bảng.
+> Nếu GradingServer chỉ trả `score` và `raw_distance`, Mercari-server vẫn tự sinh nhận xét dựa trên điểm từng bên và khoảng cách DTW để người học không chỉ nhìn thấy mỗi điểm.
 
 > [!NOTE]
 > **Cơ chế trả lỗi khi chấm thất bại:**
