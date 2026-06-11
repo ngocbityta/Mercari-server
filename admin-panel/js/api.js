@@ -1,8 +1,6 @@
 // Tự động nhận diện môi trường để kết nối đúng Database
 const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-const BASE_URL = isLocalhost 
-    ? 'http://localhost:3000/it4788' 
-    : 'https://group1.it4788.sukkaito.id.vn/it4788';
+const BASE_URL = 'https://group1.it4788.sukkaito.id.vn/it4788';
 
 class ApiClient {
     // Helper nội bộ xử lý fetch
@@ -115,6 +113,10 @@ class ApiClient {
 
     async searchPosts(keyword, index = '0', count = '10') {
         return this.authPost('/search', { keyword, index: index.toString(), count: count.toString() });
+    }
+
+    async getListReports(index = '0', count = '20') {
+        return this.authPost('/get_list_reports', { index: index.toString(), count: count.toString() });
     }
 
     async getComments(postId, index = '0', count = '20') {

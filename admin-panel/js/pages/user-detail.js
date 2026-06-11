@@ -52,7 +52,7 @@ export async function renderUserDetail(container, userId) {
                 
                 <div style="padding: 0 1.5rem 1.5rem; text-align: center; margin-top: -50px; position: relative; z-index: 10;">
                     <div style="position: relative; display: inline-block;">
-                        <img src="${avatarSrc}" style="width: 100px; height: 100px; border-radius: 50%; border: 4px solid var(--bg-secondary); object-fit: cover; background: #fff;" onerror="this.src='https://ui-avatars.com/api/?name=U'">
+                        <img src="${avatarSrc}" style="width: 100px; height: 100px; border-radius: 50%; border: 4px solid var(--bg-secondary); object-fit: cover; background: #fff;" onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name=U'">
                         <div class="${user.online ? 'online-dot animate' : 'offline-dot'}" style="position: absolute; bottom: 8px; right: 8px; width: 16px; height: 16px; border: 3px solid var(--bg-secondary);"></div>
                     </div>
                     
@@ -244,7 +244,7 @@ async function loadUserPosts(userId) {
                     return `
                     <div class="post-card" onclick="window.location.hash='#/posts/${p.post_id}'">
                         <div class="post-card-thumb">
-                            <img src="${thumb || 'https://via.placeholder.com/300x200?text=Video'}" onerror="this.src='https://via.placeholder.com/300x200?text=Video'">
+                            <img src="${thumb || 'https://via.placeholder.com/300x200?text=Video'}" onerror="this.onerror=null; this.src='https://via.placeholder.com/300x200?text=Video'">
                             <svg class="post-card-icon" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg>
                         </div>
                         <div class="post-card-body">

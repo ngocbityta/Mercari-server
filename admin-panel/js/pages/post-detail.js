@@ -127,7 +127,7 @@ export async function renderPostDetail(container, postId) {
         // Author
         document.getElementById('author-container').innerHTML = `
             <div style="display: flex; align-items: center; gap: 0.875rem;">
-                <img src="${authorAvatar}" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(99,102,241,0.2);" onerror="this.src='https://ui-avatars.com/api/?name=U&background=6366F1&color=fff'">
+                <img src="${authorAvatar}" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(99,102,241,0.2);" onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name=U&background=6366F1&color=fff'">
                 <div style="flex: 1;">
                     <div style="font-weight: 600; font-size: 0.9375rem;">${author.name || 'Không có tên'}</div>
                     <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 2px;">
@@ -224,7 +224,7 @@ async function loadComments(postId) {
             return `
             <div style="background: rgba(0,0,0,0.15); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 0.875rem; margin-bottom: 0.625rem; transition: border-color 0.2s;" onmouseenter="this.style.borderColor='var(--border-color-light)'" onmouseleave="this.style.borderColor='var(--border-color)'">
                 <div style="display: flex; align-items: center; gap: 0.625rem; margin-bottom: 0.5rem;">
-                    <img src="${userAvatar}" style="width: 30px; height: 30px; border-radius: 50%;" onerror="this.src='https://ui-avatars.com/api/?name=U&background=334155&color=fff'">
+                    <img src="${userAvatar}" style="width: 30px; height: 30px; border-radius: 50%;" onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name=U&background=334155&color=fff'">
                     <div style="flex: 1;">
                         <span style="font-weight: 600; font-size: 0.8125rem;">${c.poster?.name || 'User'}</span>
                         <span style="font-size: 0.6875rem; color: var(--text-muted); margin-left: 0.5rem;">${new Date(c.created).toLocaleString('vi-VN')}</span>

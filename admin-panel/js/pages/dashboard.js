@@ -120,7 +120,7 @@ export async function renderDashboard(container) {
                         ${userList.map(u => `
                             <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.875rem 0.5rem; border-bottom: 1px solid var(--border-color);">
                                 <div style="display: flex; align-items: center; gap: 0.875rem;">
-                                    <img src="${u.avatar ? (u.avatar.startsWith('http') ? u.avatar : 'http://localhost:3000' + u.avatar) : 'https://ui-avatars.com/api/?name=' + encodeURIComponent(u.username || 'U') + '&background=random'}" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover;" onerror="this.src='https://ui-avatars.com/api/?name=U'">
+                                    <img src="${u.avatar ? (u.avatar.startsWith('http') ? u.avatar : 'http://localhost:3000' + u.avatar) : 'https://ui-avatars.com/api/?name=' + encodeURIComponent(u.username || 'U') + '&background=random'}" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover;" onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name=U'">
                                     <div>
                                         <div style="font-weight: 600; font-size: 0.875rem; color: var(--text-primary);">${u.username || 'Không tên'}</div>
                                         <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">${u.phonenumber}</div>
@@ -204,7 +204,7 @@ export async function renderDashboard(container) {
                 return `
                 <a href="#/posts/${p.post_id}" class="recent-post-item" style="display: flex; gap: 0.75rem; margin-bottom: 0.5rem; align-items: center; padding: 0.5rem; border-radius: var(--radius-lg); transition: all 0.2s; text-decoration: none;">
                     <div style="width: 44px; height: 44px; border-radius: var(--radius-md); overflow: hidden; background: #000; flex-shrink: 0; position: relative;">
-                        <img src="${thumb || 'https://via.placeholder.com/44x44?text=▶'}" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.8;" onerror="this.src='https://via.placeholder.com/44x44?text=▶'">
+                        <img src="${thumb || 'https://via.placeholder.com/44x44?text=▶'}" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.8;" onerror="this.onerror=null; this.src='https://via.placeholder.com/44x44?text=▶'">
                     </div>
                     <div style="flex: 1; overflow: hidden;">
                         <div style="font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.8125rem;">${p.described || 'Không có mô tả'}</div>

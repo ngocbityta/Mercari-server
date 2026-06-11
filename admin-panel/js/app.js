@@ -5,11 +5,13 @@ import { renderUsers } from './pages/users.js';
 import { renderUserDetail } from './pages/user-detail.js';
 import { renderPosts } from './pages/posts.js';
 import { renderPostDetail } from './pages/post-detail.js';
+import { renderReports } from './pages/reports.js';
 
 const routes = {
     '#/login': renderLogin,
     '#/': renderDashboard,
     '#/users': renderUsers,
+    '#/reports': renderReports,
 };
 
 function getRoute() {

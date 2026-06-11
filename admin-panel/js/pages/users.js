@@ -41,7 +41,7 @@ export async function renderUsers(container) {
                     const avatarSrc = row.avatar ? (row.avatar.startsWith('http') ? row.avatar : `http://localhost:3000${row.avatar}`) : `https://ui-avatars.com/api/?name=${encodeURIComponent(val || 'U')}&background=random`;
                     return `
                         <div class="table-user-info">
-                            <img src="${avatarSrc}" class="table-avatar" onerror="this.src='https://ui-avatars.com/api/?name=U'">
+                            <img src="${avatarSrc}" class="table-avatar" onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name=U'">
                             <div class="table-user-details">
                                 <span class="table-user-name">${val || 'Không tên'}</span>
                                 <span class="table-user-sub">${row.phonenumber}</span>

@@ -32,7 +32,7 @@ export async function renderPosts(container) {
                     const thumb = val && val.length > 0 ? val[0].thumb : '';
                     return `
                         <div style="position: relative; width: 64px; height: 64px; border-radius: 8px; overflow: hidden; background: #000;">
-                            <img src="${thumb || 'https://via.placeholder.com/64x64?text=Video'}" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.8;" onerror="this.src='https://via.placeholder.com/64x64?text=Video'">
+                            <img src="${thumb || 'https://via.placeholder.com/64x64?text=Video'}" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.8;" onerror="this.onerror=null; this.src='https://via.placeholder.com/64x64?text=Video'">
                             <svg style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: rgba(255,255,255,0.9);" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg>
                         </div>
                     `;
@@ -50,7 +50,7 @@ export async function renderPosts(container) {
                     const avatar = val?.avatar ? (val.avatar.startsWith('http') ? val.avatar : `http://localhost:3000${val.avatar}`) : `https://ui-avatars.com/api/?name=${val?.username || 'U'}`;
                     return `
                         <div style="display:flex; align-items:center; gap:8px;">
-                            <img src="${avatar}" style="width:32px; height:32px; border-radius:50%; object-fit: cover;" onerror="this.src='https://ui-avatars.com/api/?name=U'">
+                            <img src="${avatar}" style="width:32px; height:32px; border-radius:50%; object-fit: cover;" onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name=U'">
                             <div>
                                 <div style="font-weight: 500">${val?.username || 'Unknown'}</div>
                                 <div style="font-size: 0.75rem; color: var(--text-muted)">${val?.role || ''}</div>
