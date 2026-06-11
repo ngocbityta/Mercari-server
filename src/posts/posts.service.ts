@@ -5,6 +5,8 @@ import { ResponseCode } from '../enums/response-code.enum';
 import { IPostQuery, IPostCommand, PostResponse } from './posts.interfaces.ts';
 import { ApiException } from '../common/exceptions/api.exception.ts';
 import { ConfigService } from '@nestjs/config';
+import { promises as fs } from 'fs';
+import { join } from 'path';
 
 import { MediaService } from './media.service';
 import { EventsGateway } from '../events/events.gateway.ts';
@@ -18,6 +20,12 @@ const SYSTEM_BOT_USER_ID = '00000000-0000-0000-0000-000000000001';
 interface PostWithThumbs {
     leftVideoThumb?: string | null;
     rightVideoThumb?: string | null;
+}
+
+interface PoseGradeResult {
+    score: number;
+    rawDistance: number;
+    detailMistakes?: string;
 }
 
 @Injectable()
@@ -1536,13 +1544,397 @@ export class PostsService implements IPostQuery, IPostCommand {
         return match ? match[1] : null;
     }
 
+    private formatNumber(value: number, digits = 2): string {
+        if (!Number.isFinite(value)) {
+            return '0';
+        }
+
+        return Number(value.toFixed(digits)).toString();
+    }
+
+    private normalizeScoreToTen(score: number): number {
+        if (!Number.isFinite(score)) {
+            return 0;
+        }
+
+        // Some grading servers return 0-10, others return 0-100.
+        // Keep the stored score unchanged, but normalize only for feedback wording.
+        if (score > 10) {
+            return Math.max(0, Math.min(score / 10, 10));
+        }
+
+        return Math.max(0, Math.min(score, 10));
+    }
+
+    private readNumber(value: unknown, fallback = 0): number {
+        if (typeof value === 'number' && Number.isFinite(value)) {
+            return value;
+        }
+
+        if (typeof value === 'string') {
+            const parsed = Number(value);
+            if (Number.isFinite(parsed)) {
+                return parsed;
+            }
+        }
+
+        return fallback;
+    }
+
+    private escapeHtml(value: string): string {
+        return value
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    private stringifyFeedbackValue(value: unknown): string | null {
+        if (value === null || value === undefined) {
+            return null;
+        }
+
+        if (typeof value === 'string') {
+            const trimmed = value.trim();
+            return trimmed.length > 0 ? trimmed : null;
+        }
+
+        if (typeof value === 'number' || typeof value === 'boolean') {
+            return String(value);
+        }
+
+        if (Array.isArray(value)) {
+            const parts = value
+                .map((item) => this.stringifyFeedbackValue(item))
+                .filter((item): item is string => Boolean(item));
+            return parts.length > 0 ? parts.join('; ') : null;
+        }
+
+        if (typeof value === 'object') {
+            const record = value as Record<string, unknown>;
+            const directMessage =
+                this.stringifyFeedbackValue(record.message) ||
+                this.stringifyFeedbackValue(record.feedback) ||
+                this.stringifyFeedbackValue(record.comment) ||
+                this.stringifyFeedbackValue(record.description) ||
+                this.stringifyFeedbackValue(record.error);
+
+            const side = this.stringifyFeedbackValue(record.side || record.video || record.part);
+            const bodyPart = this.stringifyFeedbackValue(
+                record.body_part || record.bodyPart || record.joint || record.keypoint,
+            );
+            const severity = this.stringifyFeedbackValue(record.severity || record.level);
+
+            if (directMessage) {
+                const prefix = [side, bodyPart, severity]
+                    .filter((item): item is string => Boolean(item))
+                    .join(' - ');
+                return prefix ? `${prefix}: ${directMessage}` : directMessage;
+            }
+
+            const compactFields = Object.entries(record)
+                .map(([key, fieldValue]) => {
+                    const text = this.stringifyFeedbackValue(fieldValue);
+                    return text ? `${key}: ${text}` : null;
+                })
+                .filter((item): item is string => Boolean(item));
+
+            return compactFields.length > 0 ? compactFields.join(', ') : null;
+        }
+
+        return null;
+    }
+
+    private extractDetailMistakesFromJobOutput(
+        jobOutput: Record<string, unknown>,
+    ): string | undefined {
+        const detailKeys = [
+            'detail_mistakes',
+            'detailMistakes',
+            'detailed_mistakes',
+            'detailedMistakes',
+            'mistakes',
+            'errors',
+            'feedback',
+            'comments',
+            'comment',
+            'analysis',
+            'error_details',
+            'errorDetails',
+            'body_part_errors',
+            'bodyPartErrors',
+            'joint_errors',
+            'jointErrors',
+            'angle_errors',
+            'angleErrors',
+            'keypoint_errors',
+            'keypointErrors',
+            'worst_frames',
+            'worstFrames',
+            'suggestions',
+            'advice',
+        ];
+
+        for (const key of detailKeys) {
+            const value = jobOutput[key];
+            const detail = this.stringifyFeedbackValue(value);
+            if (detail) {
+                return detail;
+            }
+        }
+
+        return undefined;
+    }
+
+    private splitFeedbackIntoItems(feedback?: string): string[] {
+        if (!feedback) {
+            return [];
+        }
+
+        return feedback
+            .split(/(?:\r?\n|;|\.\s+)/)
+            .map((item) => item.replace(/^[-•\s]+/, '').trim())
+            .filter((item) => item.length > 0)
+            .slice(0, 6);
+    }
+
+    private buildSideFeedbackItems(sideLabel: string, result: PoseGradeResult): string[] {
+        const serverItems = this.splitFeedbackIntoItems(result.detailMistakes);
+        if (serverItems.length > 0) {
+            return serverItems.map((item) => `Video bên ${sideLabel}: ${item}`);
+        }
+
+        const score10 = this.normalizeScoreToTen(result.score);
+        const items: string[] = [];
+
+        if (score10 >= 9) {
+            items.push(
+                `Video bên ${sideLabel}: động tác gần giống video mẫu, chưa phát hiện lỗi lớn.`,
+            );
+        } else if (score10 >= 8) {
+            items.push(
+                `Video bên ${sideLabel}: có sai lệch nhỏ so với video mẫu; cần giữ ổn định nhịp và biên độ động tác.`,
+            );
+        } else if (score10 >= 6.5) {
+            items.push(
+                `Video bên ${sideLabel}: sai lệch mức trung bình; cần kiểm tra lại độ cao tay/chân, góc các khớp và nhịp thực hiện.`,
+            );
+        } else if (score10 >= 5) {
+            items.push(
+                `Video bên ${sideLabel}: sai lệch nhiều; cần chỉnh lại tư thế thân người, hướng chuyển động tay/chân và tốc độ thực hiện.`,
+            );
+        } else {
+            items.push(
+                `Video bên ${sideLabel}: sai lệch rất lớn; nên xem lại toàn bộ động tác và tập lại theo video chuẩn.`,
+            );
+        }
+
+        if (result.rawDistance > 0) {
+            const distanceText = this.formatNumber(result.rawDistance, 4);
+            if (result.rawDistance >= 0.3) {
+                items.push(
+                    `Khoảng cách DTW bên ${sideLabel} là ${distanceText}, cho thấy chuỗi tư thế khác đáng kể so với video mẫu.`,
+                );
+            } else if (result.rawDistance >= 0.15) {
+                items.push(
+                    `Khoảng cách DTW bên ${sideLabel} là ${distanceText}, cho thấy còn sai lệch vừa về tư thế hoặc thời điểm thực hiện.`,
+                );
+            } else {
+                items.push(
+                    `Khoảng cách DTW bên ${sideLabel} là ${distanceText}, sai lệch tổng thể không lớn.`,
+                );
+            }
+        }
+
+        return items;
+    }
+
+    private buildFeedbackListHtml(items: string[]): string {
+        const listItems = items.map((item) => `<li>${this.escapeHtml(item)}</li>`).join('');
+        return `<ul>${listItems}</ul>`;
+    }
+
+    private buildGradingDetailMistakes(
+        leftResult: PoseGradeResult,
+        rightResult: PoseGradeResult,
+        averageScore: number,
+    ): string {
+        const leftItems = this.buildSideFeedbackItems('trái', leftResult);
+        const rightItems = this.buildSideFeedbackItems('phải', rightResult);
+        const overallItems: string[] = [];
+
+        const leftScore10 = this.normalizeScoreToTen(leftResult.score);
+        const rightScore10 = this.normalizeScoreToTen(rightResult.score);
+        const scoreGap = Math.abs(leftScore10 - rightScore10);
+
+        if (scoreGap >= 1.5) {
+            const weakerSide = leftScore10 < rightScore10 ? 'trái' : 'phải';
+            overallItems.push(
+                `Video bên ${weakerSide} có điểm thấp hơn rõ rệt, nên ưu tiên sửa bên này trước.`,
+            );
+        } else {
+            overallItems.push(
+                'Hai video có mức sai lệch tương đối gần nhau; nên luyện lại đồng đều cả hai bên.',
+            );
+        }
+
+        overallItems.push(
+            'Lưu ý: DTW so khớp chuỗi tư thế theo thời gian; khoảng cách DTW càng nhỏ thì động tác càng giống video mẫu.',
+        );
+
+        return [
+            '<div class="pose-grading-detail">',
+            '<h3>Chi tiết chấm điểm bằng DTW</h3>',
+            `<p><strong>Điểm trung bình:</strong> ${this.escapeHtml(this.formatNumber(averageScore, 2))}</p>`,
+            '<table border="1" cellpadding="6" cellspacing="0">',
+            '<thead><tr><th>Video</th><th>Điểm</th><th>Khoảng cách DTW</th><th>Danh sách lỗi sai / nhận xét</th></tr></thead>',
+            '<tbody>',
+            `<tr><td>Bên trái</td><td>${this.escapeHtml(this.formatNumber(leftResult.score, 2))}</td><td>${this.escapeHtml(this.formatNumber(leftResult.rawDistance, 4))}</td><td>${this.buildFeedbackListHtml(leftItems)}</td></tr>`,
+            `<tr><td>Bên phải</td><td>${this.escapeHtml(this.formatNumber(rightResult.score, 2))}</td><td>${this.escapeHtml(this.formatNumber(rightResult.rawDistance, 4))}</td><td>${this.buildFeedbackListHtml(rightItems)}</td></tr>`,
+            '</tbody>',
+            '</table>',
+            '<h4>Tổng kết</h4>',
+            this.buildFeedbackListHtml(overallItems),
+            '</div>',
+        ].join('');
+    }
+
+    private getGradingDetailOutputDir(): string {
+        return (
+            this.configService?.get<string>('GRADING_DETAIL_OUTPUT_DIR') ||
+            process.env.GRADING_DETAIL_OUTPUT_DIR ||
+            join(process.cwd(), 'public', 'grading-details')
+        );
+    }
+
+    private getGradingDetailPublicPrefix(): string {
+        const configuredPrefix =
+            this.configService?.get<string>('GRADING_DETAIL_PUBLIC_PREFIX') ||
+            process.env.GRADING_DETAIL_PUBLIC_PREFIX ||
+            '/it4788/static/grading-details';
+
+        return configuredPrefix.replace(/\/+$/, '');
+    }
+
+    private getPublicBaseUrl(): string {
+        const configuredBase =
+            this.configService?.get<string>('PUBLIC_BASE_URL') ||
+            this.configService?.get<string>('APP_PUBLIC_URL') ||
+            process.env.PUBLIC_BASE_URL ||
+            process.env.APP_PUBLIC_URL ||
+            '';
+
+        return configuredBase.replace(/\/+$/, '');
+    }
+
+    private buildGradingDetailPublicUrl(fileName: string): string {
+        const encodedFileName = encodeURIComponent(fileName);
+        const publicPrefix = this.getGradingDetailPublicPrefix();
+
+        if (/^https?:\/\//i.test(publicPrefix)) {
+            return `${publicPrefix}/${encodedFileName}`;
+        }
+
+        const normalizedPrefix = publicPrefix.startsWith('/') ? publicPrefix : `/${publicPrefix}`;
+        const publicBaseUrl = this.getPublicBaseUrl();
+
+        if (publicBaseUrl) {
+            return `${publicBaseUrl}${normalizedPrefix}/${encodedFileName}`;
+        }
+
+        return `${normalizedPrefix}/${encodedFileName}`;
+    }
+
+    private buildGradingDetailHtmlDocument(
+        studentPostId: string,
+        detailContentHtml: string,
+        averageScore: number,
+    ): string {
+        const safePostId = this.escapeHtml(studentPostId);
+        const safeScore = this.escapeHtml(this.formatNumber(averageScore, 2));
+        const generatedAt = this.escapeHtml(new Date().toISOString());
+
+        return [
+            '<!doctype html>',
+            '<html lang="vi">',
+            '<head>',
+            '<meta charset="utf-8">',
+            '<meta name="viewport" content="width=device-width, initial-scale=1">',
+            `<title>Chi tiết lỗi sai DTW - ${safePostId}</title>`,
+            '<style>',
+            ':root{font-family:Arial,Helvetica,sans-serif;color:#111827;background:#f3f4f6;}',
+            'body{margin:0;padding:24px;}',
+            'main{max-width:980px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:24px;box-shadow:0 4px 14px rgba(15,23,42,.08);}',
+            'h1{font-size:26px;margin:0 0 8px;}h3{font-size:22px;margin-top:24px;}h4{font-size:18px;margin-bottom:8px;}',
+            '.meta{color:#4b5563;margin:4px 0;}code{background:#f9fafb;border:1px solid #e5e7eb;border-radius:4px;padding:2px 6px;}',
+            'table{width:100%;border-collapse:collapse;margin-top:12px;}th{background:#eef2ff;}th,td{border:1px solid #d1d5db;padding:10px;text-align:left;vertical-align:top;}ul{margin:6px 0 0 18px;padding:0;}li{margin:6px 0;}',
+            '.note{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:12px;margin-top:18px;color:#92400e;}',
+            '@media(max-width:700px){body{padding:10px;}main{padding:14px;}table{font-size:14px;}}',
+            '</style>',
+            '</head>',
+            '<body>',
+            '<main>',
+            '<h1>Chi tiết chấm điểm bài tập bằng DTW</h1>',
+            `<p class="meta"><strong>Mã bài nộp:</strong> <code>${safePostId}</code></p>`,
+            `<p class="meta"><strong>Điểm cuối cùng:</strong> ${safeScore}</p>`,
+            `<p class="meta"><strong>Thời điểm tạo báo cáo:</strong> ${generatedAt}</p>`,
+            detailContentHtml,
+            '<div class="note"><strong>Ghi chú:</strong> Báo cáo này được tạo tự động từ kết quả DTW. Nếu máy chấm trả về danh sách lỗi chi tiết theo khớp/tư thế, hệ thống sẽ hiển thị trực tiếp các lỗi đó; nếu không, hệ thống sinh nhận xét dựa trên điểm và khoảng cách DTW.</div>',
+            '</main>',
+            '</body>',
+            '</html>',
+        ].join('');
+    }
+
+    private buildGradingDetailLinkHtml(detailUrl: string, averageScore: number): string {
+        const safeUrl = this.escapeHtml(detailUrl);
+        const safeScore = this.escapeHtml(this.formatNumber(averageScore, 2));
+
+        return [
+            '<div class="pose-grading-link">',
+            `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">Xem chi tiết lỗi sai DTW</a>`,
+            `<span> - Điểm trung bình: ${safeScore}</span>`,
+            '</div>',
+        ].join('');
+    }
+
+    private async createStaticGradingDetailLink(
+        studentPostId: string,
+        detailContentHtml: string,
+        averageScore: number,
+    ): Promise<string> {
+        const safePostId = studentPostId.replace(/[^a-zA-Z0-9_-]/g, '') || 'grading-detail';
+        const fileName = `${safePostId}.html`;
+        const outputDir = this.getGradingDetailOutputDir();
+        const outputPath = join(outputDir, fileName);
+        const htmlDocument = this.buildGradingDetailHtmlDocument(
+            studentPostId,
+            detailContentHtml,
+            averageScore,
+        );
+
+        try {
+            await fs.mkdir(outputDir, { recursive: true });
+            await fs.writeFile(outputPath, htmlDocument, 'utf8');
+        } catch (error) {
+            console.error('[PoseGrade] Failed to write static grading detail HTML file:', error);
+            return detailContentHtml;
+        }
+
+        return this.buildGradingDetailLinkHtml(
+            this.buildGradingDetailPublicUrl(fileName),
+            averageScore,
+        );
+    }
+
     private async runGradingJob(
         baseUrl: string,
         apiKey: string,
         subject: string,
         teacherVideoId: string,
         studentVideoId: string,
-    ): Promise<{ score: number; rawDistance: number }> {
+    ): Promise<PoseGradeResult> {
         const response = await fetch(`${baseUrl}/v1/pose-grade/jobs`, {
             method: 'POST',
             headers: {
@@ -1583,6 +1975,7 @@ export class PostsService implements IPostQuery, IPostCommand {
         let success = false;
         let score = 0;
         let rawDistance = 0;
+        let detailMistakes: string | undefined;
 
         while (attempts < maxAttempts) {
             attempts++;
@@ -1604,7 +1997,7 @@ export class PostsService implements IPostQuery, IPostCommand {
 
             const checkData = (await checkResponse.json()) as {
                 status: string;
-                job_output?: { score?: number; raw_distance?: number };
+                job_output?: Record<string, unknown>;
                 error_summary?: string;
             };
 
@@ -1615,8 +2008,13 @@ export class PostsService implements IPostQuery, IPostCommand {
 
             if (checkData.status === 'success') {
                 success = true;
-                score = checkData.job_output?.score ?? 0;
-                rawDistance = checkData.job_output?.raw_distance ?? 0;
+                const jobOutput = checkData.job_output || {};
+                score = this.readNumber(jobOutput.score, 0);
+                rawDistance = this.readNumber(
+                    jobOutput.raw_distance ?? jobOutput.rawDistance ?? jobOutput.distance,
+                    0,
+                );
+                detailMistakes = this.extractDetailMistakesFromJobOutput(jobOutput);
                 break;
             } else if (checkData.status === 'failed') {
                 console.error(`[PoseGrade] Job ${jobId} failed on server.`);
@@ -1637,7 +2035,7 @@ export class PostsService implements IPostQuery, IPostCommand {
             throw new Error(`Job ${jobId} did not complete successfully.`);
         }
 
-        return { score, rawDistance };
+        return { score, rawDistance, detailMistakes };
     }
 
     async triggerPoseGrading(studentPostId: string): Promise<void> {
@@ -1720,13 +2118,25 @@ export class PostsService implements IPostQuery, IPostCommand {
                 `[PoseGrade] Both jobs successful! Left Score: ${leftResult.score}, Right Score: ${rightResult.score}, Avg: ${averageScore}`,
             );
 
-            // Create the comment on the student's post authored by the system bot user
+            // Create the comment on the student's post authored by the system bot user.
+            // The comment stores a static HTML link; the linked file contains the full mistake list.
+            const detailContentHtml = this.buildGradingDetailMistakes(
+                leftResult,
+                rightResult,
+                averageScore,
+            );
+            const detailMistakes = await this.createStaticGradingDetailLink(
+                studentPostId,
+                detailContentHtml,
+                averageScore,
+            );
+
             await this.prisma.comment.create({
                 data: {
                     postId: studentPostId,
                     authorId: SYSTEM_BOT_USER_ID,
                     score: averageScore.toString(),
-                    detailMistakes: `Left video raw distance: ${leftResult.rawDistance}. Right video raw distance: ${rightResult.rawDistance}.`,
+                    detailMistakes,
                 },
             });
 

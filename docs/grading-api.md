@@ -52,7 +52,7 @@ Lấy danh sách comment của bài viết. Dùng để **kiểm tra kết quả
 
 ### Response `200 OK`
 
-#### Ví dụ 1: Chấm điểm thành công (Trả về điểm số và chi tiết khoảng cách)
+#### Ví dụ 1: Chấm điểm thành công (Trả về điểm số và link HTML tĩnh chứa chi tiết lỗi sai)
 ```json
 {
     "code": "1000",
@@ -63,7 +63,7 @@ Lấy danh sách comment của bài viết. Dùng để **kiểm tra kết quả
                 "id": "comment_id",
                 "comment": null,
                 "score": "85",
-                "detail_mistakes": "Left video raw distance: 0.12. Right video raw distance: 0.08.",
+                "detail_mistakes": "<div class=\"pose-grading-link\"><a href=\"/it4788/static/grading-details/student-post-id.html\" target=\"_blank\" rel=\"noopener noreferrer\">Xem chi tiết lỗi sai DTW</a><span> - Điểm trung bình: 85</span></div>",
                 "created": "2026-06-09T15:14:33.063683Z",
                 "poster": {
                     "id": "00000000-0000-0000-0000-000000000001",
@@ -76,6 +76,14 @@ Lấy danh sách comment của bài viết. Dùng để **kiểm tra kết quả
     }
 }
 ```
+
+File HTML tĩnh được sinh tại `public/grading-details/<student-post-id>.html` và được serve qua URL:
+
+```text
+/it4788/static/grading-details/<student-post-id>.html
+```
+
+Nội dung file HTML có bảng chi tiết gồm: điểm video trái/phải, khoảng cách DTW trái/phải, danh sách lỗi sai/nhận xét từng bên và tổng kết.
 
 #### Ví dụ 2: Chấm điểm thất bại (Trả về thông báo lỗi chi tiết từ server chấm điểm)
 ```json
@@ -111,6 +119,12 @@ Comment do hệ thống tạo có `poster.id = "00000000-0000-0000-0000-00000000
 | ✅ Chấm thành công | `score` có giá trị điểm (VD: `"85"`), `comment` thường là `null` | Hiển thị điểm |
 | ❌ Chấm thất bại | `score` = `null`, `comment` chứa nội dung thông báo lỗi cố định | Hiển thị lỗi từ trường `comment` + nút **"Chấm lại"** (chỉ GV) |
 | ⏳ Đang xử lý | Chưa có comment của SystemBot | Đợi thêm khoảng 10-15s, thử lại sau |
+
+> [!NOTE]
+> Trường `detail_mistakes` hiện trả về **một link HTML tĩnh**. Link này trỏ tới file `.html` được sinh tự động trong `public/grading-details`.
+> File HTML tĩnh có bảng/lists lỗi sai để người học biết sai ở video trái/phải, điểm từng bên và khoảng cách DTW.
+> Nếu GradingServer trả thêm dữ liệu chi tiết như `mistakes`, `feedback`, `analysis`, `body_part_errors`, `joint_errors`, `angle_errors` hoặc `detail_mistakes` trong `job_output`, Mercari-server sẽ ưu tiên đưa dữ liệu đó vào file HTML.
+> Nếu GradingServer chỉ trả `score` và `raw_distance`, Mercari-server vẫn tự sinh nhận xét dựa trên điểm từng bên và khoảng cách DTW để người học không chỉ nhìn thấy mỗi điểm.
 
 > [!NOTE]
 > **Cơ chế trả lỗi khi chấm thất bại:**
